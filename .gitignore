@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Open-Meteo requests_cache DB
+.cache.sqlite
+
+# 개인용 로컬 Claude 설정 (팀 공유 대상 아님)
+.claude/settings.local.json
+
+# 스크래치 (Crossref API 응답 등 임시 조회 결과)
+cr.json

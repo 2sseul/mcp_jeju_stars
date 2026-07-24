@@ -28,17 +28,18 @@ import astro  # noqa: E402
 import judge as _judge  # noqa: E402
 import open_meteo  # noqa: E402
 
-_STATE_NAMES = {0: "완전한 밤", 1: "천문박명", 2: "항해박명", 3: "시민박명", 4: "낮"}
-
 
 # --- 노드 --------------------------------------------------------------------
 
 def astro_node(state: EngineState) -> dict:
-    """태양 고도 → 박명 구간·완전한 밤 구간(천문학적 사실)."""
+    """태양 고도 → 박명 구간·완전한 밤 구간(천문학적 사실). 판정은 judge 소관.
+
+    사람이 읽는 문장은 만들지 않는다 — 숫자만 numbers 에 담고, 등급·설명은
+    judge 가 정한다(관심사 분리).
+    """
     lat, lon, when = state["lat"], state["lon"], state["when"]
     code = astro.twilight_state(lat, lon, when)
     numbers: dict = {"twilight_state": code}
-    reasons = [f"태양 고도 상태 {code}({_STATE_NAMES.get(code, code)})"]
 
     window = astro.dark_window(lat, lon, when)
     if window is not None:
@@ -47,12 +48,10 @@ def astro_node(state: EngineState) -> dict:
             "start": start.isoformat(timespec="minutes"),
             "end": end.isoformat(timespec="minutes"),
         }
-        reasons.append(f"완전한 밤 {start:%H:%M}~{end:%H:%M}")
 
     return {
         "state_code": code,
         "numbers": numbers,
-        "reasons": reasons,
         "attribution": ["천체력: JPL DE421 via Skyfield"],
     }
 
@@ -67,12 +66,12 @@ def weather_node(state: EngineState) -> dict:
     """
     try:
         data = open_meteo.fetch(state["lat"], state["lon"], state["when"])
-    except Exception as exc:  # noqa: BLE001 — 외부 I/O 경계, 스키마 보장이 우선
+    except Exception:  # noqa: BLE001 — 외부 I/O 경계, 스키마 보장이 우선
+        # 값을 None 으로 흘리면 judge 가 "정보를 가져오지 못했어요"로 환원한다.
         return {
             "cloud_low": None,
             "visibility": None,
             "numbers": {"cloud_cover_low": None, "visibility_m": None},
-            "reasons": [f"기상 데이터 조회 실패({type(exc).__name__})"],
             "attribution": ["기상: Open-Meteo (조회 실패)"],
         }
 
@@ -86,11 +85,15 @@ def weather_node(state: EngineState) -> dict:
 
 
 def judge_node(state: EngineState) -> dict:
-    """상태·저층운·시정 → 관측 가능 여부(운영 정책)."""
+    """상태·저층운·시정 → 관측 등급(운영 정책)."""
     result = _judge.judge(
         state.get("state_code"), state.get("cloud_low"), state.get("visibility")
     )
-    return {"possible": result.possible, "reasons": list(result.reasons)}
+    return {
+        "verdict": result.verdict,
+        "possible": result.possible,
+        "reasons": list(result.reasons),
+    }
 
 
 # --- 그래프 조립 --------------------------------------------------------------

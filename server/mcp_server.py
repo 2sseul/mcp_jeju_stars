@@ -30,12 +30,37 @@ _LON_MIN, _LON_MAX = 126.1452, 126.9723
 mcp = FastMCP("jeju-star", stateless_http=True)
 
 
-def _resolve_when(date: str | None) -> datetime:
-    """date(YYYY-MM-DD) 있으면 그날 밤 22:00(KST), 없으면 현재 시각."""
-    if date is None:
-        return datetime.now(KST)
-    y, m, d = (int(x) for x in date.split("-"))
-    return datetime(y, m, d, 22, 0, tzinfo=KST)
+def _resolve_when(date: str | None, time: str | None) -> datetime:
+    """평가 시각을 KST datetime 으로 만든다.
+
+    - date(YYYY-MM-DD) 생략 → 오늘
+    - time(HH:MM, 24시간) 생략 → 22:00
+    - date·time 모두 생략 → 현재 시각 그대로
+    파싱 실패 시 ValueError.
+    """
+    now = datetime.now(KST)
+    if date is None and time is None:
+        return now
+    y, m, d = (now.year, now.month, now.day) if date is None else (
+        int(x) for x in date.split("-")
+    )
+    hh, mm = (22, 0) if time is None else (int(x) for x in time.split(":"))
+    return datetime(y, m, d, hh, mm, tzinfo=KST)
+
+
+def _invalid_when(date: str | None, time: str | None) -> dict:
+    """date/time 형식 오류에 대한 프롬프트형 응답."""
+    return Response(
+        verdict="입력 오류",
+        reasons=[
+            f"날짜/시각 형식을 이해하지 못했습니다 (date={date!r}, time={time!r}). "
+            "date 는 YYYY-MM-DD, time 은 24시간제 HH:MM 형식으로 주세요 "
+            "(예: date='2026-07-24', time='21:00')."
+        ],
+        numbers={},
+        attribution=[],
+        as_of=datetime.now(KST).isoformat(timespec="minutes"),
+    ).to_dict()
 
 
 def _out_of_range(lat: float, lon: float) -> dict:
@@ -55,13 +80,17 @@ def _out_of_range(lat: float, lon: float) -> dict:
 
 
 @mcp.tool()
-def evaluate_spot(lat: float, lon: float, date: str | None = None) -> dict:
+def evaluate_spot(
+    lat: float, lon: float, date: str | None = None, time: str | None = None
+) -> dict:
     """제주 특정 좌표의 별 관측 가능 여부를 평가한다.
 
     Args:
-        lat: 위도 (제주 범위 33.1~33.6).
-        lon: 경도 (제주 범위 126.1~127.0).
-        date: 평가할 날짜 YYYY-MM-DD. 생략하면 현재. 지정하면 그날 밤 22:00(KST) 기준.
+        lat: 위도 (제주 범위 내).
+        lon: 경도 (제주 범위 내).
+        date: 평가할 날짜 YYYY-MM-DD. 생략하면 오늘.
+        time: 평가할 시각 24시간제 HH:MM(KST). 생략하면 22:00.
+            date·time 모두 생략하면 현재 시각으로 평가한다.
 
     Returns:
         verdict/reasons/numbers/attribution/as_of 스키마(dict).
@@ -69,13 +98,24 @@ def evaluate_spot(lat: float, lon: float, date: str | None = None) -> dict:
     if not (_LAT_MIN <= lat <= _LAT_MAX and _LON_MIN <= lon <= _LON_MAX):
         return _out_of_range(lat, lon)
 
-    when = _resolve_when(date)
+    try:
+        when = _resolve_when(date, time)
+    except (ValueError, AttributeError):
+        return _invalid_when(date, time)
     final = graph.run(lat, lon, when)
 
-    verdict = "관측 양호" if final.get("possible") else "관측 불가"
+    reasons = list(final.get("reasons", []))
+    # 관측 가능하면 오늘 완전히 어두운 시간대를 덤으로 알려준다.
+    window = final.get("numbers", {}).get("dark_window")
+    if final.get("possible") and window:
+        reasons.append(
+            f"참고로 오늘 완전히 어두운 시간대는 "
+            f"{window['start'][11:16]}~{window['end'][11:16]}예요"
+        )
+
     return Response(
-        verdict=verdict,
-        reasons=final.get("reasons", []),
+        verdict=final.get("verdict") or "불가",
+        reasons=reasons,
         numbers=final.get("numbers", {}),
         attribution=final.get("attribution", []),
         as_of=when.isoformat(timespec="minutes"),

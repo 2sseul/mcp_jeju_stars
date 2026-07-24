@@ -58,8 +58,24 @@ def astro_node(state: EngineState) -> dict:
 
 
 def weather_node(state: EngineState) -> dict:
-    """Open-Meteo → 해당 정시의 저층운·시정."""
-    data = open_meteo.fetch(state["lat"], state["lon"], state["when"])
+    """Open-Meteo → 해당 정시의 저층운·시정.
+
+    외부 조회는 실패 가능한 경로다(타임아웃·429·예보 범위 밖 날짜 등). 예외가
+    나도 P0 의 '항상 고정 스키마 반환' 약속을 깨지 않도록 여기서 잡아 값을 None
+    으로 흘려보낸다 — judge 가 None 을 '데이터 없음'으로 처리해 관측 불가 사유로
+    환원한다. 즉 이 노드는 절대 예외를 밖으로 내보내지 않는다.
+    """
+    try:
+        data = open_meteo.fetch(state["lat"], state["lon"], state["when"])
+    except Exception as exc:  # noqa: BLE001 — 외부 I/O 경계, 스키마 보장이 우선
+        return {
+            "cloud_low": None,
+            "visibility": None,
+            "numbers": {"cloud_cover_low": None, "visibility_m": None},
+            "reasons": [f"기상 데이터 조회 실패({type(exc).__name__})"],
+            "attribution": ["기상: Open-Meteo (조회 실패)"],
+        }
+
     cl, vis = data["cloud_cover_low"], data["visibility"]
     return {
         "cloud_low": cl,

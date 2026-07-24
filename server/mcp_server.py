@@ -21,9 +21,11 @@ from server.schema import Response
 
 KST = ZoneInfo("Asia/Seoul")
 
-# 제주 범위(계획서 P0). 밖이면 평가하지 않는다.
-_LAT_MIN, _LAT_MAX = 33.1, 33.6
-_LON_MIN, _LON_MAX = 126.1, 127.0
+# 제주도 공식 행정구역 범위. 밖이면 평가하지 않는다.
+# 위도 33°11′27″~33°33′50″N, 경도 126°08′43″~126°58′20″E 를 십진 변환하고,
+# 경계점이 포함되도록 최소는 내림·최대는 올림했다.
+_LAT_MIN, _LAT_MAX = 33.1908, 33.5639
+_LON_MIN, _LON_MAX = 126.1452, 126.9723
 
 mcp = FastMCP("jeju-star", stateless_http=True)
 

@@ -1,0 +1,33 @@
+{
+  "meta": {
+    "title": "제주 다크스카이 관측지 큐레이션 목록",
+    "generated": "2026-07-24",
+    "source": "general-purpose 리서치 — 한국관광공사(대한민국 구석구석)·비짓제주·위키백과(KO/EN)·디지털문화대전 교차확인",
+    "coordinate_note": "위도(lat)·경도(lon)는 각각 별도 필드. 좌표는 위키/문화대전/관광포털 교차확인했으나 다수 오름·시설은 공표 십진좌표가 없어 주소 기반 추정. coord_confidence(high/medium/low)로 표기. 특히 용눈이오름·다랑쉬오름은 위키백과 좌표 중복 오류로 low/medium — 정밀 판정 전 지도 재검증 필요.",
+    "darkness_note": "제주 개별 지점 SQM/Bortle 실측 공표값은 거의 없어 notes 는 정성적 광공해 정보. 어둡기 실검증(광공해 래스터)은 후속 확장 대상.",
+    "jeju_bounds": {"lat_min": 33.1908, "lat_max": 33.5639, "lon_min": 126.1452, "lon_max": 126.9723},
+    "count": 20
+  },
+  "spots": [
+    {"name_ko": "용눈이오름", "name_en": "Yongnuni Oreum", "lat": 33.4762, "lon": 126.8229, "coord_confidence": "medium", "region": "동", "type": "오름", "why": "동부 중산간의 대표 별 명소. 부드러운 능선과 사방 개활, 주변 밝은 빛 적고 공기 맑아 은하수 관측지로 꼽힘", "notes": "위키백과(KO/EN)가 다랑쉬오름과 동일 좌표를 표기해 좌표 신뢰도 하향. 동부 중산간 Bortle 3~4급 추정, 측정 SQM 공표값 없음"},
+    {"name_ko": "다랑쉬오름", "name_en": "Darangshi Oreum", "lat": 33.4630, "lon": 126.8510, "coord_confidence": "low", "region": "동", "type": "오름", "why": "'오름의 여왕'. 표고 382m 정상 360도 파노라마, 주변 광원 적어 동부 다크스카이 촬영지로 인기", "notes": "위키 좌표가 용눈이오름과 중복(오류 추정)이라 세화리 산6 주소 기반 추정치. 야간 산행은 급경사 주의"},
+    {"name_ko": "아부오름", "name_en": "Abu Oreum", "lat": 33.4356, "lon": 126.7291, "coord_confidence": "medium", "region": "동", "type": "오름", "why": "완만해 정상까지 10분, 넓은 원형 분화구와 트인 시야. 송당 일대 어두운 하늘로 접근성 좋은 관측지", "notes": ""},
+    {"name_ko": "백약이오름", "name_en": "Baegyagi Oreum", "lat": 33.3897, "lon": 126.8070, "coord_confidence": "medium", "region": "동", "type": "오름", "why": "성읍·가시리 동부 중산간의 어두운 초지대에 위치, 넓은 개활지와 낮은 광공해로 별·은하수 관측 양호", "notes": "주소 성읍리 산1 기반 추정 좌표"},
+    {"name_ko": "우도(우도봉 일대)", "name_en": "Udo (Udobong area)", "lat": 33.5033, "lon": 126.9536, "coord_confidence": "medium", "region": "동", "type": "해안/섬", "why": "본섬과 분리된 섬이라 육지 광공해 영향 적고 해안 수평선까지 트임. 저녁 배편 이후 조용한 관측 가능", "notes": "우도 취락지 가로등 인접 시 국지적 광공해. 좌표는 우도봉 부근"},
+    {"name_ko": "산굼부리", "name_en": "Sangumburi Crater", "lat": 33.4340, "lon": 126.6870, "coord_confidence": "medium", "region": "중산간", "type": "오름/분화구", "why": "교래리 중산간 개활 초지, 사방이 트여 계절 별자리 조망 용이. 접근 도로 양호", "notes": "유료 관람지로 야간 개방은 시기·행사에 따라 제한될 수 있음"},
+    {"name_ko": "절물자연휴양림", "name_en": "Jeolmul Natural Recreation Forest", "lat": 33.4497, "lon": 126.6320, "coord_confidence": "medium", "region": "중산간", "type": "숲", "why": "봉개 중산간 삼나무 숲, 야간 숙박객 대상 별 관측 프로그램 운영 사례. 도심에서 벗어난 어두운 환경", "notes": "제주시 도심에서 남쪽 8~10km, 시가지 방향 저고도에 광공해 잔존"},
+    {"name_ko": "사려니숲길(비자림로 입구)", "name_en": "Saryeoni Forest Trail", "lat": 33.4180, "lon": 126.6597, "coord_confidence": "medium", "region": "중산간", "type": "숲", "why": "해발 500~600m 중산간 숲길, 주변 인공광 거의 없어 매우 어두움. 개활지는 적으나 다크스카이 환경 우수", "notes": "숲 캐노피로 시야 제한, 개방 구간·시간 확인 필요. 좌표는 비자림로측 입구"},
+    {"name_ko": "제주마방목지", "name_en": "Jeju Mabang Pasture", "lat": 33.4353, "lon": 126.5658, "coord_confidence": "medium", "region": "중산간", "type": "목장/초지", "why": "5·16도로변 드넓은 초원, 동서남북 사방 개활로 사계절 별자리와 5~8월 은하수 육안 관측 가능", "notes": "도로변 차량 헤드라이트 유의. 관광공사 소개 은하수 스팟"},
+    {"name_ko": "1100고지 휴게소", "name_en": "1100 Highland Rest Area", "lat": 33.3583, "lon": 126.4658, "coord_confidence": "medium", "region": "중산간", "type": "고지/전망", "why": "해발 1100m 한라산 중턱, 도심 광공해 위로 올라가 은하수 중심부까지 선명. 제주 대표 별 성지", "notes": "가로등 없는 산길 야간 운전 주의, 겨울 결빙. 습도 낮은 겨울 투명도 우수"},
+    {"name_ko": "제주별빛누리공원", "name_en": "Jeju Starlight World Park", "lat": 33.4636, "lon": 126.5386, "coord_confidence": "medium", "region": "북", "type": "관측소/천문공원", "why": "천체망원경 관측실·플라네타리움 갖춘 공식 천문시설, 초보자 관측 교육에 적합", "notes": "제주시 오등동 도심 인접 언덕이라 광공해 큼 — 심층 관측보다 교육·입문용. 주소 선돌목동길 60"},
+    {"name_ko": "새별오름", "name_en": "Saebyeol Oreum", "lat": 33.3664, "lon": 126.3568, "coord_confidence": "medium", "region": "서", "type": "오름", "why": "서부 중산간 초원 위 대표 은하수 명소. '나홀로 나무' 실루엣과 별 조합, 주변 불빛 거의 없음", "notes": "평화로 인접이나 오름 뒤편 초지는 어두움. 관광공사·여행기 다수 추천"},
+    {"name_ko": "금오름", "name_en": "Geum Oreum", "lat": 33.3559, "lon": 126.3056, "coord_confidence": "high", "region": "서", "type": "오름", "why": "한림 금악리 정상 굼부리(호수)와 트인 지평선, 서부 중산간의 어두운 하늘로 일몰·별 관측 인기", "notes": "좌표 위키백과 교차확인(33.3559, 126.3056)"},
+    {"name_ko": "저지오름", "name_en": "Jeoji Oreum", "lat": 33.3312, "lon": 126.2541, "coord_confidence": "high", "region": "서", "type": "오름", "why": "한경면 서부 내륙, 아름다운 숲 오름상 수상지. 인근 마을 광원 적어 서부 관측 후보지", "notes": "좌표 위키백과 교차확인(33.3312, 126.2541). 분화구는 숲으로 시야 제한, 둘레길에서 관측"},
+    {"name_ko": "성이시돌목장(테쉬폰)", "name_en": "St. Isidore Ranch (Teshpon)", "lat": 33.3531, "lon": 126.3260, "coord_confidence": "medium", "region": "서", "type": "목장", "why": "한림 금악리 넓은 목초지와 이국적 테쉬폰 건물, 광공해 적어 은하수 촬영 배경지로 유명", "notes": "야간 사유지 출입·주차 매너 필요"},
+    {"name_ko": "따라비오름", "name_en": "Ttarabi Oreum", "lat": 33.3608, "lon": 126.7808, "coord_confidence": "high", "region": "남", "type": "오름", "why": "가시리 중산간 '오름의 여왕', 세 개 굼부리와 억새·개활. 동남부 어두운 하늘로 관측·촬영 인기", "notes": "좌표 위키백과 교차확인(33.3608, 126.7808)"},
+    {"name_ko": "유채꽃프라자·녹산로", "name_en": "Yuchaekkot Plaza & Noksan-ro", "lat": 33.3846, "lon": 126.7433, "coord_confidence": "medium", "region": "남", "type": "공원/도로", "why": "가시리 광활한 중산간 평원·전망대, 사방 트이고 광원 적어 은하수 파노라마 관측지", "notes": "녹산로 일대 가로등 적음. 전망대 주차장 기준 좌표"},
+    {"name_ko": "물영아리오름", "name_en": "Mulyeongari Oreum", "lat": 33.3302, "lon": 126.7010, "coord_confidence": "medium", "region": "남", "type": "오름/습지", "why": "남원 수망리 람사르 습지 오름, 주변 목장·중산간으로 어둡고 조용. 능선 개활지에서 관측", "notes": "정상 습지·숲 구간 시야 제한, 야간 산행 안전 주의"},
+    {"name_ko": "서귀포천문과학문화관", "name_en": "Seogwipo Astronomical Science & Culture Center", "lat": 33.2820, "lon": 126.4665, "coord_confidence": "medium", "region": "남", "type": "관측소", "why": "하원동 1100로변 공식 천문대, 주망원경 상시 관측·카노푸스(노인성) 관측 이벤트 등 대중 관측 프로그램", "notes": "서귀포 도심 북측 중산간, 도심 방향 저고도 광공해. 주소 1100로 506-1"},
+    {"name_ko": "알뜨르비행장", "name_en": "Alddreu Airfield", "lat": 33.1985, "lon": 126.2735, "coord_confidence": "medium", "region": "남", "type": "평야/역사터", "why": "대정 상모리 탁 트인 벌판, 제주 현지인이 꼽는 은하수 스팟. 남쪽 하늘 저고도까지 개활", "notes": "위도 33.199로 공식 하한(33.19)에 근접. 인근 마을·모슬포 방향 광공해 일부"}
+  ]
+}

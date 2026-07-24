@@ -1,10 +1,10 @@
 """제주 밤하늘 관측 MCP 서버 (P0 — 걷는 뼈대).
 
-FastMCP · stateless · streamable HTTP `/mcp`. 도구는 evaluate_spot 하나.
-엔진(LangGraph)이 astro→weather→judge 를 돌려 최종형 스키마로 답한다.
+FastMCP · stateless · streamable HTTP `/mcp`. 도구: evaluate_spot(좌표),
+evaluate_place(주소·지명). 엔진(LangGraph)이 astro→weather→judge 를 돌려
+최종형 스키마로 답한다.
 
-P0 범위: 좌표 직접 입력만(지오코딩·지명 없음), 제주 범위 밖은 프롬프트형 에러.
-어둡기(SQM)·별 개수는 아직 numbers 에 없음 — P1/P3 에서 factor 로 추가한다.
+제주 범위 밖은 프롬프트형 에러. 어둡기(SQM)·별 개수는 아직 numbers 에 없다.
 
 실행:  uv run python -m server.mcp_server   → http://127.0.0.1:8000/mcp
 """
@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 from mcp.server.fastmcp import FastMCP
 
 from server.engine import graph
+from server.geocode import geocode
 from server.schema import Response
 
 KST = ZoneInfo("Asia/Seoul")
@@ -28,6 +29,10 @@ _LAT_MIN, _LAT_MAX = 33.1908, 33.5639
 _LON_MIN, _LON_MAX = 126.1452, 126.9723
 
 mcp = FastMCP("jeju-star", stateless_http=True)
+
+
+def _in_jeju(lat: float, lon: float) -> bool:
+    return _LAT_MIN <= lat <= _LAT_MAX and _LON_MIN <= lon <= _LON_MAX
 
 
 def _resolve_when(date: str | None, time: str | None) -> datetime:
@@ -79,31 +84,19 @@ def _out_of_range(lat: float, lon: float) -> dict:
     ).to_dict()
 
 
-@mcp.tool()
-def evaluate_spot(
-    lat: float, lon: float, date: str | None = None, time: str | None = None
+def _evaluate_coords(
+    lat: float, lon: float, date: str | None, time: str | None
 ) -> dict:
-    """제주 특정 좌표의 별 관측 가능 여부를 평가한다.
-
-    Args:
-        lat: 위도 (제주 범위 내).
-        lon: 경도 (제주 범위 내).
-        date: 평가할 날짜 YYYY-MM-DD. 생략하면 오늘.
-        time: 평가할 시각 24시간제 HH:MM(KST). 생략하면 22:00.
-            date·time 모두 생략하면 현재 시각으로 평가한다.
-
-    Returns:
-        verdict/reasons/numbers/attribution/as_of 스키마(dict).
-    """
-    if not (_LAT_MIN <= lat <= _LAT_MAX and _LON_MIN <= lon <= _LON_MAX):
+    """좌표 평가 코어 — evaluate_spot·evaluate_place 가 공유한다."""
+    if not _in_jeju(lat, lon):
         return _out_of_range(lat, lon)
 
     try:
         when = _resolve_when(date, time)
     except (ValueError, AttributeError):
         return _invalid_when(date, time)
-    final = graph.run(lat, lon, when)
 
+    final = graph.run(lat, lon, when)
     reasons = list(final.get("reasons", []))
     # 관측 가능하면 오늘 완전히 어두운 시간대를 덤으로 알려준다.
     window = final.get("numbers", {}).get("dark_window")
@@ -120,6 +113,75 @@ def evaluate_spot(
         attribution=final.get("attribution", []),
         as_of=when.isoformat(timespec="minutes"),
     ).to_dict()
+
+
+@mcp.tool()
+def evaluate_spot(
+    lat: float, lon: float, date: str | None = None, time: str | None = None
+) -> dict:
+    """제주 특정 좌표의 별 관측 가능 여부를 평가한다.
+
+    Args:
+        lat: 위도 (제주 범위 내).
+        lon: 경도 (제주 범위 내).
+        date: 평가할 날짜 YYYY-MM-DD. 생략하면 오늘.
+        time: 평가할 시각 24시간제 HH:MM(KST). 생략하면 22:00.
+            date·time 모두 생략하면 현재 시각으로 평가한다.
+    """
+    return _evaluate_coords(lat, lon, date, time)
+
+
+@mcp.tool()
+def evaluate_place(
+    query: str, date: str | None = None, time: str | None = None
+) -> dict:
+    """주소·지명으로 별 관측 가능 여부를 평가한다(제주).
+
+    query 를 좌표로 변환(지오코딩)한 뒤 evaluate_spot 과 동일하게 평가한다.
+    예: '제주시 애월읍', '성산일출봉', '한라산 1100고지'.
+
+    Args:
+        query: 제주 안의 주소 또는 지명.
+        date: YYYY-MM-DD (생략 시 오늘).
+        time: HH:MM 24시간 KST (생략 시 22:00; date·time 모두 생략 시 현재).
+    """
+    try:
+        hit = geocode(query)
+    except Exception:  # noqa: BLE001 — 외부 지오코딩 실패도 스키마로 환원
+        hit = None
+    if hit is None:
+        # 좌표를 못 찾으면 이 서버는 여기까지. 좌표를 알아내는 건 Host 몫이다
+        # (웹검색 등으로 좌표를 구해 evaluate_spot(lat, lon) 을 호출).
+        return Response(
+            verdict="주소 확인 실패",
+            reasons=[
+                f"'{query}'의 위치를 제주에서 찾지 못했습니다. "
+                "좌표(위도·경도)를 알면 evaluate_spot 으로 바로 평가할 수 있어요. "
+                "아니면 더 구체적인 주소·지명으로 다시 시도해 주세요."
+            ],
+            numbers={},
+            attribution=["지오코딩: Photon (OpenStreetMap)"],
+            as_of=datetime.now(KST).isoformat(timespec="minutes"),
+        ).to_dict()
+
+    result = _evaluate_coords(hit.lat, hit.lon, date, time)
+    result["resolved"] = {
+        "query": query,
+        "matched_query": hit.matched_query,
+        "display_name": hit.display_name,
+        "lat": hit.lat,
+        "lon": hit.lon,
+    }
+    if hit.matched_query and hit.matched_query != query:
+        note = (
+            f"'{query}'를 정확히 못 찾아 '{hit.matched_query}'로 검색했어요 → "
+            f"{hit.display_name} ({hit.lat:.4f}, {hit.lon:.4f})"
+        )
+    else:
+        note = f"'{query}' → {hit.display_name} ({hit.lat:.4f}, {hit.lon:.4f})로 해석했어요"
+    result.setdefault("reasons", []).insert(0, note)
+    result.setdefault("attribution", []).append("지오코딩: Photon (OpenStreetMap)")
+    return result
 
 
 if __name__ == "__main__":

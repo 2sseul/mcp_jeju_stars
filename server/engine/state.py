@@ -30,7 +30,8 @@ class EngineState(TypedDict, total=False):
     state_code: int | None  # 박명 구간 값(0=완전한 밤)
     cloud_low: float | None  # 저층운 %
     visibility: float | None  # 시정 m
-    possible: bool | None  # 최종 판정
+    verdict: str | None  # 판정 등급(최적/양호/밝은 별 한정/불가)
+    possible: bool | None  # 밝은 별이라도 볼 수 있는가
 
     # 누적(리듀서)
     numbers: Annotated[dict, _merge]

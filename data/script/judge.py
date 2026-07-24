@@ -1,16 +1,23 @@
-"""별 관측 가능/불가 판정 (순수 함수).
+"""별 관측 판정 (순수 함수, 정책).
 
-태양 고도 상태(astro.twilight_state)와 기상값(저층운·시정)만으로
-"지금 별을 볼 수 있는가"를 판정한다. API 호출 없이 값만 받아 값만 반환하므로
-단독 테스트가 가능하다.
+태양 고도 상태와 기상값(저층운·시정)만으로 "지금 별이 얼마나 보이나"를 등급으로
+판정한다. API 호출 없이 값만 받아 값만 반환하므로 단독 테스트가 가능하다.
 
-판정 우선순위(리서치 star_observation_conditions.md):
-    1. 완전한 밤인가 (태양 고도 −18° 이하, state==0)
-    2. 저층운이 하늘을 덮지 않는가 — 저층운은 다른 모든 조건을 무의미하게 만든다
-    3. 시정이 확보되는가 (안개·연무 배제)
+하늘 준비도는 단계적이다 — 완전한 밤(−18°)이어야만 별이 보이는 게 아니라, 해가
+지고 어두워지면서 밝은 별부터 단계적으로 보이기 시작한다. (근거: Patat 2006
+A&A 455, 385 / NOAA·USNO 박명 정의 / Crumey 2014 MNRAS 442, 2600 —
+common/star_observation_conditions.md [T-1]~[T-5])
 
-구름·시정 임계값은 **문헌 상수가 아니라 운영 기준**이다(리서치 확정).
-현장 피드백에 따라 조정할 수 있도록 모듈 상수로 노출한다.
+    태양 고도 상태(astro.twilight_state)      판정
+    0 완전한 밤 (< −18°)        최적          은하수·성운까지
+    1 천문박명 (−18~−12°)       양호          대부분의 맨눈 별
+    2 항해박명 (−12~−6°)        밝은 별 한정   밝은 별·별자리 보이기 시작
+    3 시민박명 (−6~0°)          불가          아직 하늘이 밝음
+    4 낮                        불가          해가 떠 있음
+
+단, 구름·안개는 하늘이 아무리 어두워도 별을 물리적으로 가린다 → 날씨가 나쁘면
+어둡기 등급과 무관하게 불가로 끌어내린다. 구름·시정 임계값은 문헌 상수가 아니라
+운영 기준이다(현장 피드백으로 조정 가능).
 """
 
 from __future__ import annotations
@@ -19,23 +26,31 @@ from dataclasses import dataclass, field
 
 # --- 운영 임계값(튜닝 가능) ---------------------------------------------------
 
-#: 저층운(Open-Meteo cloud_cover_low, %)이 이 값을 초과하면 불가.
-#: 저층운은 별빛을 직접 차단하므로 가장 엄격하게 본다.
+#: 저층운(Open-Meteo cloud_cover_low, %)이 이 값을 초과하면 하늘을 덮은 것으로 본다.
 CLOUD_LOW_MAX_PCT: float = 30.0
 
-#: 시정(Open-Meteo visibility, m)이 이 값 미만이면 불가(안개·연무).
+#: 시정(Open-Meteo visibility, m)이 이 값 미만이면 안개·연무로 본다.
 VISIBILITY_MIN_M: float = 10_000.0
 
-#: 완전한 밤을 의미하는 twilight_state 값(astro.py와 동일 정의).
-_NIGHT_STATE: int = 0
+# --- 판정 등급 ----------------------------------------------------------------
 
-_STATE_LABELS = {
-    0: "완전한 밤",
-    1: "천문박명",
-    2: "항해박명",
-    3: "시민박명",
-    4: "낮",
+OPTIMAL = "최적"
+GOOD = "양호"
+LIMITED = "밝은 별 한정"
+IMPOSSIBLE = "불가"
+
+#: 태양 고도 상태 → (등급, 사람이 읽는 하늘 설명). 근거: 위 docstring 참조.
+_SKY = {
+    0: (OPTIMAL, "완전한 밤이라 은하수·성운까지 볼 수 있어요"),
+    1: (GOOD, "하늘이 충분히 어두워 대부분의 별이 보여요"),
+    2: (LIMITED, "아직 완전히 어둡진 않지만 밝은 별과 별자리는 보이기 시작해요"),
+    3: (IMPOSSIBLE, "해가 진 지 얼마 안 돼 하늘이 밝아요 — 가장 밝은 별·행성만 겨우 보입니다"),
+    4: (IMPOSSIBLE, "아직 낮이에요 — 해가 떠 있습니다"),
 }
+
+
+def _km(m: float) -> str:
+    return f"{m / 1000:.1f}km"
 
 
 # --- 반환 타입 ----------------------------------------------------------------
@@ -44,10 +59,12 @@ _STATE_LABELS = {
 class Judgement:
     """판정 결과.
 
-    possible: 관측 가능 여부.
-    reasons:  판정 근거 문자열 목록. 불가면 막는 이유들, 가능이면 충족 근거들.
+    verdict:  등급(최적/양호/밝은 별 한정/불가).
+    possible: 밝은 별이라도 볼 수 있는가(최적·양호·밝은 별 한정이면 True).
+    reasons:  사람이 읽는 근거 문자열 목록.
     """
 
+    verdict: str
     possible: bool
     reasons: list[str] = field(default_factory=list)
 
@@ -59,7 +76,7 @@ def judge(
     cloud_low: float | None,
     visibility_m: float | None,
 ) -> Judgement:
-    """상태·저층운·시정으로 관측 가능 여부를 판정한다.
+    """태양 고도 상태·저층운·시정으로 관측 등급을 판정한다.
 
     Args:
         state: astro.twilight_state 값(0=완전한 밤 ~ 4=낮).
@@ -67,39 +84,37 @@ def judge(
         visibility_m: 시정(m). 없으면 None.
 
     Returns:
-        Judgement(possible, reasons). 불가 사유는 모두 모아 반환한다.
+        Judgement(verdict, possible, reasons).
     """
+    sky_verdict, sky_msg = _SKY.get(
+        state, (IMPOSSIBLE, f"하늘 상태를 알 수 없어요(상태 {state})")
+    )
+
+    # 애초에 별을 볼 시간대가 아니면(낮·시민박명) 날씨를 볼 것도 없다.
+    if sky_verdict == IMPOSSIBLE:
+        return Judgement(IMPOSSIBLE, False, [sky_msg])
+
+    # 구름·안개는 어둡기와 무관하게 별을 가린다 → 하나라도 걸리면 불가.
     blockers: list[str] = []
-
-    # 1) 밤이 아니면 즉시 불가(다른 조건은 볼 것도 없음).
-    if state != _NIGHT_STATE:
-        label = _STATE_LABELS.get(state, f"상태 {state}")
-        return Judgement(False, [f"아직 완전한 밤이 아님({label})"])
-
-    # 2) 저층운 — 다른 모든 조건을 무의미하게 만드는 결정적 요인.
     if cloud_low is None:
-        blockers.append("저층운 데이터 없음")
+        blockers.append("구름 정보를 가져오지 못했어요")
     elif cloud_low > CLOUD_LOW_MAX_PCT:
-        blockers.append(f"저층운 {cloud_low:.0f}% (> {CLOUD_LOW_MAX_PCT:.0f}%)")
-
-    # 3) 시정 — 안개·연무 배제.
+        blockers.append(f"낮은 구름이 하늘을 덮고 있어요 (저층운 {cloud_low:.0f}%)")
     if visibility_m is None:
-        blockers.append("시정 데이터 없음")
+        blockers.append("시야 정보를 가져오지 못했어요")
     elif visibility_m < VISIBILITY_MIN_M:
-        blockers.append(
-            f"시정 {visibility_m / 1000:.1f}km (< {VISIBILITY_MIN_M / 1000:.0f}km)"
-        )
+        blockers.append(f"안개·연무로 시야가 흐려요 (시정 {_km(visibility_m)})")
 
     if blockers:
-        return Judgement(False, blockers)
+        return Judgement(IMPOSSIBLE, False, blockers)
 
-    # 가능 — 충족 근거를 함께 반환한다.
+    # 관측 가능 — 하늘 등급 + 좋은 날씨 근거를 함께 반환한다.
     reasons = [
-        "완전한 밤",
-        f"저층운 {cloud_low:.0f}%",
-        f"시정 {visibility_m / 1000:.1f}km",
+        sky_msg,
+        f"구름 적음 (저층운 {cloud_low:.0f}%)",
+        f"공기 맑음 (시정 {_km(visibility_m)})",
     ]
-    return Judgement(True, reasons)
+    return Judgement(sky_verdict, True, reasons)
 
 
 # --- 검증 (API 불필요) --------------------------------------------------------
@@ -111,16 +126,18 @@ if __name__ == "__main__":
         sys.stdout.reconfigure(encoding="utf-8")
 
     cases = [
-        ("한밤+맑음+좋은시정", 0, 5.0, 20_000.0),
-        ("한밤+저층운많음", 0, 80.0, 20_000.0),
-        ("한밤+연무(시정낮음)", 0, 10.0, 4_000.0),
-        ("한밤+구름과연무동시", 0, 60.0, 3_000.0),
-        ("아직낮", 4, 0.0, 30_000.0),
-        ("천문박명(아직안됨)", 1, 0.0, 30_000.0),
-        ("데이터일부없음", 0, None, 20_000.0),
+        ("완전한밤+맑음", 0, 5.0, 20_000.0),
+        ("천문박명+맑음", 1, 5.0, 20_000.0),
+        ("항해박명+맑음", 2, 5.0, 20_000.0),
+        ("시민박명(너무밝음)", 3, 0.0, 30_000.0),
+        ("낮", 4, 0.0, 30_000.0),
+        ("완전한밤+저층운많음", 0, 80.0, 20_000.0),
+        ("완전한밤+안개", 0, 10.0, 400.0),
+        ("천문박명+안개", 1, 10.0, 400.0),
+        ("완전한밤+데이터없음", 0, None, 20_000.0),
     ]
 
     for name, st, cl, vis in cases:
         r = judge(st, cl, vis)
-        mark = "가능 ✅" if r.possible else "불가 ❌"
-        print(f"[{name}] -> {mark} : {', '.join(r.reasons)}")
+        mark = "가능" if r.possible else "불가"
+        print(f"[{name}] -> {r.verdict}({mark}) : {', '.join(r.reasons)}")

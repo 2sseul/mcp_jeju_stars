@@ -57,10 +57,10 @@ def astro_node(state: EngineState) -> dict:
 
 
 def weather_node(state: EngineState) -> dict:
-    """Open-Meteo → 해당 정시의 저층운·시정.
+    """Open-Meteo → 해당 정시의 총운량·시정.
 
     외부 조회는 실패 가능한 경로다(타임아웃·429·예보 범위 밖 날짜 등). 예외가
-    나도 P0 의 '항상 고정 스키마 반환' 약속을 깨지 않도록 여기서 잡아 값을 None
+    나도 '항상 고정 스키마 반환' 약속을 깨지 않도록 여기서 잡아 값을 None
     으로 흘려보낸다 — judge 가 None 을 '데이터 없음'으로 처리해 관측 불가 사유로
     환원한다. 즉 이 노드는 절대 예외를 밖으로 내보내지 않는다.
     """
@@ -69,42 +69,23 @@ def weather_node(state: EngineState) -> dict:
     except Exception:  # noqa: BLE001 — 외부 I/O 경계, 스키마 보장이 우선
         # 값을 None 으로 흘리면 judge 가 "정보를 가져오지 못했어요"로 환원한다.
         return {
-            "cloud_low": None,
-            "cloud_mid": None,
-            "cloud_high": None,
+            "cloud": None,
             "visibility": None,
             "numbers": {
-                "cloud_cover_low": None,
-                "cloud_cover_mid": None,
-                "cloud_cover_high": None,
+                "cloud_cover": None,
                 "visibility_m": None,
             },
             "attribution": ["기상: Open-Meteo (조회 실패)"],
         }
 
-    cl, cm, ch = (
-        data["cloud_cover_low"],
-        data["cloud_cover_mid"],
-        data["cloud_cover_high"],
-    )
+    cloud = data["cloud_cover"]
     vis = data["visibility"]
     numbers: dict = {
-        "cloud_cover_low": cl,
-        "cloud_cover_mid": cm,
-        "cloud_cover_high": ch,
+        "cloud_cover": cloud,
         "visibility_m": vis,
-        "elevation_m": data.get("elevation"),
-        # 저/중/고 운량을 어떻게 얻었는지: 집계 변수(aggregated) 또는
-        # 관측자 표고 위 기압면 재구성(above_observer, 운해 보정).
-        "cloud_method": data.get("cloud_method"),
-        # 보정 전 지상 저층운(발밑 운해 포함). above_observer 일 때 corrected 와
-        # 비교해 운해를 걷어냈는지 안내하는 데 쓴다.
-        "cloud_cover_low_surface": data.get("cloud_cover_low_surface"),
     }
     return {
-        "cloud_low": cl,
-        "cloud_mid": cm,
-        "cloud_high": ch,
+        "cloud": cloud,
         "visibility": vis,
         "numbers": numbers,
         "attribution": ["기상: Open-Meteo (open-meteo.com)"],
@@ -112,12 +93,10 @@ def weather_node(state: EngineState) -> dict:
 
 
 def judge_node(state: EngineState) -> dict:
-    """상태·저층운·시정 → 관측 등급(운영 정책)."""
+    """상태·총운량·시정 → 관측 등급(운영 정책)."""
     result = _judge.judge(
         state.get("state_code"),
-        state.get("cloud_low"),
-        state.get("cloud_mid"),
-        state.get("cloud_high"),
+        state.get("cloud"),
         state.get("visibility"),
     )
     return {

@@ -1,20 +1,17 @@
 """별 관측 판정 (순수 함수, 정책).
 
-태양 고도 상태와 기상값(층별 운량·시정)만으로 "지금 별이 얼마나 보이나"를 등급으로
+태양 고도 상태와 기상값(총운량·시정)만으로 "지금 별이 얼마나 보이나"를 등급으로
 판정한다. API 호출 없이 값만 받아 값만 반환하므로 단독 테스트가 가능하다.
 
-판정은 두 축을 각각 평가한 뒤 가장 나쁜 축을 따른다. 고층운은 판정에 넣지 않고
-정보성 문구로만 표시한다.
+판정은 두 축을 각각 평가한 뒤 가장 나쁜 축을 따른다.
 
-    어둡기 축 (태양 고도)       →  등급 결정
-    차폐 축 (저층운 + 중층운)   →  등급 결정
-    고층운 (권운)               →  판정에 관여하지 않음(정보성 문구만)
-    시정                        →  판정에 관여하지 않음(참고 문구만)
+    어둡기 축 (태양 고도)   →  등급 결정
+    차폐 축 (총운량)        →  등급 결정
+    시정                    →  판정에 관여하지 않음(참고 문구만)
 
 두 축을 하나의 점수로 합치지 않는 것은 ESO 의 구조를 따른 것이다. ESO 는
-clear sky 를 "운량 10% 미만 AND 투과율 변동 10% 미만" 으로 두 조건을 각각 걸고,
-투과율 변동 초과분은 thin cirrus 로 따로 분류한다. 가중합으로 단일 점수를 만들면
-검증할 수 없는 계수가 생기므로 쓰지 않는다.
+clear sky 를 "운량 10% 미만 AND 투과율 변동 10% 미만" 으로 두 조건을 각각 건다.
+가중합으로 단일 점수를 만들면 검증할 수 없는 계수가 생기므로 쓰지 않는다.
 (Kerber et al. 2014 — A&A 2022, 10.1051/0004-6361/202142493 에서 재인용)
 
 
@@ -33,33 +30,19 @@ common/star_observation_conditions.md [T-1]~[T-5])
     4 낮                        불가          해가 떠 있음
 
 
-2. 차폐 축 — 저층운 + 중층운
+2. 차폐 축 — 총운량
 --------------------------------------------------------------------------
-저층운·중층운은 물방울 구름이라 불투명하다. 하늘이 아무리 어두워도 별을 물리적으로
-가리므로 어둡기 등급과 무관하게 등급을 끌어내린다.
+구름은 하늘이 아무리 어두워도 별을 물리적으로 가리므로 어둡기 등급과 무관하게
+등급을 끌어내린다. 층별(저/중/고) 구분 없이 총운량 한 값으로 판정한다 — 관측자가
+실제로 마주하는 건 머리 위를 덮은 구름의 총량이기 때문이다.
 
-두 층을 단순히 더하지 않는다. 같은 하늘 조각을 두 층이 동시에 덮을 수 있어 단순
-합은 과대평가가 된다. 대기 복사 계산에서 층 구름을 결합할 때 쓰는 표준 가정 중
-random overlap 을 쓴다. random 가정의 결과는 maximum 과 minimum 가정 사이에
-위치한다. (Geleyn & Hollingsworth 1979; 개관은 Zhang & Jing 2016)
-
-    차폐율 = 1 - (1 - low) x (1 - mid)
+고지대(운해)의 경우, 관측자 발밑에 깔린 구름은 open_meteo 의 표고 보정에서 이미
+빠진 "관측자 위 총운량"이 넘어온다(common/star_research.md 운해 절).
 
 
-3. 고층운 — 판정에 넣지 않고 정보성 문구로만
+3. 임계값 사다리 (차폐 축)
 --------------------------------------------------------------------------
-권운은 얼음 결정이라 반투과다. 별을 가리는 게 아니라 어둡게 만든다(차폐가 아니라
-감광). 그런데 별빛 감쇠를 정하는 건 운량(%)이 아니라 광학두께 τ·투과율인데,
-Open-Meteo 의 cloud_cover_high 는 하늘을 덮은 면적 비율일 뿐 τ 를 주지 않는다.
-얇은 권운이면 0.3등급, 짙으면 3등급 이상으로 감쇠 폭이 10배 넘게 갈리므로 운량만으로
-등급 손실을 정량화하면 근거 없는 수를 지어내는 것이 된다. 그래서 고층운은 등급에
-넣지 않고, "은하수·성운 대비가 저하될 수 있다"는 정성 문구로만 표시한다.
-(common/star_research.md 고층운 절 — 정보성 표시로 한정)
-
-
-4. 임계값 사다리 (차폐 축 전용)
---------------------------------------------------------------------------
-세 경계 모두 문헌값이며, 차폐 축에만 적용한다.
+세 경계 모두 문헌값이다.
 
     <= 10%   ESO clear sky (Kerber et al. 2014)
     <= 30%   Xin et al. 2020 photometric time block (PTB) 상한
@@ -68,18 +51,16 @@ Open-Meteo 의 cloud_cover_high 는 하늘을 덮은 면적 비율일 뿐 τ 를
     >  50%   관측 불가
 
 
-5. 시정 — 판정에 관여하지 않는다
+4. 시정 — 판정에 관여하지 않는다
 --------------------------------------------------------------------------
 참고 정보로만 노출한다. 이유는 셋이다.
 
 1) 물리량이 다르다. 예보 시정은 지표 20 m 층의 *수평* 시정인데, 별을 보는 건
    *수직* 방향이다. 관측 지침도 이 둘을 구분해, 하늘이 차폐돼 운고를 못 낼 때
    수평시정이 아니라 수직시정(VV)으로 대체한다.
-2) 저층운과 중복이다. 안개는 지면에 닿은 층운이므로, 하늘을 가릴 만큼 두꺼우면
-   그 사실이 이미 cloud_cover_low 에 반영된다. 반대로 두께 수십 m 의 얕은
-   복사안개는 수평시정만 무너뜨리고 수직으로는 투과한다. 실제로 한 모델 안에서
-   두 변수는 일관된다(metno: 저층운 98%/시정 140 m, GFS: 0%/24 km) — 시정이
-   독립적으로 더해주는 정보가 없다.
+2) 총운량과 중복이다. 안개는 지면에 닿은 층운이므로, 하늘을 가릴 만큼 두꺼우면
+   그 사실이 이미 총운량에 반영된다. 반대로 두께 수십 m 의 얕은 복사안개는
+   수평시정만 무너뜨리고 수직으로는 투과한다 — 시정이 독립적으로 더해주는 정보가 없다.
 3) 예보 성능이 낮다. ECMWF 는 자사 시정 진단을 "an experimental product ...
    expectations regarding the quality of this product should remain low" 로
    명시하고, 저시정은 "orographic features that are not resolved by the model"
@@ -90,13 +71,12 @@ Open-Meteo 의 cloud_cover_high 는 하늘을 덮은 면적 비율일 뿐 τ 를
 안개 경계 1 km 는 WMO 의 안개 정의를 따른다. 이 값은 등급이 아니라 문구만 바꾼다.
 
 
-6. 결측
+5. 결측
 --------------------------------------------------------------------------
-등급을 정하는 건 차폐 축(저·중층운)뿐이므로, '알 수 없음'은 **저층운 또는 중층운이
-없을 때만** 낸다. 고층운은 정보성 문구 전용이라, 고층운만 없으면 문구 한 줄을
-생략할 뿐 등급 판정에는 영향이 없다(고층운 결측이 등급을 바꾸면 정보성이라는 정책과
-어긋난다). 결측을 '불가'로 두지 않는 것은, 모르는 것과 나쁜 것을 같은 등급으로 두면
-관측지 추천에서 데이터 없는 지점이 흐린 지점과 같은 순위로 떨어지기 때문이다.
+등급을 정하는 건 차폐 축(총운량)이므로, 총운량이 없으면 '불가' 가 아니라
+'알 수 없음' 을 낸다. 결측을 '불가'로 두지 않는 것은, 모르는 것과 나쁜 것을 같은
+등급으로 두면 관측지 추천에서 데이터 없는 지점이 흐린 지점과 같은 순위로 떨어지기
+때문이다.
 """
 
 from __future__ import annotations
@@ -154,14 +134,13 @@ def _km(m: float) -> str:
     return f"{math.floor(m / 100) / 10:.1f}km"
 
 
-#: 경계 비교용 허용오차. blocking_pct() 의 곱셈에서 부동소수점 오차가 생겨
-#: 정확히 경계값인 입력이 한 단계 아래로 떨어지는 것을 막는다.
-#: (예: low=30, mid=0 → 30.000000000000004)
+#: 경계 비교용 허용오차. 표고 보정의 곱셈에서 부동소수점 오차가 생겨 정확히
+#: 경계값인 입력이 한 단계 아래로 떨어지는 것을 막는다.
 _EPS: float = 1e-9
 
 
 def _ladder(pct: float) -> str:
-    """운량(%)을 등급으로. 경계는 모두 문헌값이다(모듈 docstring 4절)."""
+    """총운량(%)을 등급으로. 경계는 모두 문헌값이다(모듈 docstring 3절)."""
     if pct <= CLEAR_PCT + _EPS:
         return OPTIMAL
     if pct <= PHOTOMETRIC_PCT + _EPS:
@@ -173,57 +152,12 @@ def _ladder(pct: float) -> str:
 
 #: 차폐 등급별 사람이 읽는 구름 문구. 등급과 문구가 어긋나지 않게 등급별로 나눈다
 #: (31~50% 는 '밝은 별 한정' 인데 "구름 적음" 이라고 하면 모순). IMPOSSIBLE 은
-#: cloud_verdict 에서 따로 처리하므로 여기 없다.
+#: judge 에서 따로 처리하므로 여기 없다.
 _CLOUD_PHRASE = {
     OPTIMAL: "구름이 거의 없어요",
-    GOOD: "낮은 구름이 조금 있어요",
-    LIMITED: "낮은 구름이 다소 많아요",
+    GOOD: "구름이 조금 있어요",
+    LIMITED: "구름이 다소 많아요",
 }
-
-
-def blocking_pct(low: float, mid: float) -> float:
-    """저층운·중층운을 random overlap 가정으로 결합한 차폐율(%).
-
-    두 층은 독립이 아니므로 단순 합이 아니라 여집합의 곱으로 계산한다.
-    (Geleyn & Hollingsworth 1979)
-    """
-    return (1.0 - (1.0 - low / 100.0) * (1.0 - mid / 100.0)) * 100.0
-
-
-def cloud_verdict(
-    low: float, mid: float, high: float | None
-) -> tuple[str, list[str]]:
-    """층별 운량으로 구름 등급과 근거 문구를 반환한다.
-
-    등급은 차폐 축(저층운+중층운)만으로 정한다. 고층운은 등급에 넣지 않고 정성
-    문구로만 덧붙인다 — 운량(%)만으로는 감광 폭을 정량화할 수 없기 때문(docstring 3절).
-
-    Args:
-        low:  저층운 비율(%, 0~100). Open-Meteo cloud_cover_low.
-        mid:  중층운 비율(%, 0~100). Open-Meteo cloud_cover_mid.
-        high: 고층운 비율(%, 0~100). Open-Meteo cloud_cover_high.
-              정보성 전용이라 없으면(None) 문구만 생략하고 등급엔 영향 없다.
-
-    Returns:
-        (등급, 근거 문구 목록).
-    """
-    blocked = blocking_pct(low, mid)
-    block_grade = _ladder(blocked)
-
-    if block_grade == IMPOSSIBLE:
-        return IMPOSSIBLE, [f"낮은 구름이 하늘을 덮고 있어요 (차폐 {blocked:.0f}%)"]
-
-    reasons = [f"{_CLOUD_PHRASE[block_grade]} (차폐 {blocked:.0f}%)"]
-
-    # 고층운은 등급을 바꾸지 않는다 — 정성 문구로만 노출한다(docstring 3절).
-    # 결측이면 문구만 생략한다(등급 불변).
-    if high is not None and high > CLEAR_PCT:
-        reasons.append(
-            f"높은 구름(권운)이 있어요 (고층운 {high:.0f}%) — 밝은 별·행성 관측엔 "
-            "지장이 적지만 은하수·성운의 대비는 다소 저하될 수 있어요"
-        )
-
-    return block_grade, reasons
 
 
 # --- 반환 타입 ----------------------------------------------------------------
@@ -246,18 +180,15 @@ class Judgement:
 
 def judge(
     state: int,
-    cloud_low: float | None,
-    cloud_mid: float | None,
-    cloud_high: float | None,
+    cloud_cover: float | None,
     visibility_m: float | None,
 ) -> Judgement:
-    """태양 고도 상태·층별 운량·시정으로 관측 등급을 판정한다.
+    """태양 고도 상태·총운량·시정으로 관측 등급을 판정한다.
 
     Args:
         state: astro.twilight_state 값(0=완전한 밤 ~ 4=낮).
-        cloud_low:  저층운 비율(%, 0~100). 없으면 None.
-        cloud_mid:  중층운 비율(%, 0~100). 없으면 None.
-        cloud_high: 고층운 비율(%, 0~100). 없으면 None.
+        cloud_cover: 총운량 비율(%, 0~100). 없으면 None.
+                     고지대는 open_meteo 에서 발밑 운해를 뺀 '관측자 위 총운량'.
         visibility_m: 시정(m). 없으면 None.
 
     Returns:
@@ -271,23 +202,25 @@ def judge(
     if sky_verdict == IMPOSSIBLE:
         return Judgement(IMPOSSIBLE, False, [sky_msg])
 
-    # 결측은 '불가' 가 아니라 '알 수 없음' 이다(모듈 docstring 6절).
-    # 등급을 정하는 건 차폐 축(저·중층운)뿐이라 이 둘만 필수로 검사한다. 고층운은
-    # 정보성 전용이므로 없어도(cloud_high is None) 등급 판정을 막지 않는다.
-    if cloud_low is None or cloud_mid is None:
+    # 결측은 '불가' 가 아니라 '알 수 없음' 이다(모듈 docstring 5절).
+    if cloud_cover is None:
         return Judgement(UNKNOWN, None, [sky_msg, "구름 정보를 가져오지 못했어요"])
 
-    cloud_grade, cloud_reasons = cloud_verdict(cloud_low, cloud_mid, cloud_high)
+    cloud_grade = _ladder(cloud_cover)
 
-    # 어둡기 축과 구름 축 중 나쁜 쪽을 따른다.
+    # 어둡기 축과 차폐 축 중 나쁜 쪽을 따른다.
     verdict = _BY_RANK[max(_RANK[sky_verdict], _RANK[cloud_grade])]
 
     if verdict == IMPOSSIBLE:
-        return Judgement(IMPOSSIBLE, False, cloud_reasons)
+        return Judgement(
+            IMPOSSIBLE,
+            False,
+            [f"구름이 하늘을 덮고 있어요 (총운량 {cloud_cover:.0f}%)"],
+        )
 
-    reasons = [sky_msg, *cloud_reasons]
+    reasons = [sky_msg, f"{_CLOUD_PHRASE[cloud_grade]} (총운량 {cloud_cover:.0f}%)"]
 
-    # 시정은 등급에 관여하지 않는다 — 참고 정보로만 덧붙인다(docstring 5절).
+    # 시정은 등급에 관여하지 않는다 — 참고 정보로만 덧붙인다(docstring 4절).
     if visibility_m is None:
         pass
     elif visibility_m < VISIBILITY_FOG_M:
@@ -312,59 +245,46 @@ if __name__ == "__main__":
         sys.stdout.reconfigure(encoding="utf-8")
 
     cases = [
-        # (이름, 상태, low, mid, high, 시정, 기대 등급)
+        # (이름, 상태, 총운량, 시정, 기대 등급)
         # 어둡기 축 — 구름이 없을 때 태양 고도가 그대로 등급이 된다.
-        ("완전한밤+맑음", 0, 5.0, 0.0, 0.0, 20_000.0, OPTIMAL),
-        ("천문박명+맑음", 1, 5.0, 0.0, 0.0, 20_000.0, GOOD),
-        ("항해박명+맑음", 2, 5.0, 0.0, 0.0, 20_000.0, LIMITED),
-        ("시민박명(너무밝음)", 3, 0.0, 0.0, 0.0, 30_000.0, IMPOSSIBLE),
-        ("낮", 4, 0.0, 0.0, 0.0, 30_000.0, IMPOSSIBLE),
+        ("완전한밤+맑음", 0, 5.0, 20_000.0, OPTIMAL),
+        ("천문박명+맑음", 1, 5.0, 20_000.0, GOOD),
+        ("항해박명+맑음", 2, 5.0, 20_000.0, LIMITED),
+        ("시민박명(너무밝음)", 3, 0.0, 30_000.0, IMPOSSIBLE),
+        ("낮", 4, 0.0, 30_000.0, IMPOSSIBLE),
         # 차폐 축 — 나쁜 쪽이 등급을 결정한다.
-        ("완전한밤+저층운많음", 0, 80.0, 0.0, 0.0, 20_000.0, IMPOSSIBLE),
-        ("완전한밤+차폐45%", 0, 45.0, 0.0, 0.0, 20_000.0, LIMITED),
-        ("완전한밤+차폐28%", 0, 15.0, 15.0, 0.0, 20_000.0, GOOD),
-        ("완전한밤+차폐36%", 0, 20.0, 20.0, 0.0, 20_000.0, LIMITED),
-        ("천문박명+차폐45%", 1, 45.0, 0.0, 0.0, 20_000.0, LIMITED),
-        # random overlap — 단순 합(64%)이면 불가지만 실제 차폐는 51%다.
-        ("저층30+중층30", 0, 30.0, 30.0, 0.0, 20_000.0, IMPOSSIBLE),
-        ("저층28+중층28", 0, 28.0, 28.0, 0.0, 20_000.0, LIMITED),
-        # 고층운 — 판정에 넣지 않으므로 어떤 값이든 등급을 바꾸지 않는다(문구만 추가).
-        ("완전한밤+권운가득", 0, 0.0, 0.0, 100.0, 20_000.0, OPTIMAL),
-        ("완전한밤+권운보통", 0, 0.0, 0.0, 40.0, 20_000.0, OPTIMAL),
-        ("완전한밤+권운약간", 0, 0.0, 0.0, 20.0, 20_000.0, OPTIMAL),
-        ("완전한밤+권운없음", 0, 0.0, 0.0, 5.0, 20_000.0, OPTIMAL),
-        ("항해박명+권운가득", 2, 0.0, 0.0, 100.0, 20_000.0, LIMITED),
-        # 결측 — 차폐 축(저·중층운)이 없을 때만 알 수 없음.
-        ("완전한밤+저층데이터없음", 0, None, 0.0, 0.0, 20_000.0, UNKNOWN),
-        ("완전한밤+중층데이터없음", 0, 0.0, None, 0.0, 20_000.0, UNKNOWN),
-        # 고층운만 결측 — 정보성 전용이라 등급은 정상 산출(문구만 생략).
-        ("완전한밤+고층데이터없음", 0, 5.0, 5.0, None, 20_000.0, OPTIMAL),
-        ("천문박명+고층데이터없음", 1, 5.0, 5.0, None, 20_000.0, GOOD),
+        ("완전한밤+운량80", 0, 80.0, 20_000.0, IMPOSSIBLE),
+        ("완전한밤+운량45", 0, 45.0, 20_000.0, LIMITED),
+        ("완전한밤+운량28", 0, 28.0, 20_000.0, GOOD),
+        ("천문박명+운량45", 1, 45.0, 20_000.0, LIMITED),
+        # 결측 — 총운량이 없으면 알 수 없음.
+        ("완전한밤+운량데이터없음", 0, None, 20_000.0, UNKNOWN),
+        ("천문박명+운량데이터없음", 1, None, 20_000.0, UNKNOWN),
         # 시정 = 참고 정보. 어떤 값이든 등급을 바꾸지 않는다.
-        ("완전한밤+안개", 0, 10.0, 0.0, 0.0, 400.0, OPTIMAL),
-        ("천문박명+안개", 1, 10.0, 0.0, 0.0, 400.0, GOOD),
-        ("항해박명+안개", 2, 10.0, 0.0, 0.0, 400.0, LIMITED),
-        ("완전한밤+연무", 0, 10.0, 0.0, 0.0, 5_000.0, OPTIMAL),
-        ("완전한밤+시정없음", 0, 10.0, 0.0, 0.0, None, OPTIMAL),
+        ("완전한밤+안개", 0, 10.0, 400.0, OPTIMAL),
+        ("천문박명+안개", 1, 10.0, 400.0, GOOD),
+        ("항해박명+안개", 2, 10.0, 400.0, LIMITED),
+        ("완전한밤+연무", 0, 10.0, 5_000.0, OPTIMAL),
+        ("완전한밤+시정없음", 0, 10.0, None, OPTIMAL),
         # 표기 경계 — 문구만 바뀌고 등급은 동일해야 한다.
-        ("시정 999m(안개 문구)", 0, 10.0, 0.0, 0.0, 999.0, OPTIMAL),
-        ("시정 1000m(연무 문구)", 0, 10.0, 0.0, 0.0, 1_000.0, OPTIMAL),
-        ("시정 9999m(연무 문구)", 0, 10.0, 0.0, 0.0, 9_999.0, OPTIMAL),
-        ("시정 10000m(맑음 문구)", 0, 10.0, 0.0, 0.0, 10_000.0, OPTIMAL),
+        ("시정 999m(안개 문구)", 0, 10.0, 999.0, OPTIMAL),
+        ("시정 1000m(연무 문구)", 0, 10.0, 1_000.0, OPTIMAL),
+        ("시정 9999m(연무 문구)", 0, 10.0, 9_999.0, OPTIMAL),
+        ("시정 10000m(맑음 문구)", 0, 10.0, 10_000.0, OPTIMAL),
         # 사다리 경계 — 절벽이 아니라 단계적으로 내려간다.
-        ("차폐 10%", 0, 10.0, 0.0, 0.0, 20_000.0, OPTIMAL),
-        ("차폐 11%", 0, 11.0, 0.0, 0.0, 20_000.0, GOOD),
-        ("차폐 30%", 0, 30.0, 0.0, 0.0, 20_000.0, GOOD),
-        ("차폐 31%", 0, 31.0, 0.0, 0.0, 20_000.0, LIMITED),
-        ("차폐 50%", 0, 50.0, 0.0, 0.0, 20_000.0, LIMITED),
-        ("차폐 51%", 0, 51.0, 0.0, 0.0, 20_000.0, IMPOSSIBLE),
-        # 실제 사례: 1100고지 2026-07-27 01:00 (저층운 다수모델 0%, 시정 140m)
-        ("1100고지 07-27 01시", 0, 0.0, 0.0, 0.0, 140.0, OPTIMAL),
+        ("운량 10%", 0, 10.0, 20_000.0, OPTIMAL),
+        ("운량 11%", 0, 11.0, 20_000.0, GOOD),
+        ("운량 30%", 0, 30.0, 20_000.0, GOOD),
+        ("운량 31%", 0, 31.0, 20_000.0, LIMITED),
+        ("운량 50%", 0, 50.0, 20_000.0, LIMITED),
+        ("운량 51%", 0, 51.0, 20_000.0, IMPOSSIBLE),
+        # 실제 사례: 1100고지 2026-07-27 01:00 (운해 보정 후 총운량 낮음, 시정 140m)
+        ("1100고지 07-27 01시", 0, 0.0, 140.0, OPTIMAL),
     ]
 
     failed = 0
-    for name, st, lo, mi, hi, vis, expected in cases:
-        r = judge(st, lo, mi, hi, vis)
+    for name, st, cc, vis, expected in cases:
+        r = judge(st, cc, vis)
         ok = r.verdict == expected
         failed += not ok
         mark = {True: "가능", False: "불가", None: "미상"}[r.possible]
@@ -373,42 +293,27 @@ if __name__ == "__main__":
 
     # 불변식 1: 시정은 등급을 바꾸지 않는다.
     for st in (0, 1, 2):
-        base = judge(st, 0.0, 0.0, 0.0, 20_000.0).verdict
+        base = judge(st, 0.0, 20_000.0).verdict
         for vis in (0.0, 50.0, 999.0, 1_000.0, 9_999.0, None):
-            got = judge(st, 0.0, 0.0, 0.0, vis)
+            got = judge(st, 0.0, vis)
             assert got.possible, f"시정 {vis} 가 불가를 만들었다"
             assert got.verdict == base, f"시정 {vis} 가 등급을 {base}→{got.verdict} 로 바꿨다"
 
-    # 불변식 2: 고층운은 등급을 바꾸지 않는다(정보성 표시 전용).
+    # 불변식 2: 총운량이 늘어나면 등급은 나빠지기만 한다(단조성).
     for st in (0, 1, 2):
-        base = judge(st, 0.0, 0.0, 0.0, 20_000.0).verdict
-        for hi in range(0, 101, 10):
-            got = judge(st, 0.0, 0.0, float(hi), 20_000.0)
-            assert got.verdict == base, f"고층운 {hi}% 가 등급을 {base}→{got.verdict} 로 바꿨다"
+        prev = -1
+        for pct in range(0, 101, 5):
+            v = judge(st, float(pct), 20_000.0).verdict
+            cur = _RANK[v]
+            assert cur >= prev, f"상태{st} 총운량 {pct}% 에서 등급이 좋아졌다"
+            prev = cur
 
-    # 불변식 3: random overlap 은 단순 합보다 크지 않다.
-    for lo in range(0, 101, 10):
-        for mi in range(0, 101, 10):
-            assert blocking_pct(lo, mi) <= lo + mi + 1e-9
-
-    # 불변식 4: 어느 층이든 늘어나면 등급은 나빠지기만 한다(단조성).
-    for st in (0, 1, 2):
-        for layer in range(3):
-            prev = -1
-            for pct in range(0, 101, 5):
-                args = [0.0, 0.0, 0.0]
-                args[layer] = float(pct)
-                v = judge(st, *args, 20_000.0).verdict
-                cur = _RANK[v]
-                assert cur >= prev, f"상태{st} 층{layer} {pct}% 에서 등급이 좋아졌다"
-                prev = cur
-
-    # 불변식 5: 어둡기 축보다 좋아질 수 없다.
+    # 불변식 3: 어둡기 축보다 좋아질 수 없다.
     for st in (0, 1, 2):
         ceiling = _RANK[_SKY[st][0]]
-        for lo in range(0, 101, 10):
-            v = judge(st, float(lo), 0.0, 0.0, 20_000.0).verdict
-            assert _RANK[v] >= ceiling, f"상태{st} 저층운{lo}% 가 어둡기 상한을 넘었다"
+        for cc in range(0, 101, 10):
+            v = judge(st, float(cc), 20_000.0).verdict
+            assert _RANK[v] >= ceiling, f"상태{st} 총운량{cc}% 가 어둡기 상한을 넘었다"
 
     print(f"\n{len(cases) - failed}/{len(cases)} 통과")
     sys.exit(1 if failed else 0)

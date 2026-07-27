@@ -92,9 +92,11 @@ Open-Meteo 의 cloud_cover_high 는 하늘을 덮은 면적 비율일 뿐 τ 를
 
 6. 결측
 --------------------------------------------------------------------------
-구름 정보가 없으면 '불가' 가 아니라 '알 수 없음' 이다. 모르는 것과 나쁜 것을
-같은 등급으로 두면 관측지 추천에서 데이터 없는 지점이 흐린 지점과 같은 순위로
-떨어진다.
+등급을 정하는 건 차폐 축(저·중층운)뿐이므로, '알 수 없음'은 **저층운 또는 중층운이
+없을 때만** 낸다. 고층운은 정보성 문구 전용이라, 고층운만 없으면 문구 한 줄을
+생략할 뿐 등급 판정에는 영향이 없다(고층운 결측이 등급을 바꾸면 정보성이라는 정책과
+어긋난다). 결측을 '불가'로 두지 않는 것은, 모르는 것과 나쁜 것을 같은 등급으로 두면
+관측지 추천에서 데이터 없는 지점이 흐린 지점과 같은 순위로 떨어지기 때문이다.
 """
 
 from __future__ import annotations
@@ -178,7 +180,9 @@ def blocking_pct(low: float, mid: float) -> float:
     return (1.0 - (1.0 - low / 100.0) * (1.0 - mid / 100.0)) * 100.0
 
 
-def cloud_verdict(low: float, mid: float, high: float) -> tuple[str, list[str]]:
+def cloud_verdict(
+    low: float, mid: float, high: float | None
+) -> tuple[str, list[str]]:
     """층별 운량으로 구름 등급과 근거 문구를 반환한다.
 
     등급은 차폐 축(저층운+중층운)만으로 정한다. 고층운은 등급에 넣지 않고 정성
@@ -188,6 +192,7 @@ def cloud_verdict(low: float, mid: float, high: float) -> tuple[str, list[str]]:
         low:  저층운 비율(%, 0~100). Open-Meteo cloud_cover_low.
         mid:  중층운 비율(%, 0~100). Open-Meteo cloud_cover_mid.
         high: 고층운 비율(%, 0~100). Open-Meteo cloud_cover_high.
+              정보성 전용이라 없으면(None) 문구만 생략하고 등급엔 영향 없다.
 
     Returns:
         (등급, 근거 문구 목록).
@@ -201,7 +206,8 @@ def cloud_verdict(low: float, mid: float, high: float) -> tuple[str, list[str]]:
     reasons = [f"낮은 구름 적음 (차폐 {blocked:.0f}%)"]
 
     # 고층운은 등급을 바꾸지 않는다 — 정성 문구로만 노출한다(docstring 3절).
-    if high > CLEAR_PCT:
+    # 결측이면 문구만 생략한다(등급 불변).
+    if high is not None and high > CLEAR_PCT:
         reasons.append(
             f"높은 구름(권운)이 있어요 (고층운 {high:.0f}%) — 밝은 별·행성 관측엔 "
             "지장이 적지만 은하수·성운의 대비는 다소 저하될 수 있어요"
@@ -256,7 +262,9 @@ def judge(
         return Judgement(IMPOSSIBLE, False, [sky_msg])
 
     # 결측은 '불가' 가 아니라 '알 수 없음' 이다(모듈 docstring 6절).
-    if cloud_low is None or cloud_mid is None or cloud_high is None:
+    # 등급을 정하는 건 차폐 축(저·중층운)뿐이라 이 둘만 필수로 검사한다. 고층운은
+    # 정보성 전용이므로 없어도(cloud_high is None) 등급 판정을 막지 않는다.
+    if cloud_low is None or cloud_mid is None:
         return Judgement(UNKNOWN, None, [sky_msg, "구름 정보를 가져오지 못했어요"])
 
     cloud_grade, cloud_reasons = cloud_verdict(cloud_low, cloud_mid, cloud_high)
@@ -316,9 +324,12 @@ if __name__ == "__main__":
         ("완전한밤+권운약간", 0, 0.0, 0.0, 20.0, 20_000.0, OPTIMAL),
         ("완전한밤+권운없음", 0, 0.0, 0.0, 5.0, 20_000.0, OPTIMAL),
         ("항해박명+권운가득", 2, 0.0, 0.0, 100.0, 20_000.0, LIMITED),
-        # 결측 — 불가가 아니라 알 수 없음.
-        ("완전한밤+구름데이터없음", 0, None, 0.0, 0.0, 20_000.0, UNKNOWN),
+        # 결측 — 차폐 축(저·중층운)이 없을 때만 알 수 없음.
+        ("완전한밤+저층데이터없음", 0, None, 0.0, 0.0, 20_000.0, UNKNOWN),
         ("완전한밤+중층데이터없음", 0, 0.0, None, 0.0, 20_000.0, UNKNOWN),
+        # 고층운만 결측 — 정보성 전용이라 등급은 정상 산출(문구만 생략).
+        ("완전한밤+고층데이터없음", 0, 5.0, 5.0, None, 20_000.0, OPTIMAL),
+        ("천문박명+고층데이터없음", 1, 5.0, 5.0, None, 20_000.0, GOOD),
         # 시정 = 참고 정보. 어떤 값이든 등급을 바꾸지 않는다.
         ("완전한밤+안개", 0, 10.0, 0.0, 0.0, 400.0, OPTIMAL),
         ("천문박명+안개", 1, 10.0, 0.0, 0.0, 400.0, GOOD),

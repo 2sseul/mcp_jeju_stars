@@ -34,6 +34,12 @@ _BIAS_LAT, _BIAS_LON = 33.36, 126.53
 # 변형 검색에서 떼어낼 접두 지역어
 _PREFIXES = ("한라산 ", "제주특별자치도 ", "제주도 ", "제주시 ", "서귀포시 ", "제주 ")
 
+# 단독으로는 관측지가 아니라 넓은 행정구역·산 전체를 가리키는 일반 지역어.
+# 변형 fallback 이 이런 단어로 축약되면(예: '제주 없는장소' → '제주') Photon 이
+# 제주 도심 같은 엉뚱한 일반 위치를 반환하고, 그걸 원래 장소로 확정해 버린다.
+# 그래서 이 단어들은 변형 후보에서 제외한다(원문 질의 자체가 이 단어면 못 찾은 것으로 둔다).
+_GENERIC = frozenset({p.strip() for p in _PREFIXES} | {"제주도", "서귀포", "한라산"})
+
 
 @dataclass(frozen=True)
 class GeocodeResult:
@@ -44,12 +50,16 @@ class GeocodeResult:
 
 
 def _variants(query: str) -> list[str]:
-    """정확 매칭 실패에 대비한 검색어 변형(우선순위 순, 중복 제거)."""
+    """정확 매칭 실패에 대비한 검색어 변형(우선순위 순, 중복 제거).
+
+    단독 지역어(_GENERIC)로 축약된 변형은 넣지 않는다 — 그런 후보는 원래 장소가
+    아니라 제주 일대의 일반 위치를 반환해 오확정을 부른다(리뷰 반영).
+    """
     out: list[str] = []
 
     def add(x: str) -> None:
         x = x.strip()
-        if x and x not in out:
+        if x and x not in _GENERIC and x not in out:
             out.append(x)
 
     q = query.strip()

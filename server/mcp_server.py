@@ -127,6 +127,9 @@ def evaluate_spot(
         date: 평가할 날짜 YYYY-MM-DD. 생략하면 오늘.
         time: 평가할 시각 24시간제 HH:MM(KST). 생략하면 22:00.
             date·time 모두 생략하면 현재 시각으로 평가한다.
+
+    Returns:
+        verdict/reasons/numbers/attribution/as_of 스키마(dict).
     """
     return _evaluate_coords(lat, lon, date, time)
 

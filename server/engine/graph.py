@@ -70,16 +70,35 @@ def weather_node(state: EngineState) -> dict:
         # 값을 None 으로 흘리면 judge 가 "정보를 가져오지 못했어요"로 환원한다.
         return {
             "cloud_low": None,
+            "cloud_mid": None,
+            "cloud_high": None,
             "visibility": None,
-            "numbers": {"cloud_cover_low": None, "visibility_m": None},
+            "numbers": {
+                "cloud_cover_low": None,
+                "cloud_cover_mid": None,
+                "cloud_cover_high": None,
+                "visibility_m": None,
+            },
             "attribution": ["기상: Open-Meteo (조회 실패)"],
         }
 
-    cl, vis = data["cloud_cover_low"], data["visibility"]
+    cl, cm, ch = (
+        data["cloud_cover_low"],
+        data["cloud_cover_mid"],
+        data["cloud_cover_high"],
+    )
+    vis = data["visibility"]
     return {
         "cloud_low": cl,
+        "cloud_mid": cm,
+        "cloud_high": ch,
         "visibility": vis,
-        "numbers": {"cloud_cover_low": cl, "visibility_m": vis},
+        "numbers": {
+            "cloud_cover_low": cl,
+            "cloud_cover_mid": cm,
+            "cloud_cover_high": ch,
+            "visibility_m": vis,
+        },
         "attribution": ["기상: Open-Meteo (open-meteo.com)"],
     }
 
@@ -87,7 +106,11 @@ def weather_node(state: EngineState) -> dict:
 def judge_node(state: EngineState) -> dict:
     """상태·저층운·시정 → 관측 등급(운영 정책)."""
     result = _judge.judge(
-        state.get("state_code"), state.get("cloud_low"), state.get("visibility")
+        state.get("state_code"),
+        state.get("cloud_low"),
+        state.get("cloud_mid"),
+        state.get("cloud_high"),
+        state.get("visibility"),
     )
     return {
         "verdict": result.verdict,

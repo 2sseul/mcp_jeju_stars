@@ -29,6 +29,8 @@ class EngineState(TypedDict, total=False):
     # 노드가 채우는 중간 값(스칼라: overwrite)
     state_code: int | None  # 박명 구간 값(0=완전한 밤)
     cloud_low: float | None  # 저층운 %
+    cloud_mid: float | None  # 중층운 %
+    cloud_high: float | None  # 고층운 %
     visibility: float | None  # 시정 m
     verdict: str | None  # 판정 등급(최적/양호/밝은 별 한정/불가)
     possible: bool | None  # 밝은 별이라도 볼 수 있는가

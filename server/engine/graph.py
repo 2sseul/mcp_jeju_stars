@@ -27,6 +27,7 @@ if str(_CALC) not in sys.path:
 import astro  # noqa: E402
 import judge as _judge  # noqa: E402
 import open_meteo  # noqa: E402
+import tonight as _tonight  # noqa: E402
 
 
 # --- 노드 --------------------------------------------------------------------
@@ -124,7 +125,7 @@ _GRAPH = _build()
 
 
 def run(lat: float, lon: float, when: datetime) -> EngineState:
-    """엔진 1회 실행. 누적된 최종 state 를 반환한다."""
+    """엔진 1회 실행("지금 별 보이나?"). 누적된 최종 state 를 반환한다."""
     init: EngineState = {
         "lat": lat,
         "lon": lon,
@@ -134,3 +135,59 @@ def run(lat: float, lon: float, when: datetime) -> EngineState:
         "attribution": [],
     }
     return _GRAPH.invoke(init)
+
+
+# --- 밤 단위 집계 ("오늘 밤 볼 수 있나?") -------------------------------------
+
+def run_tonight(lat: float, lon: float, when: datetime) -> dict:
+    """when 이 속한(또는 이후 도래하는) '박명 포함 밤'을 시간별로 판정해 집계한다.
+
+    순간 판정 그래프(run)와 달리 밤 구간(astro.night_window)의 각 정시를 judge 로
+    판정한 뒤 tonight.summarize 로 모은다. 3시간 기준으로 가능/불가를 매기지 않고
+    관측 가능 시간 수·등급 분포·연속 창을 그대로 돌려준다.
+
+    Returns:
+        {"window": {"start": iso, "end": iso} | None,
+         "summary": <tonight.summarize dict> | None,
+         "attribution": [...]}
+        완전한 밤이 없거나(백야 등) 조회 실패면 summary 는 None.
+    """
+    attribution = ["천체력: JPL DE421 via Skyfield"]
+
+    window = astro.night_window(lat, lon, when)
+    if window is None:
+        return {"window": None, "summary": None, "attribution": attribution}
+    start, end = window
+
+    # 외부 I/O 는 실패해도 스키마를 깨지 않는다(순간 그래프의 weather_node 와 같은 규율).
+    try:
+        series = open_meteo.fetch_series(lat, lon, start, end)
+        attribution.append("기상: Open-Meteo (open-meteo.com)")
+    except Exception:  # noqa: BLE001 — 외부 I/O 경계, 스키마 보장이 우선
+        return {
+            "window": _iso_window(start, end),
+            "summary": None,
+            "attribution": attribution + ["기상: Open-Meteo (조회 실패)"],
+        }
+
+    hours = []
+    for row in series:
+        t = row["time"]
+        state = astro.twilight_state(lat, lon, t)
+        result = _judge.judge(state, row["cloud_cover"], row["visibility"])
+        hours.append(
+            _tonight.HourResult(t, result.verdict, result.possible, row["cloud_cover"])
+        )
+
+    return {
+        "window": _iso_window(start, end),
+        "summary": _tonight.summarize(hours),
+        "attribution": attribution,
+    }
+
+
+def _iso_window(start: datetime, end: datetime) -> dict:
+    return {
+        "start": start.isoformat(timespec="minutes"),
+        "end": end.isoformat(timespec="minutes"),
+    }

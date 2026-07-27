@@ -1,8 +1,15 @@
 """제주 밤하늘 관측 MCP 서버 (P0 — 걷는 뼈대).
 
-FastMCP · stateless · streamable HTTP `/mcp`. 도구: evaluate_spot(좌표),
-evaluate_place(주소·지명). 엔진(LangGraph)이 astro→weather→judge 를 돌려
-최종형 스키마로 답한다.
+FastMCP · stateless · streamable HTTP `/mcp`. 두 질의 형태를 지원한다:
+
+    "지금 별 보이나?"   → evaluate_spot(좌표) / evaluate_place(주소·지명)
+                          한 시각을 판정한다(astro→weather→judge 그래프).
+    "오늘 밤 볼 수 있나?" → evaluate_night_spot / evaluate_night_place
+                          박명 포함 밤 전체를 시간별로 판정해 관측 가능한 시간 수·
+                          등급 분포·연속 창을 집계한다(graph.run_tonight).
+
+밤 집계는 3시간 같은 기준으로 가능/불가를 매기지 않고 시간 수를 그대로 돌려준다 —
+몇 시간이면 충분한지는 호출자·사용자가 정한다.
 
 제주 범위 밖은 프롬프트형 에러. 어둡기(SQM)·별 개수는 아직 numbers 에 없다.
 
@@ -188,6 +195,163 @@ def evaluate_place(
         "lon": hit.lon,
     }
     result = _evaluate_coords(hit.lat, hit.lon, date, time, resolved=resolved)
+    if hit.matched_query and hit.matched_query != query:
+        note = (
+            f"'{query}'를 정확히 못 찾아 '{hit.matched_query}'로 검색했어요 → "
+            f"{hit.display_name} ({hit.lat:.4f}, {hit.lon:.4f})"
+        )
+    else:
+        note = f"'{query}' → {hit.display_name} ({hit.lat:.4f}, {hit.lon:.4f})로 해석했어요"
+    result.setdefault("reasons", []).insert(0, note)
+    result.setdefault("attribution", []).append("지오코딩: Photon (OpenStreetMap)")
+    return result
+
+
+# --- 밤 단위 평가 ("오늘 밤 볼 수 있나?") ------------------------------------
+
+def _resolve_night_when(date: str | None) -> datetime:
+    """밤 집계의 기준 시각을 만든다. date 가 주어지면 그날 저녁(20:00)을, 없으면
+    현재 시각을 쓴다 — 어느 쪽이든 night_window 가 '그 밤'을 찾는다.
+    파싱 실패 시 ValueError.
+    """
+    now = datetime.now(KST)
+    if date is None:
+        return now
+    y, m, d = (int(x) for x in date.split("-"))
+    return datetime(y, m, d, 20, 0, tzinfo=KST)
+
+
+def _night_verdict(summary: dict | None, window: dict | None) -> str:
+    """밤 집계를 한 줄 결론으로. 3시간 기준으로 가능/불가를 매기지 않는다 —
+    관측 가능한 시간 수라는 사실만 문장으로 압축한다(0시간도 '불가'가 아닌 사실)."""
+    if window is None:
+        return "이 날짜에는 관측할 밤 구간을 찾지 못했어요"
+    if summary is None:
+        return "밤 기상 정보를 가져오지 못했어요"
+    n = summary["observable_hours"]
+    if n == 0:
+        if summary["unknown_hours"] and not summary["total_hours"] - summary["unknown_hours"]:
+            return "밤 기상 정보를 가져오지 못했어요"
+        return "오늘 밤은 구름으로 별 볼 만한 시간이 거의 없어요"
+    return f"오늘 밤 약 {n}시간 관측 가능"
+
+
+def _night_reasons(summary: dict | None, window: dict | None) -> list[str]:
+    """밤 집계의 사람이 읽는 근거. 판정이 아니라 시간 수·분포를 그대로 서술한다."""
+    if window is None or summary is None:
+        return []
+
+    reasons = [
+        f"오늘 밤 어두운 구간(박명 포함)은 "
+        f"{window['start'][11:16]}~{window['end'][11:16]}예요"
+    ]
+
+    for w in summary["windows"]:
+        reasons.append(
+            f"{w['start'][11:16]}~{w['end'][11:16]} 관측 가능 ({w['hours']}시간)"
+        )
+
+    by_grade = summary["by_grade"]
+    if by_grade:
+        parts = [f"{g} {h}시간" for g, h in by_grade.items()]
+        reasons.append("등급별로는 " + ", ".join(parts) + "예요")
+
+    reasons.append(
+        f"맑은 시간(총운량 30% 이하) {summary['photometric_hours']}시간, "
+        f"다소 맑은 시간(50% 이하) {summary['spectroscopic_hours']}시간"
+    )
+
+    if summary["unknown_hours"]:
+        reasons.append(f"구름 정보를 못 받은 시간이 {summary['unknown_hours']}시간 있어요")
+
+    return reasons
+
+
+def _evaluate_night(
+    lat: float, lon: float, date: str | None, resolved: dict | None = None
+) -> dict:
+    """밤 집계 코어 — evaluate_night_spot·evaluate_night_place 가 공유한다."""
+    if not _in_jeju(lat, lon):
+        return _out_of_range(lat, lon)
+
+    try:
+        when = _resolve_night_when(date)
+    except (ValueError, AttributeError):
+        return _invalid_when(date, None)
+
+    result = graph.run_tonight(lat, lon, when)
+    window = result.get("window")
+    summary = result.get("summary")
+
+    numbers: dict = {"night_window": window}
+    if summary is not None:
+        numbers["tonight"] = summary
+
+    return Response(
+        verdict=_night_verdict(summary, window),
+        reasons=_night_reasons(summary, window),
+        numbers=numbers,
+        attribution=result.get("attribution", []),
+        as_of=when.isoformat(timespec="minutes"),
+        resolved=resolved,
+    ).to_dict()
+
+
+@mcp.tool()
+def evaluate_night_spot(lat: float, lon: float, date: str | None = None) -> dict:
+    """제주 특정 좌표에서 '오늘 밤(또는 지정일 밤)' 관측 가능한 시간대를 집계한다.
+
+    한 시각을 판정하는 evaluate_spot 과 달리, 박명 포함 밤 구간 전체를 시간별로
+    판정해 **관측 가능한 시간 수·등급 분포·연속 관측 창**을 돌려준다. 3시간 같은
+    기준으로 가능/불가를 매기지 않으므로, 몇 시간이면 충분한지는 사용자가 정한다.
+
+    Args:
+        lat, lon: 관측지 좌표(제주 범위 내).
+        date: 평가할 밤의 날짜 YYYY-MM-DD. 생략하면 오늘 밤(현재 시각 기준). 시각은
+            받지 않는다 — 밤 전체를 집계하기 때문.
+
+    Returns:
+        verdict/reasons/numbers/attribution/as_of/resolved 스키마(dict).
+        numbers.tonight 에 시간 수·등급 분포·창이, numbers.night_window 에 밤 구간이 담긴다.
+    """
+    return _evaluate_night(lat, lon, date)
+
+
+@mcp.tool()
+def evaluate_night_place(query: str, date: str | None = None) -> dict:
+    """주소·지명으로 '오늘 밤' 관측 가능한 시간대를 집계한다(제주).
+
+    query 를 좌표로 변환(지오코딩)한 뒤 evaluate_night_spot 과 동일하게 집계한다.
+
+    Args:
+        query: 제주 안의 주소 또는 지명.
+        date: YYYY-MM-DD (생략 시 오늘 밤).
+    """
+    try:
+        hit = geocode(query)
+    except Exception:  # noqa: BLE001 — 외부 지오코딩 실패도 스키마로 환원
+        hit = None
+    if hit is None:
+        return Response(
+            verdict="주소 확인 실패",
+            reasons=[
+                f"'{query}'의 위치를 제주에서 찾지 못했습니다. "
+                "좌표(위도·경도)를 알면 evaluate_night_spot 으로 바로 집계할 수 있어요. "
+                "아니면 더 구체적인 주소·지명으로 다시 시도해 주세요."
+            ],
+            numbers={},
+            attribution=["지오코딩: Photon (OpenStreetMap)"],
+            as_of=datetime.now(KST).isoformat(timespec="minutes"),
+        ).to_dict()
+
+    resolved = {
+        "query": query,
+        "matched_query": hit.matched_query,
+        "display_name": hit.display_name,
+        "lat": hit.lat,
+        "lon": hit.lon,
+    }
+    result = _evaluate_night(hit.lat, hit.lon, date, resolved=resolved)
     if hit.matched_query and hit.matched_query != query:
         note = (
             f"'{query}'를 정확히 못 찾아 '{hit.matched_query}'로 검색했어요 → "

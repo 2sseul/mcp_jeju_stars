@@ -88,17 +88,25 @@ def weather_node(state: EngineState) -> dict:
         data["cloud_cover_high"],
     )
     vis = data["visibility"]
+    numbers: dict = {
+        "cloud_cover_low": cl,
+        "cloud_cover_mid": cm,
+        "cloud_cover_high": ch,
+        "visibility_m": vis,
+        "elevation_m": data.get("elevation"),
+        # 저/중/고 운량을 어떻게 얻었는지: 집계 변수(aggregated) 또는
+        # 관측자 표고 위 기압면 재구성(above_observer, 운해 보정).
+        "cloud_method": data.get("cloud_method"),
+        # 보정 전 지상 저층운(발밑 운해 포함). above_observer 일 때 corrected 와
+        # 비교해 운해를 걷어냈는지 안내하는 데 쓴다.
+        "cloud_cover_low_surface": data.get("cloud_cover_low_surface"),
+    }
     return {
         "cloud_low": cl,
         "cloud_mid": cm,
         "cloud_high": ch,
         "visibility": vis,
-        "numbers": {
-            "cloud_cover_low": cl,
-            "cloud_cover_mid": cm,
-            "cloud_cover_high": ch,
-            "visibility_m": vis,
-        },
+        "numbers": numbers,
         "attribution": ["기상: Open-Meteo (open-meteo.com)"],
     }
 

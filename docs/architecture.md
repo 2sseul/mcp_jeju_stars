@@ -11,7 +11,8 @@
 | 데이터 | 출처 | 파일 / 접근 | 지금 쓰는가 | 용도 |
 |---|---|---|---|---|
 | **천체력 (Ephemeris)** | JPL DE421 (via Skyfield) | `data/ephem/de421.bsp` (16 MB, 로컬 고정) | ✅ | 태양 고도 → 박명 구간·완전한 밤 구간 계산 |
-| **기상 예보** | Open-Meteo API | `https://api.open-meteo.com/v1/forecast` (캐시 1h + 재시도) | ✅ | 정시별 **저층운·중층운·고층운(%)**, **시정(m)** 조회 |
+| **기상 예보** | Open-Meteo API | `https://api.open-meteo.com/v1/forecast` (캐시 1h + 재시도) | ✅ | 정시별 **저층운·중층운·고층운(%)**, **시정(m)**. 고지대는 **기압면 운량+지오포텐셜 고도**로 표고 보정(운해) |
+| **표고 (DEM)** | Open-Meteo Elevation API | `https://api.open-meteo.com/v1/elevation` (좌표당 메모이즈) | ✅ | 관측지 해발 표고 — 발밑 구름(운해)을 걷어내는 기준 |
 | **지오코딩** | Photon (Komoot, OSM 기반) | `https://photon.komoot.io/api/` | ✅ | 주소·지명 → 좌표 (`evaluate_place`) |
 | **다크스카이 관측지 큐레이션** | 한국관광공사·비짓제주·위키·디지털문화대전 교차확인 | `data/jeju_spots.json` (20곳) | ⚠️ 참고자료 | 제주 대표 관측지 20곳 좌표·정성 정보. **엔진엔 아직 미연결** |
 | **광공해 래스터 (VIIRS)** | VIIRS/NPP 야간광 | `data/raw/jeju_2025_viirs_npp.tif`, `jeju_2025_GeoTIFF_raw.tif` | ❌ 미사용 | 향후 어둡기(SQM/Bortle) 실검증용 원본. 아직 파이프라인 없음 |
@@ -26,9 +27,10 @@
 
 - **Open-Meteo (`data/script/open_meteo.py`)**
   - judge 가 소비하는 값만 요청: `cloud_cover_low`, `cloud_cover_mid`, `cloud_cover_high`, `visibility` (기온·습도 등은 요청조차 안 함).
-    - 저·중층운 → 차폐 축, 고층운 → 투명도 축, 시정 → 참고 문구용 (§2.4).
+    - 저·중층운 → 차폐 축, 고층운 → 정보성, 시정 → 참고 문구용 (§2.4).
   - `when` 이 속한 정시로 내림해 그 시각의 예보값 사용. 값 없으면(NaN·범위 밖) `None`.
   - `requests_cache`(1h) + `retry_requests`(5회) 로 감싼 클라이언트를 모듈 로드 시 1회 초기화.
+  - **표고 보정(운해)**: 표고 ≥ 500 m 관측지는 기압면 운량(`cloud_cover_XXXhPa`)+지오포텐셜 고도를 추가로 받아 저/중/고 운량을 재구성한다(§2.5).
   - ⚠️ 요청 변수 순서 = 반환부 `Variables(index)` 순서. 어긋나면 값이 뒤섞이거나 인덱스 초과로 터진다.
 
 - **Photon (`server/geocode.py`)**
@@ -140,6 +142,28 @@ Kerber et al. 2014). 등급 순위: 최적(0) < 양호(1) < 밝은 별 한정(2)
 > 판정 함수: `judge(state, cloud_low, cloud_mid, cloud_high, visibility_m)` — 파일 하단
 > `__main__` 에 37개 케이스 + 불변식 5종(시정·고층운 등급 무관, 단조성, 어둡기 상한, overlap ≤ 단순합) 자체 검증 포함.
 
+### 2.5 관측자 표고 보정 — 운해 (`data/script/open_meteo.py`)
+
+**문제**: 집계 변수 `cloud_cover_low` 는 지면부터의 저층운이라 관측자 **발밑**에 깔린
+구름(운해)까지 포함한다. 1100고지(해발 1106 m)에서 운해가 600 m 에 깔리면
+`cloud_cover_low` = 100% 지만, 관측자는 그 위 맑은 하늘을 본다 — 오히려 운해가 아래
+도시 광공해를 가려 **최상 조건**인데, 보정 없이는 `불가` 로 오판한다.
+
+**해결**: 표고 ≥ `HIGH_SPOT_ELEVATION_M`(500 m) 관측지는 기압면 운량
+(`cloud_cover_{hPa}`)+지오포텐셜 고도(`geopotential_height_{hPa}`, AMSL)를 받아,
+**관측자 표고보다 높은 기압면만** 남겨 저/중/고 운량을 재구성한다(`bands_above_observer`,
+순수 함수). 발밑 층은 지오포텐셜 고도 비교로 자동 제외된다.
+
+- 밴드 분류는 **ISCCP 기압 경계**(저 ≥680, 중 440–680, 고 <440 hPa) — Open-Meteo 집계
+  변수와 같은 정의라 새 임계값이 아니다. 밴드값 = 그 밴드에서 관측자 위 층들의 운량 최댓값(연직 인접층 최대중첩).
+- 이후는 §2.4 와 동일 — 재구성된 저·중층운으로 차폐율(random overlap) 산출, 고층운은 정보성.
+- **표고 < 500 m 는 집계 변수 그대로**(발밑에 뺄 구름이 거의 없어 결과가 같고, 요청도 가볍다) → **하이브리드**.
+- `numbers` 에 `elevation_m`, `cloud_method`(`aggregated`|`above_observer`), `cloud_cover_low_surface`(보정 전 지상 저층운) 노출.
+- MCP 계층은 `above_observer` + 관측 가능 + (지상−보정 저층운 ≥ 20%p)일 때만 "발밑 운해를 빼고 평가했다"는 안내 문구를 덧붙인다(불가일 땐 붙이지 않아 오해를 막음).
+
+> 표고는 Open-Meteo Elevation API(90 m DEM)로 좌표당 1회 조회·메모이즈. 조회 실패 시
+> 보정 없이 집계 변수로 폴백한다(스키마·판정은 그대로).
+
 ---
 
 ## 3. MCP 서버 계층 (`server/mcp_server.py`)
@@ -198,8 +222,8 @@ data/
   raw/*.tif            # VIIRS 광공해 래스터 (미사용, 향후 어둡기 축)
   script/
     astro.py           # 태양 고도 → 박명/완전한 밤 (사실)
-    open_meteo.py      # 기상 조회 (저·중·고층운 + 시정)
-    judge.py           # 관측 등급 판정 (3축 정책, 순수 함수)
+    open_meteo.py      # 기상 조회 (저·중·고층운 + 시정 + 표고 보정/운해)
+    judge.py           # 관측 등급 판정 (2축 정책 + 고층운 정보성, 순수 함수)
 ```
 
 > **임시 브리지:** 계산 3모듈(`data/script/{astro,judge,open_meteo}`)은 아직 PR 검토 중이라
@@ -210,9 +234,11 @@ data/
 
 ## 5. 최근 반영 / 다음 확장 축
 
-**최근 반영** — 구름 판정을 저층운 단일 차단에서 **3축(차폐·투명도·어둡기) 정책**으로 확장.
-`open_meteo.fetch` 가 중·고층운을 추가 조회하고, `state`·`weather_node`·`judge` 가
-이를 관통하도록 배선. 결측을 '불가'와 분리해 '알 수 없음' 등급 신설.
+**최근 반영**
+- 구름 판정을 저층운 단일 차단에서 **차폐(저+중층운)·어둡기 2축 + 고층운 정보성** 정책으로 확장.
+  중·고층운 추가 조회, `state`·`weather_node`·`judge` 관통. 결측을 '불가'와 분리해 '알 수 없음' 신설.
+- 코드리뷰 반영: 고층운을 등급에서 제외(정보성만), 고층운 결측이 등급을 안 바꾸게, `resolved` 고정 스키마 편입, 단독 지역어 지오코딩 차단.
+- **관측자 표고 보정(운해)** — 고지대(≥500 m)는 기압면 운량에서 발밑 구름을 걷어내 재구성(§2.5).
 
 **다음 확장 축**
 - **어둡기(SQM/Bortle)** — VIIRS 래스터(`data/raw/*.tif`)를 좌표 샘플링하는 provider 노드 추가 예정. `numbers` 에 필드만 늘리면 됨.

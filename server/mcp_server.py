@@ -107,8 +107,26 @@ def _evaluate_coords(
 
     final = graph.run(lat, lon, when)
     reasons = list(final.get("reasons", []))
+    nums = final.get("numbers", {})
+
+    # 운해 보정 안내: 표고가 높아 기압면 방식으로 평가했고, 지상 저층운이 실제로
+    # 관측자 발밑에 상당량 깔려 있었다면(보정 전후 차이가 크면) 그 사실을 알려준다.
+    # 고지대 운해는 오히려 아래 광공해를 가려 좋은 조건이라 사용자에게 유용한 정보다.
+    # 단 '유리하다'는 안내는 실제로 관측이 가능할 때만 — 머리 위에도 구름이 많아
+    # 불가라면(발밑 운해 + 머리 위 구름) 운해를 강조하는 건 오해를 부른다.
+    if final.get("possible") and nums.get("cloud_method") == "above_observer":
+        surface = nums.get("cloud_cover_low_surface")
+        corrected = nums.get("cloud_cover_low") or 0.0
+        elev = nums.get("elevation_m")
+        if surface is not None and surface - corrected >= 20.0:
+            reasons.append(
+                f"해발 {elev:.0f}m라 발밑에 깔린 구름(운해)은 빼고 평가했어요 "
+                f"— 지상 저층운 {surface:.0f}%는 관측자 아래에 있어, 오히려 아랫마을 "
+                "불빛을 가려 관측엔 유리할 수 있어요"
+            )
+
     # 관측 가능하면 오늘 완전히 어두운 시간대를 덤으로 알려준다.
-    window = final.get("numbers", {}).get("dark_window")
+    window = nums.get("dark_window")
     if final.get("possible") and window:
         reasons.append(
             f"참고로 오늘 완전히 어두운 시간대는 "

@@ -52,8 +52,10 @@ class GeocodeResult:
 def _variants(query: str) -> list[str]:
     """정확 매칭 실패에 대비한 검색어 변형(우선순위 순, 중복 제거).
 
-    단독 지역어(_GENERIC)로 축약된 변형은 넣지 않는다 — 그런 후보는 원래 장소가
-    아니라 제주 일대의 일반 위치를 반환해 오확정을 부른다(리뷰 반영).
+    fallback 은 **알려진 지역 접두어(_PREFIXES) 제거로만** 제한한다. 끝/첫 토큰을
+    임의로 떼는 축약은 '성산일출봉 없는장소' → '성산일출봉' 처럼 존재하지 않는
+    질의를 전혀 다른 실제 장소로 확정시켜 오답을 부르므로 쓰지 않는다(리뷰 반영).
+    접두어를 뗀 결과가 단독 지역어(_GENERIC)면 그것도 제외한다.
     """
     out: list[str] = []
 
@@ -67,12 +69,6 @@ def _variants(query: str) -> list[str]:
     for pre in _PREFIXES:
         if q.startswith(pre):
             add(q[len(pre):])
-    toks = q.split()
-    if len(toks) >= 2:
-        add(" ".join(toks[1:]))   # 첫 토큰 제거 (예: '한라산' 떼기)
-        add(" ".join(toks[:-1]))  # 끝 토큰 제거
-        add(toks[-1])
-        add(toks[0])
     return out[:5]
 
 

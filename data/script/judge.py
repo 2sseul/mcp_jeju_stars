@@ -171,6 +171,16 @@ def _ladder(pct: float) -> str:
     return IMPOSSIBLE
 
 
+#: 차폐 등급별 사람이 읽는 구름 문구. 등급과 문구가 어긋나지 않게 등급별로 나눈다
+#: (31~50% 는 '밝은 별 한정' 인데 "구름 적음" 이라고 하면 모순). IMPOSSIBLE 은
+#: cloud_verdict 에서 따로 처리하므로 여기 없다.
+_CLOUD_PHRASE = {
+    OPTIMAL: "구름이 거의 없어요",
+    GOOD: "낮은 구름이 조금 있어요",
+    LIMITED: "낮은 구름이 다소 많아요",
+}
+
+
 def blocking_pct(low: float, mid: float) -> float:
     """저층운·중층운을 random overlap 가정으로 결합한 차폐율(%).
 
@@ -203,7 +213,7 @@ def cloud_verdict(
     if block_grade == IMPOSSIBLE:
         return IMPOSSIBLE, [f"낮은 구름이 하늘을 덮고 있어요 (차폐 {blocked:.0f}%)"]
 
-    reasons = [f"낮은 구름 적음 (차폐 {blocked:.0f}%)"]
+    reasons = [f"{_CLOUD_PHRASE[block_grade]} (차폐 {blocked:.0f}%)"]
 
     # 고층운은 등급을 바꾸지 않는다 — 정성 문구로만 노출한다(docstring 3절).
     # 결측이면 문구만 생략한다(등급 불변).

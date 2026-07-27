@@ -8,6 +8,12 @@
 - numbers:      구조화 수치 — LLM 이 지어내지 못하게 문장과 분리해 노출
 - attribution:  데이터 출처. 최상위에 두고 축약·생략하지 않는다
 - as_of:        평가 기준 시각(ISO8601, +09:00)
+- resolved:     지오코딩으로 해석된 위치(질의·좌표 등). 좌표를 직접 받은 경우나
+                해석 실패 시에는 None. 필드 자체는 모든 응답에 항상 존재한다.
+
+resolved 는 evaluate_place 에서만 값이 차지만, 성공/실패에 따라 응답의 필드 집합이
+달라지지 않도록 **모든 경로에서 키를 항상 내보낸다**(없으면 None). 응답 '모양'을
+고정한다는 계획서 고정2 원칙을 도구·경로에 걸쳐 지키기 위함이다.
 """
 
 from __future__ import annotations
@@ -22,6 +28,7 @@ class Response:
     numbers: dict
     attribution: list[str]
     as_of: str
+    resolved: dict | None = None
 
     def to_dict(self) -> dict:
         """MCP 도구 반환용 순수 dict. 복사본을 만들어 내부 상태 유출을 막는다."""
@@ -31,4 +38,5 @@ class Response:
             "numbers": dict(self.numbers),
             "attribution": list(self.attribution),
             "as_of": self.as_of,
+            "resolved": dict(self.resolved) if self.resolved is not None else None,
         }

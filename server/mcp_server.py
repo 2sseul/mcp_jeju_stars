@@ -85,9 +85,18 @@ def _out_of_range(lat: float, lon: float) -> dict:
 
 
 def _evaluate_coords(
-    lat: float, lon: float, date: str | None, time: str | None
+    lat: float,
+    lon: float,
+    date: str | None,
+    time: str | None,
+    resolved: dict | None = None,
 ) -> dict:
-    """좌표 평가 코어 — evaluate_spot·evaluate_place 가 공유한다."""
+    """좌표 평가 코어 — evaluate_spot·evaluate_place 가 공유한다.
+
+    resolved 는 지오코딩으로 해석된 위치 메타데이터다. evaluate_place 만 채워 넘기고
+    evaluate_spot 은 None 이다. 어느 쪽이든 Response 가 항상 키를 내보내 응답 '모양'이
+    같게 유지된다(고정 스키마).
+    """
     if not _in_jeju(lat, lon):
         return _out_of_range(lat, lon)
 
@@ -112,6 +121,7 @@ def _evaluate_coords(
         numbers=final.get("numbers", {}),
         attribution=final.get("attribution", []),
         as_of=when.isoformat(timespec="minutes"),
+        resolved=resolved,
     ).to_dict()
 
 
@@ -129,7 +139,8 @@ def evaluate_spot(
             date·time 모두 생략하면 현재 시각으로 평가한다.
 
     Returns:
-        verdict/reasons/numbers/attribution/as_of 스키마(dict).
+        verdict/reasons/numbers/attribution/as_of/resolved 스키마(dict).
+        좌표를 직접 받으므로 resolved 는 항상 None.
     """
     return _evaluate_coords(lat, lon, date, time)
 
@@ -167,14 +178,14 @@ def evaluate_place(
             as_of=datetime.now(KST).isoformat(timespec="minutes"),
         ).to_dict()
 
-    result = _evaluate_coords(hit.lat, hit.lon, date, time)
-    result["resolved"] = {
+    resolved = {
         "query": query,
         "matched_query": hit.matched_query,
         "display_name": hit.display_name,
         "lat": hit.lat,
         "lon": hit.lon,
     }
+    result = _evaluate_coords(hit.lat, hit.lon, date, time, resolved=resolved)
     if hit.matched_query and hit.matched_query != query:
         note = (
             f"'{query}'를 정확히 못 찾아 '{hit.matched_query}'로 검색했어요 → "

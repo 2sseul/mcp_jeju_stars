@@ -90,10 +90,10 @@ flowchart LR
 
 ### 2.4 판정 정책 (`data/script/judge.py`, 순수 함수)
 
-**세 축을 각각 평가한 뒤 가장 나쁜 축을 따른다**(`max(_RANK[...])`). 하나의 점수로
-가중합하지 않는다 — 검증 불가능한 계수가 생기기 때문(ESO 의 AND 구조를 따름,
+**두 축(어둡기·차폐)을 각각 평가한 뒤 가장 나쁜 축을 따른다**(`max(_RANK[...])`). 하나의
+점수로 가중합하지 않는다 — 검증 불가능한 계수가 생기기 때문(ESO 의 AND 구조를 따름,
 Kerber et al. 2014). 등급 순위: 최적(0) < 양호(1) < 밝은 별 한정(2) < 불가(3).
-`알 수 없음`은 이 순위에 없는 **별개 상태**다.
+`알 수 없음`은 이 순위에 없는 **별개 상태**다. 고층운은 판정에 넣지 않고 정보성 문구로만 표시한다.
 
 **① 어둡기 축 — 태양 고도(등급 상한)**
 
@@ -110,17 +110,20 @@ Kerber et al. 2014). 등급 순위: 최적(0) < 양호(1) < 밝은 별 한정(2)
   `차폐율 = 1 − (1 − low) × (1 − mid)`
 - 차폐율을 아래 **임계값 사다리**에 넣어 등급 산출.
 
-**③ 투명도 축 — 고층운** (권운 = 얼음 결정, 반투과 → 가리지 않고 어둡게만)
-- 같은 사다리를 적용하되, 권운 단독으로는 **'불가'가 될 수 없다** — 하한은 '밝은 별 한정'(ESO thin cirrus 분류).
+**임계값 사다리 (차폐 축 전용, 전부 문헌값 — 튜닝 대상 아님)**
 
-**임계값 사다리 (차폐·투명도 축 공통, 전부 문헌값 — 튜닝 대상 아님)**
-
-| 운량 | 등급 | 근거 |
+| 차폐율 | 등급 | 근거 |
 |---|---|---|
 | ≤ 10% | 최적 | ESO clear sky (Kerber et al. 2014) |
 | ≤ 30% | 양호 | Xin et al. 2020 PTB 상한 |
 | ≤ 50% | 밝은 별 한정 | Xin et al. 2020 STB 상한 |
 | > 50% | 불가 | — |
+
+**고층운(권운) — 판정에 넣지 않음, 정보성 문구만**: 권운은 차폐가 아니라 **감광**이다.
+그런데 별빛 감쇠를 정하는 건 운량(%)이 아니라 광학두께 τ 인데 Open-Meteo 는 τ 를 주지
+않는다(얇은 권운 0.3등급 ~ 짙으면 3등급 이상으로 10배 넘게 갈림). 운량만으로 등급 손실을
+정량화하면 근거 없는 수가 되므로, 등급에 넣지 않고 "은하수·성운 대비 저하 가능"이라는
+정성 문구로만 노출한다(리포지토리 리서치 `common/star_research.md` 고층운 절).
 
 **시정 — 판정에 관여하지 않음**: 참고 문구(안개 <1km / 연무 <10km / 맑음)만 바꾼다. 근거:
 ① 수평 vs 수직 물리량 차이, ② 저층운과 중복, ③ 예보 성능 낮음(ECMWF 자체 experimental 명시).
@@ -132,15 +135,16 @@ Kerber et al. 2014). 등급 순위: 최적(0) < 양호(1) < 밝은 별 한정(2)
 > Kerber et al. 2014 / Xin et al. 2020 / Geleyn & Hollingsworth 1979 /
 > WMO 안개 정의(1 km). 상세는 `common/star_observation_conditions.md`.
 > 판정 함수: `judge(state, cloud_low, cloud_mid, cloud_high, visibility_m)` — 파일 하단
-> `__main__` 에 34개 케이스 + 불변식 5종(단조성·상한·overlap 등) 자체 검증 포함.
+> `__main__` 에 35개 케이스 + 불변식 5종(시정·고층운 등급 무관, 단조성, 어둡기 상한, overlap ≤ 단순합) 자체 검증 포함.
 
 ---
 
 ## 3. MCP 서버 계층 (`server/mcp_server.py`)
 
 - **FastMCP · stateless · streamable HTTP `/mcp`**. 실행: `uv run python -m server.mcp_server` → `http://127.0.0.1:8000/mcp`.
-- 응답 스키마(`server/schema.py`, `Response`): `verdict / reasons / numbers / attribution / as_of`.
+- 응답 스키마(`server/schema.py`, `Response`): `verdict / reasons / numbers / attribution / as_of / resolved`.
   - 값이 부분/하드코딩이라도 응답 **모양은 1단계부터 최종형으로 고정**(필드 추가는 쉬워도 구조 변경은 어렵기 때문).
+  - `resolved`(지오코딩으로 해석된 위치)는 `evaluate_place` 성공 시에만 값이 차고 나머지는 `None` 이지만, **키 자체는 모든 응답·모든 경로에 항상 존재**한다 — 성공/실패로 필드 집합이 달라지지 않게(도구·경로 불문 동일 스키마).
 
 ### 도구 2개
 
@@ -170,7 +174,7 @@ evaluate_place(query)          evaluate_spot(lat,lon)
                           │
                 astro → weather → judge  (state 누적)
                           │
-              Response(verdict, reasons, numbers, attribution, as_of).to_dict()
+        Response(verdict, reasons, numbers, attribution, as_of, resolved).to_dict()
 ```
 
 ---

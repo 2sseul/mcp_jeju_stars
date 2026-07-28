@@ -1,11 +1,11 @@
-"""P0 엔진 — astro → weather → judge → darkness 를 LangGraph StateGraph 로 잇는다.
+"""엔진 — astro → weather → judge → darkness 를 LangGraph StateGraph 로 잇는다.
 
-각 노드는 계획서의 provider/factor 역할을 한다. 축을 '하나씩' 추가하며 확장한다 —
-그때도 이 파일의 그래프 조립과 state 계약은 안 바뀐다(엣지·노드만 늘어남). P1 어둡기
-(광공해) 축을 darkness_node 로 붙였다. 별 개수 등은 이후 단계.
+축을 '하나씩' 추가하며 확장한다 — 그때도 이 파일의 그래프 조립과 state 계약은
+안 바뀐다(엣지·노드만 늘어남). 어둡기(광공해) 축이 darkness_node 로 그렇게 붙었다.
+별 개수 축은 이후 단계.
 
-계산 모듈(data/script/{astro,judge,open_meteo,darkness})은 아직 PR 검토 중이라 옮기지
-않고 import 만 한다. P1/P2 에서 server/providers·factors 로 정식 이관 예정.
+계산 모듈은 `server/core`(순수함수) · 네트워크는 `server/clients` 로 나뉜다.
+core 는 API·LLM 을 호출하지 않고, 이 파일이 둘을 조립한다.
 """
 
 from __future__ import annotations

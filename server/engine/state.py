@@ -1,11 +1,11 @@
 """LangGraph 엔진 공유 상태.
 
-계획서의 엔진 원칙(고정3): factor(=노드)들을 순서대로 돌며 결과를 '누적'만 한다.
-그 누적을 LangGraph StateGraph 의 리듀서로 표현한다 — 각 노드는 자기 조각만
-반환하고, numbers/reasons/attribution 은 리듀서가 합친다. 스칼라(state_code 등)는
+엔진 원칙: 노드들을 순서대로 돌며 결과를 '누적'만 한다. 그 누적을 LangGraph
+StateGraph 의 리듀서로 표현한다 — 각 노드는 자기 조각만 반환하고,
+numbers/reasons/attribution 은 리듀서가 합친다. 스칼라(state_code 등)는
 마지막 기록이 이긴다(overwrite).
 
-factor 를 늘려도(P1 어둡기, P3 별개수 …) 이 상태와 엔진 루프는 안 바뀐다.
+축을 늘려도(어둡기·별 개수 …) 이 상태와 엔진 루프는 안 바뀐다.
 """
 
 from __future__ import annotations

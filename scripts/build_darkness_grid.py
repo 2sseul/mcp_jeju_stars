@@ -7,9 +7,9 @@
 (star_research.md: "MCP 서버 컨테이너는 배치 결과 파일을 읽기만 한다").
 
 실행(전처리 의존은 커밋하지 않고 임시로 끌어온다):
-    uv run --with tifffile --with imagecodecs python data/script/build_darkness_grid.py
+    uv run --with tifffile --with imagecodecs python -m scripts.build_darkness_grid
 
-입력  : data/raw/jeju_2025_GeoTIFF_raw.tif  (= sb_202500, 인공 밝기 mcd/m², LZW)
+입력  : data/light_pollution/jeju_2025_GeoTIFF_raw.tif  (인공 밝기 mcd/m², LZW)
 출력  : data/darkness/jeju_sb_grid.npz
         grid   : float32 (nrows, ncols)  — 인공 밝기 mcd/m², 결측은 nodata
         affine : float64 [origin_lon, origin_lat, scale_deg, nodata]

@@ -1,4 +1,4 @@
-"""제주 밤하늘 관측 MCP 서버 (P0 — 걷는 뼈대).
+"""제주 밤하늘 관측 MCP 서버.
 
 FastMCP · stateless · streamable HTTP `/mcp`. 도구는 **입력 방식**으로만 둘이다:
 

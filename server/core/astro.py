@@ -22,11 +22,19 @@ skyfield.almanac.dark_twilight_day 의 구간 값(0~4)을 가공 없이 그대�
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from skyfield import almanac
 from skyfield.api import Loader, wgs84
+
+from server import path
+
+if not path.EPHEM.exists():
+    raise FileNotFoundError(f"성표 없음: {path.EPHEM}")
+
+_loader = Loader(str(path.EPHEM.parent))
+_ts = _loader.timescale()
+_eph = _loader("de421.bsp")
 
 # --- 상수 및 1회 초기화 -------------------------------------------------------
 
@@ -40,15 +48,6 @@ _NIGHT = 0
 # 하나의 밤으로 본다. 상태 3(시민박명)·4(낮)는 제외. 밤 단위 집계(tonight)의 시간
 # 창으로 쓰며, 이 역시 태양 고도라는 사실일 뿐 관측 가능 판정이 아니다.
 _NIGHTISH_MAX = 2
-
-# 천체력을 모듈 파일 기준 절대경로(data/ephem)에 고정한다.
-# 실행 위치(cwd)와 무관하게 항상 같은 파일을 쓰므로 중복 다운로드가 없다.
-_EPHEM_DIR = Path(__file__).resolve().parent.parent / "ephem"
-
-# timescale 과 ephemeris 는 모듈 로드 시 단 한 번만 초기화한다.
-_load = Loader(str(_EPHEM_DIR))
-_ts = _load.timescale()
-_eph = _load("de421.bsp")
 
 
 # --- 내부 헬퍼 ----------------------------------------------------------------

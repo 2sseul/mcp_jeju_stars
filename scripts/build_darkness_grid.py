@@ -20,14 +20,15 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import numpy as np
 import tifffile
 
-_ROOT = Path(__file__).resolve().parents[2]
-_SRC = _ROOT / "data" / "raw" / "jeju_2025_GeoTIFF_raw.tif"
-_OUT_DIR = _ROOT / "data" / "darkness"
+from server import path
+
+_SRC = path.SB_RAW
+_OUT = path.SB_GRID
+_OUT_DIR = _OUT.parent
 _OUT = _OUT_DIR / "jeju_sb_grid.npz"
 
 # 검증(star_research_validation.md [A-추가])과 대조할 기대 사양·통계.

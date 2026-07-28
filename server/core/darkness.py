@@ -40,9 +40,12 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from pathlib import Path
 
 import numpy as np
+
+from server import path
+
+_GRID_PATH = path.SB_GRID
 
 # --- 상수 --------------------------------------------------------------------
 
@@ -73,8 +76,6 @@ _MILKY_WAY = {
 #: SQM → Bortle 보조 매핑(lightpollutionmap 기준; Bortle 2001 원문엔 SQM 경계 없음).
 _BORTLE_SQM = ((21.99, 1), (21.89, 2), (21.69, 3), (20.49, 4),
                (19.50, 5), (18.94, 6), (18.38, 7))
-
-_GRID_PATH = Path(__file__).resolve().parent.parent / "darkness" / "jeju_sb_grid.npz"
 
 # 격자·아핀·귀속을 모듈 로드 시 1회 로드한다(정적 데이터).
 _npz = np.load(_GRID_PATH)

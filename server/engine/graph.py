@@ -24,11 +24,11 @@ _CALC = Path(__file__).resolve().parents[2] / "data" / "script"
 if str(_CALC) not in sys.path:
     sys.path.insert(0, str(_CALC))
 
-import astro  # noqa: E402
-import darkness as _darkness  # noqa: E402
-import judge as _judge  # noqa: E402
-import open_meteo  # noqa: E402
-import tonight as _tonight  # noqa: E402
+from server.core import astro
+from server.core import darkness
+from server.core import judge
+from server.clients import open_meteo  # noqa: E402
+from server.core import tonight
 
 
 # --- 노드 --------------------------------------------------------------------

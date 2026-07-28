@@ -11,3 +11,6 @@ __pycache__/
 
 # 스크래치 (Crossref API 응답 등 임시 조회 결과)
 cr.json
+
+# /pr 커맨드가 만드는 임시 PR 본문
+.pr-body.md

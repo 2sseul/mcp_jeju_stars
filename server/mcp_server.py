@@ -27,7 +27,7 @@ from zoneinfo import ZoneInfo
 
 from mcp.server.fastmcp import FastMCP
 
-from server.clients import geocode
+from server.clients.geocode import geocode
 from server.engine import graph
 from server.schema import Response
 

@@ -28,6 +28,7 @@ from zoneinfo import ZoneInfo
 from mcp.server.fastmcp import FastMCP
 
 from server.clients.geocode import geocode
+from server.core import astro
 from server.engine import graph
 from server.schema import Response
 
@@ -79,6 +80,26 @@ def _invalid_when(date: str | None, time: str | None) -> dict:
     ).to_dict()
 
 
+def _out_of_ephemeris(when: datetime) -> dict:
+    """천체력 지원 범위 밖 날짜에 대한 프롬프트형 응답.
+
+    박명은 천체력(DE421)으로 계산하는데 그 파일이 덮는 기간이 유한하다. 범위 밖이면
+    skyfield 가 예외를 던지므로, 도구 밖으로 새 나가기 전에 고정 스키마로 환원한다.
+    """
+    return Response(
+        verdict="입력 오류",
+        reasons=[
+            f"{when.date().isoformat()} 는 천체력이 다루는 기간 밖이라 "
+            "계산할 수 없어요. "
+            f"{astro.EPHEM_START.date().isoformat()} ~ "
+            f"{astro.EPHEM_END.date().isoformat()} 사이의 날짜로 다시 시도해 주세요."
+        ],
+        numbers={},
+        attribution=["천체력: JPL DE421 via Skyfield"],
+        as_of=datetime.now(KST).isoformat(timespec="minutes"),
+    ).to_dict()
+
+
 def _out_of_range(lat: float, lon: float) -> dict:
     """제주 범위 밖 입력에 대한 프롬프트형 응답."""
     return Response(
@@ -115,6 +136,9 @@ def _evaluate_moment(
         when = _resolve_when(date, time)
     except (ValueError, AttributeError):
         return _invalid_when(date, time)
+
+    if not astro.supports(when):
+        return _out_of_ephemeris(when)
 
     final = graph.run(lat, lon, when)
     reasons = list(final.get("reasons", []))
@@ -153,6 +177,26 @@ def _invalid_scope(scope) -> dict:
         attribution=[],
         as_of=datetime.now(KST).isoformat(timespec="minutes"),
     ).to_dict()
+
+
+def _validate_inputs(date: str | None, time: str | None, scope: str) -> dict | None:
+    """좌표와 무관한 입력(scope·날짜·시각)을 검증한다. 문제 없으면 None.
+
+    좌표 경로와 지명 경로가 **같은 판정**을 내리도록 이 하나를 공유한다. 지명 경로는
+    이것을 지오코딩보다 먼저 불러, 잘못된 입력에 외부 호출을 낭비하지 않는다.
+    """
+    s = (scope or "moment").strip().lower()
+    if s not in _SCOPES:
+        return _invalid_scope(scope)
+
+    try:
+        when = _resolve_night_when(date) if s == "night" else _resolve_when(date, time)
+    except (ValueError, AttributeError):
+        return _invalid_when(date, None if s == "night" else time)
+
+    if not astro.supports(when):
+        return _out_of_ephemeris(when)
+    return None
 
 
 def _evaluate(
@@ -195,7 +239,8 @@ def evaluate_spot(
         lat: 위도 (제주 범위 내).
         lon: 경도 (제주 범위 내).
         date: 평가할 날짜 YYYY-MM-DD. 생략하면 오늘. 미래 날짜도 가능(구름은 예보
-            지평 ~7일 안에서만, 박명·광공해는 지평 없음).
+            지평 ~7일 안에서만, 박명·광공해는 예보 지평 없음). 천체력이 덮는 기간
+            밖이면 '입력 오류'.
         time: 평가할 시각 24시간제 HH:MM(KST). scope="moment" 에서만 쓴다(생략 시 22:00;
             date·time 모두 생략 시 현재). scope="night" 이면 무시.
         scope: "moment" | "night". 기본 "moment".
@@ -226,6 +271,13 @@ def evaluate_place(
             생략 시 현재). scope="night" 이면 무시.
         scope: "moment" | "night". 기본 "moment". (evaluate_spot 참조)
     """
+    # 입력 검증을 지오코딩보다 **먼저** 한다. 뒤로 미루면 잘못된 입력인데도 외부 호출을
+    # 낭비하고, 지오코딩까지 실패하면 '입력 오류' 여야 할 응답이 '주소 확인 실패' 로
+    # 잘못 분류된다(좌표 경로와 결과가 갈림).
+    invalid = _validate_inputs(date, time, scope)
+    if invalid is not None:
+        return invalid
+
     try:
         hit = geocode(query)
     except Exception:  # noqa: BLE001 — 외부 지오코딩 실패도 스키마로 환원
@@ -346,6 +398,9 @@ def _evaluate_night(
         when = _resolve_night_when(date)
     except (ValueError, AttributeError):
         return _invalid_when(date, None)
+
+    if not astro.supports(when):
+        return _out_of_ephemeris(when)
 
     result = graph.run_tonight(lat, lon, when)
     window = result.get("window")

@@ -9,7 +9,8 @@ from __future__ import annotations
 import pytest
 
 from server import mcp_server
-from server.mcp_server import evaluate_spot
+from server.core import astro
+from server.mcp_server import evaluate_place, evaluate_spot
 
 EXPECTED_KEYS = {"verdict", "reasons", "numbers", "attribution", "as_of", "resolved"}
 
@@ -103,6 +104,75 @@ def test_범위_가드는_night_경로에도_걸린다():
     result = evaluate_spot(37.5665, 126.9780, scope="night")
     # Then: moment 와 같은 가드가 적용된다(두 경로의 일관성)
     assert result["verdict"] == "지원 범위 밖"
+
+
+# --- 천체력 지원 범위 ------------------------------------------------------------
+
+
+@pytest.mark.parametrize("scope", ["moment", "night"])
+@pytest.mark.parametrize("date", ["2100-01-01", "1800-01-01"])
+def test_천체력_범위_밖_날짜는_입력_오류로_환원된다(date, scope):
+    # Given: DE421 이 덮지 않는 날짜가 주어졌을 때(대략 1900~2053 밖)
+    # When: 제주 안 좌표로 평가하면
+    result = evaluate_spot(33.4762, 126.8229, date=date, scope=scope)
+    # Then: skyfield 의 EphemerisRangeError 가 도구 밖으로 새지 않고,
+    #       고정 스키마의 '입력 오류' 응답이 된다. 형식 검사만으로는 못 걸러진다
+    assert result["verdict"] == "입력 오류"
+    assert set(result) == EXPECTED_KEYS
+    assert any("천체력" in r for r in result["reasons"])
+
+
+def test_지원_범위_경계는_거부하지_않는다():
+    # Given: 천체력이 실제로 덮는 범위의 양 끝에서
+    for when in (astro.EPHEM_START, astro.EPHEM_END):
+        # When: 지원 여부를 물으면
+        # Then: 경계 자체는 지원한다
+        #       (범위를 파일에서 읽으므로 하드코딩과 어긋나지 않는다)
+        assert astro.supports(when)
+
+
+def test_지원_범위는_천체력_파일에서_읽는다():
+    # Given: DE421 을 로드한 상태에서
+    # When: 노출된 범위를 보면
+    # Then: 상수가 아니라 파일의 세그먼트에서 유도된 값이라 교체 시 따라온다
+    assert astro.EPHEM_START < astro.EPHEM_END
+    assert astro.EPHEM_START.year <= 1900
+    assert astro.EPHEM_END.year >= 2050
+
+
+# --- 검증 순서 --------------------------------------------------------------------
+
+
+def test_evaluate_place는_지오코딩보다_먼저_입력을_검증한다(monkeypatch):
+    # Given: 지오코딩이 호출되면 즉시 실패하도록 해두고
+    called = []
+
+    def spy(*a, **kw):
+        called.append(a)
+        raise AssertionError("입력이 잘못됐는데 지오코딩을 호출했다")
+
+    monkeypatch.setattr(mcp_server, "geocode", spy)
+
+    # When: 잘못된 scope·날짜로 지명 평가를 요청하면
+    bad_scope = evaluate_place("성산일출봉", scope="tonight")
+    bad_date = evaluate_place("성산일출봉", date="엉터리")
+
+    # Then: 외부 호출 없이 '입력 오류' 로 단락된다.
+    #       (뒤에 검증하면 지오코딩까지 실패했을 때 '주소 확인 실패' 로 잘못 분류된다)
+    assert called == []
+    assert bad_scope["verdict"] == "입력 오류"
+    assert bad_date["verdict"] == "입력 오류"
+
+
+def test_좌표_경로와_지명_경로의_입력_판정이_같다(monkeypatch):
+    # Given: 지오코딩이 항상 실패하는 상황에서(네트워크 장애 등)
+    monkeypatch.setattr(mcp_server, "geocode", lambda *a, **kw: None)
+    # When: 같은 잘못된 입력을 두 도구에 주면
+    for kwargs in ({"scope": "tonight"}, {"date": "엉터리"}, {"date": "2100-01-01"}):
+        spot = evaluate_spot(33.4762, 126.8229, **kwargs)
+        place = evaluate_place("성산일출봉", **kwargs)
+        # Then: 지오코딩 성패와 무관하게 같은 판정이 나온다
+        assert spot["verdict"] == place["verdict"] == "입력 오류", kwargs
 
 
 # --- 응답 계약 ------------------------------------------------------------------

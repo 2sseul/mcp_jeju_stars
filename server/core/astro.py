@@ -40,6 +40,30 @@ _eph = _loader("de421.bsp")
 
 KST = ZoneInfo("Asia/Seoul")
 
+#: 천체력이 실제로 덮는 날짜 범위. DE421 은 무한하지 않아(대략 1900~2053) 범위 밖
+#: 시각을 계산하면 skyfield 가 EphemerisRangeError 를 던진다. 하드코딩하지 않고
+#: 로드된 파일의 세그먼트에서 직접 읽어, 천체력을 교체해도 값이 따라오게 한다.
+def _ephemeris_span() -> tuple[datetime, datetime]:
+    """로드된 천체력이 덮는 [시작, 끝] 을 KST datetime 으로 돌려준다.
+
+    세그먼트마다 범위가 달라 **교집합**(가장 늦은 시작 ~ 가장 이른 끝)을 취한다.
+    한 세그먼트라도 범위를 벗어나면 계산이 실패하기 때문이다.
+    """
+    lo = max(seg.spk_segment.start_jd for seg in _eph.segments)
+    hi = min(seg.spk_segment.end_jd for seg in _eph.segments)
+    return (
+        _ts.tdb_jd(lo).utc_datetime().astimezone(KST),
+        _ts.tdb_jd(hi).utc_datetime().astimezone(KST),
+    )
+
+
+EPHEM_START, EPHEM_END = _ephemeris_span()
+
+
+def supports(when: datetime) -> bool:
+    """when 이 천체력 지원 범위 안인가. 밖이면 박명 계산이 불가능하다."""
+    return EPHEM_START <= _require_aware(when) <= EPHEM_END
+
 # 완전한 밤(천문박명 이후)을 의미하는 dark_twilight_day 구간 값.
 # 이것은 태양 고도라는 천문학적 사실일 뿐, "관측 가능"이라는 정책이 아니다.
 _NIGHT = 0

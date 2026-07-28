@@ -1,11 +1,11 @@
 # 제주 밤하늘 관측 MCP — 데이터·아키텍처 정리
 
-> 현재 단계(P0 — "걷는 뼈대"): 두 질의 형태를 지원한다.
+> 현재 지원하는 두 질의 형태:
 > **"지금 별 보이나?"**(한 시각, `astro→weather→judge` 그래프)와
 > **"오늘 밤 볼 수 있나?"**(밤 전체를 시간별로 판정해 모으는 집계).
-> **어둡기(광공해) 축**을 붙였다(P1) — Sky Brightness 래스터로 장소가 얼마나 어두운지
-> (SQM·Falchi)를 답한다. VIIRS 방위 분석·별 개수 축은 이후 단계. 노드·축을 하나씩 붙여
-> 확장할 수 있게 설계돼 있다.
+> 여기에 **어둡기(광공해) 축**이 붙어 있다 — Sky Brightness 래스터로 장소가 얼마나 어두운지
+> (SQM·Falchi)를 답한다. 관측지 탐색·별 개수·VIIRS 방위 분석은 이후 단계
+> (로드맵 → `docs/status.md`). 노드·축을 하나씩 붙여 확장할 수 있게 설계돼 있다.
 >
 > 이 문서는 **어떤 데이터를 / 어떻게 쓰고 / 왜 그렇게 판정하는가**를 정리한다.
 > 판정 임계값은 전부 문헌값이며, 근거 문헌은 각 절 끝과 `common/star_*` 에 있다.
@@ -73,16 +73,16 @@ weather 는 예외를 밖으로 던지지 않으며, judge 는 API·장소를 �
 | **천체력 (Ephemeris)** | JPL DE421 (via Skyfield) | `data/ephem/de421.bsp` (로컬 고정) | ✅ | 태양 고도 → 박명 구간·완전한 밤/박명 포함 밤 구간 |
 | **기상 예보** | Open-Meteo Forecast API | `api.open-meteo.com/v1/forecast` (캐시 1h + 재시도 5회) | ✅ | 정시별 **총운량(%)**·**시정(m)**. 한 시각(`fetch`) 또는 밤 구간 시계열(`fetch_series`) |
 | **지오코딩** | Photon (Komoot, OSM 기반) | `photon.komoot.io/api/` (키 불필요) | ✅ | 주소·지명 → 좌표 (`evaluate_place`) |
-| **광공해 — Sky Brightness** | NASA Black Marble(VNP46A4/VJ146A4) 기반, lightpollutionmap.info 산출(sb_2025) | `data/raw/jeju_2025_GeoTIFF_raw.tif` → 전처리 `data/darkness/jeju_sb_grid.npz` | ✅ | 장소 어둡기 — 인공 밝기(mcd/m²) → **SQM·Falchi 등급**(어둡기 축) |
-| **다크스카이 관측지 큐레이션** | 관광공사·비짓제주·위키·문화대전 교차확인 | `data/jeju_spots.json` (20곳) | ⚠️ 참고자료 | 제주 대표 관측지 20곳 좌표·정성 정보. **엔진엔 아직 미연결** |
-| **야간광 (VIIRS)** | VIIRS/NPP 야간광 복사휘도 | `data/raw/jeju_2025_viirs_npp.tif` | ⏳ 다음 단계(P6) | "어느 방향이 어두운가" 방위 분석용. 절댓값 불신·d⁻ᵖ 민감도 처리 필요 |
+| **광공해 — Sky Brightness** | NASA Black Marble(VNP46A4/VJ146A4) 기반, lightpollutionmap.info 산출(sb_2025) | `data/light_pollution/jeju_2025_GeoTIFF_raw.tif` → 전처리 `data/darkness/jeju_sb_grid.npz` | ✅ | 장소 어둡기 — 인공 밝기(mcd/m²) → **SQM·Falchi 등급**(어둡기 축) |
+| **다크스카이 관측지 큐레이션** | 관광공사·비짓제주·위키·문화대전 교차확인 | `data/jeju_spots.json` (20곳) | ⚠️ 참고자료 | 제주 대표 관측지 20곳 좌표·정성 정보. **엔진엔 아직 미연결** — 관측지 탐색 단계에서 크롤링으로 확장 후 연결 예정 |
+| **야간광 (VIIRS)** | VIIRS/NPP 야간광 복사휘도 | `data/light_pollution/jeju_2025_viirs_npp.tif` | ⏳ 이후 단계 | "어느 방향이 어두운가" 방위 분석용. 절댓값 불신·d⁻ᵖ 민감도 처리 필요 |
 
 > **이전 버전과의 차이**: 표고 기반 운해 보정을 위해 쓰던 Open-Meteo **Elevation API**와
 > **기압면 운량**은 제거했다(§2.5). 구름은 이제 집계 총운량 한 값으로만 평가한다.
 
 ### 데이터별 세부 — *무엇이고 어떻게 쓰는가*
 
-- **DE421 천체력 (`data/ephem/de421.bsp` → `data/script/astro.py`)**
+- **DE421 천체력 (`data/ephem/de421.bsp` → `server/core/astro.py`)**
   - JPL 이 배포하는 행성력. Skyfield `Loader` 가 **모듈 파일 기준 절대경로**에서 1회 로드하므로
     실행 위치(cwd)와 무관하고 중복 다운로드가 없다.
   - `skyfield.almanac.dark_twilight_day` 로 태양 고도 구간(0~4)을 **가공 없이** 노출한다.
@@ -92,7 +92,7 @@ weather 는 예외를 밖으로 던지지 않으며, judge 는 API·장소를 �
   - **왜 로컬 파일인가**: 태양 고도는 좌표·시각만으로 결정되는 결정론적 천문값이라 외부 호출이
     필요 없다. 로컬 천체력이면 오프라인·무지연·재현 가능하다.
 
-- **Open-Meteo Forecast (`data/script/open_meteo.py`)**
+- **Open-Meteo Forecast (`server/clients/open_meteo.py`)**
   - judge 가 실제로 소비하는 값만 요청한다 — `cloud_cover`(총운량, %)·`visibility`(시정, m).
     기온·습도 등은 판정에 안 쓰므로 **요청조차 하지 않는다**.
   - 두 형태: `fetch(when)`(한 정시) / `fetch_series(start, end)`(밤 구간 각 정시를 **한 번의
@@ -106,7 +106,7 @@ weather 는 예외를 밖으로 던지지 않으며, judge 는 API·장소를 �
     → 구름만 '알 수 없음'이 된다. 반면 **박명(천체력)·광공해(정적 래스터)는 지평이 없어** 어떤
     미래 날짜든 그대로 산출된다 — 즉 먼 미래도 "언제 어두운가·얼마나 어두운 곳인가"는 답할 수 있다.
 
-- **Photon 지오코딩 (`server/geocode.py`)**
+- **Photon 지오코딩 (`server/clients/geocode.py`)**
   - 키 불필요·오픈소스. Nominatim 대비 퍼지 매칭이 강해 "1100고지" 같은 비정형 지명을 잘 잡는다.
   - 제주 bbox 편향 + **알려진 접두 지역어**("한라산 ", "제주시 " 등) 제거 변형 fallback.
     끝/첫 토큰을 임의로 떼는 축약은 '성산일출봉 없는장소'→'성산일출봉'처럼 존재하지 않는 질의를
@@ -183,7 +183,7 @@ tonight.summarize(시간별 판정 목록)      ← 밤 전체. "오늘 밤 볼 
   없으면 모름이다. 모르는 것과 나쁜 것을 같은 등급으로 두면 관측지 추천에서 데이터 없는
   지점이 흐린 지점과 같은 순위로 떨어진다.
 
-### 2.5 어둡기 축 — 광공해 (`data/script/darkness.py`, P1)
+### 2.5 어둡기 축 — 광공해 (`server/core/darkness.py`)
 
 **장소가 얼마나 어두운 하늘인가**를 Sky Brightness 래스터에서 읽어 답한다. 광공해는
 도시 확장·가로등 증설로만 바뀌는 **정적(T0) 속성**이라 날짜·시각과 무관하다 — 미래 어느
@@ -234,7 +234,7 @@ SQM    = log10(총밝기 / 1.08e8) / (−0.4)     (클수록 어두움)
 > 픽스처(검증 재현): 용눈이오름 SQM 21.19 → Falchi iv, 제주시 SQM 19.18 → Falchi v·Bortle 6.
 > 격자 SQM 분포 min 19.14 / p50 21.50 / max 21.93 이 원본과 일치.
 
-### 2.6 tonight — 밤 단위 집계 (`data/script/tonight.py`)
+### 2.6 tonight — 밤 단위 집계 (`server/core/tonight.py`)
 
 judge 는 한 시점을 답한다. 그 위에 한 층을 얹어 **밤 전체**를 답한다. 밤 구간
 (`astro.night_window`, 박명 포함=태양 < −6°)의 매 정시를 judge 로 판정한 목록을 받아
@@ -284,9 +284,16 @@ flowchart LR
 - 파일: `graph.py`(그래프 조립·노드), `state.py`(공유 상태). LangGraph `StateGraph`.
 - 각 노드는 자기 조각만 반환하고 공유 상태에 **누적**한다(리듀서). 축을 늘려도 그래프 조립과
   state 계약은 안 바뀐다 — 노드·엣지만 늘어난다(darkness_node 가 그렇게 추가됐다).
-- 계산 4+1모듈(`data/script/{astro,judge,open_meteo,darkness,tonight}`)은 아직 옮기지 않고
-  `sys.path` 브리지로 import 만 한다. P1/P2 에서 `server/providers`·`factors` 로 이관 예정.
+- 계산 모듈은 **`server/core`(순수함수: astro·judge·darkness·tonight)** 와
+  **`server/clients`(네트워크: open_meteo·geocode)** 로 나뉜다. `core` 는 네트워크·LLM 을
+  호출하지 않고, 이 파일이 둘을 조립한다. 경로 상수는 전부 `server/path.py` 를 거친다.
 - `run()` 은 그래프 실행 뒤 `_apply_milky_way_correction()` 으로 광공해에 맞춰 은하수 문구만 정정한다.
+
+> **계획서와 달라진 점**: 초기 계획(`docs/plan.md` 고정3 참조)은 `factors/`·`providers/`
+> 에 `contribute(ctx) -> Contribution` 플러그인 인터페이스를 두는 구조였다. 실제로는 그 역할을
+> **LangGraph 노드 + 리듀서**가 그대로 수행하므로 별도 인터페이스를 만들지 않고, 분류 기준을
+> "요인/데이터"가 아니라 **"순수함수(core)/네트워크(clients)"** 로 바꿨다. 확장 방식("파일 하나
+> 추가 + 등록 한 줄")은 동일하게 유지된다.
 
 | 노드 | 출력(상태 조각) | 성격 |
 |---|---|---|

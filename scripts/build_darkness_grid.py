@@ -33,9 +33,13 @@ _OUT_DIR = _OUT.parent
 # 검증(star_research_validation.md [A-추가])과 대조할 기대 사양·통계.
 _EXPECT_SHAPE = (98, 118)
 _EXPECT_SCALE = 0.008333333333333333
+# 귀속 문구는 배포처가 요구하는 형식을 축어로 지킨다
+# (lightpollutionmap.info/help.html): "Jurij Stare, www.lightpollutionmap.info"
+# + "NASA's Black Marble nighttime lights product"
 _SOURCE = (
-    "광공해(Sky Brightness): NASA Black Marble (VNP46A4/VJ146A4) 기반, "
-    "lightpollutionmap.info 산출 레이어 (sb_2025). "
+    "광공해(Sky Brightness): Jurij Stare, www.lightpollutionmap.info — "
+    "NASA's Black Marble nighttime lights product (VNP46A4/VJ146A4) 기반 "
+    "산출 레이어 (sb_2025). "
     "영점 1.08e8 mcd/m² · 자연 밤하늘 22.00 mag/arcsec² 규약."
 )
 

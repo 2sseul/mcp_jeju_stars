@@ -14,3 +14,6 @@ cr.json
 
 # /pr 커맨드가 만드는 임시 PR 본문
 .pr-body.md
+
+# 발표용 시각화 산출물 (scripts/build_*_map.py · build_spot_report.py 로 재생성)
+outputs/

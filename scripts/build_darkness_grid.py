@@ -29,7 +29,6 @@ from server import path
 _SRC = path.SB_RAW
 _OUT = path.SB_GRID
 _OUT_DIR = _OUT.parent
-_OUT = _OUT_DIR / "jeju_sb_grid.npz"
 
 # 검증(star_research_validation.md [A-추가])과 대조할 기대 사양·통계.
 _EXPECT_SHAPE = (98, 118)
@@ -65,7 +64,7 @@ def main() -> None:
     print(f"원점(좌상단 모서리): lon={origin_lon}, lat={origin_lat}  nodata={nodata}")
     print(f"인공 밝기(mcd/m²): min={valid.min():.4f} p50={np.median(valid):.4f} "
           f"max={valid.max():.4f}")
-    print(f"저장: {_OUT.relative_to(_ROOT)}  ({_OUT.stat().st_size} bytes)")
+    print(f"저장: {_OUT.relative_to(path.ROOT)}  ({_OUT.stat().st_size} bytes)")
 
     # star_research_validation.md 와 교차 검증: SQM 분포가 재현되는지.
     art = valid.astype(np.float64)

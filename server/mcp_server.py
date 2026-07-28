@@ -27,8 +27,8 @@ from zoneinfo import ZoneInfo
 
 from mcp.server.fastmcp import FastMCP
 
-from server.engine import graph
 from server.clients import geocode
+from server.engine import graph
 from server.schema import Response
 
 KST = ZoneInfo("Asia/Seoul")

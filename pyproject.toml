@@ -28,3 +28,7 @@ scripts = ["tifffile>=2024.1"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "RUF"]
+ignore = ["RUF046"]

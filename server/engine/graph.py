@@ -10,26 +10,17 @@
 
 from __future__ import annotations
 
-import sys
 from datetime import datetime
-from pathlib import Path
 
 from langgraph.graph import END, START, StateGraph
 
-from .state import EngineState
-
-# --- 계산 모듈 import 브리지 (임시) -------------------------------------------
-# data/script 를 패키지로 만들지 않고 경로만 추가해 그대로 재사용한다.
-_CALC = Path(__file__).resolve().parents[2] / "data" / "script"
-if str(_CALC) not in sys.path:
-    sys.path.insert(0, str(_CALC))
-
+from server.clients import open_meteo
 from server.core import astro
-from server.core import darkness
-from server.core import judge
-from server.clients import open_meteo  # noqa: E402
-from server.core import tonight
+from server.core import darkness as _darkness
+from server.core import judge as _judge
+from server.core import tonight as _tonight
 
+from .state import EngineState
 
 # --- 노드 --------------------------------------------------------------------
 

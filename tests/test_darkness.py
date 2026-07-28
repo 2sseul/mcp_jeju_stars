@@ -133,6 +133,104 @@ def test_격자_전체_SQM_분포가_원본과_일치한다():
 # --- 은하수 문구 --------------------------------------------------------------
 
 
+# --- 종합 점수 (SQM + VIIRS + 가로등) -----------------------------------------
+
+
+def test_성분은_모두_0에서_1_사이로_묶인다():
+    # Given: 정규화 범위를 벗어나는 극단값이 주어졌을 때
+    # When: 각 성분을 구하면
+    # Then: 0~1 밖으로 나가지 않는다 (가중합이 등급 상한을 넘지 않게 하는 전제)
+    assert darkness.sqm_part(25.0) == 0.0  # 자연 밤하늘보다 어두울 수는 없다
+    assert darkness.sqm_part(10.0) == 1.0
+    assert darkness.lamp_part(5.0) == 1.0  # 5m 앞 가로등 = 최악
+    assert darkness.lamp_part(5000.0) == 0.0
+    assert darkness.nightlight_part(0.0) == 0.0
+    assert darkness.nightlight_part(1e6) == 1.0
+
+
+def test_가로등이_없으면_광원_성분이_0이다():
+    # Given: 반경 안에 가로등이 하나도 없어 최근접 거리가 None 일 때
+    # When: 성분을 구하면
+    # Then: 0 이다 — '없음'을 최악으로 오해하지 않는다
+    assert darkness.lamp_part(None) == 0.0
+
+
+def test_노이즈_임계_미만_야간광은_0으로_친다():
+    # Given: Black Marble 이 0 으로 잘라 버리는 구간(0.5 미만)의 값이 주어졌을 때
+    # When: VIIRS 성분을 구하면
+    # Then: 0 이다 — 그 아래는 '어둡다'가 아니라 '모른다'이므로 점수를 주지 않는다
+    assert darkness.nightlight_part(0.0) == darkness.nightlight_part(0.49) == 0.0
+
+
+def test_점수가_낮을수록_어두운_곳이다():
+    # Given: 제주에서 가장 어두운 급(1100고지)과 도심(제주시청)이 주어졌을 때
+    dark = darkness.assess_site(33.3583, 126.4675)
+    city = darkness.assess_site(33.4996, 126.5312)
+    # When: 종합 점수를 비교하면
+    # Then: 어두운 쪽이 확실히 낮다 (0=완전 암흑, 1=도심)
+    assert dark.score is not None and city.score is not None
+    assert dark.score < 0.2 < city.score
+
+
+@pytest.mark.parametrize(
+    ("score", "expected"),
+    [
+        pytest.param(0.0, "최적", id="완전 암흑"),
+        pytest.param(0.35, "최적", id="경계 0.35 — 관측지급 상한은 포함"),
+        pytest.param(0.351, "양호", id="0.35 초과 → 한 단계 내림"),
+        pytest.param(0.60, "양호", id="경계 0.60 — 포함"),
+        pytest.param(0.601, "밝은 별 한정", id="0.60 초과 → 두 단계 내림"),
+        pytest.param(1.0, "밝은 별 한정", id="도심"),
+    ],
+)
+def test_등급_상한_경계가_운영값과_일치한다(score, expected):
+    # Given: 종합 점수 경계값이 주어졌을 때 (0.35=관측지급, 0.60=Falchi v 중앙값)
+    # When: 등급 상한을 구하면
+    # Then: 경계값 자체는 좋은 쪽 등급에 포함되고, 초과하면 한 단계 내려간다
+    assert darkness.cap_of(score) == expected
+
+
+def test_SQM_격자_밖이면_점수를_내지_않는다():
+    # Given: SQM(주 기준) 격자를 벗어난 먼 바다 좌표가 주어졌을 때
+    site = darkness.assess_site(31.0, 128.0)
+    # When: 종합 판정을 구하면
+    # Then: 점수·상한이 None 이다 — 보조 축만으로 '광원이 없으니 최상급'이라고
+    #       판정하면 거짓이 되기 때문이다
+    assert site.darkness is None
+    assert site.score is None and site.cap is None
+
+
+def test_큐레이션_관측지가_시설_인접지보다_점수가_낮다():
+    # Given: 별 보러 가는 오름(용눈이오름)과 시설이 붙은 관측지(저지오름)가 주어졌을 때
+    #        둘 다 Falchi iv 라 SQM 만으로는 갈리지 않는다
+    oreum = darkness.assess_site(33.4762, 126.8229)
+    facility = darkness.assess_site(33.3312, 126.2541)
+    # When: 종합 점수를 비교하면
+    # Then: 국지 광원(가로등 362m vs 23m)이 순위를 가른다 — 세 신호를 쓰는 이유
+    assert oreum.darkness.falchi_grade == facility.darkness.falchi_grade == "iv"
+    assert oreum.score < facility.score
+
+
+@pytest.mark.parametrize(
+    ("name", "lat", "lon", "expected_score", "expected_cap"),
+    [
+        pytest.param(
+            "1100고지 휴게소", 33.3583, 126.4675, 0.132, "최적", id="가로등 0개"
+        ),
+        pytest.param("용눈이오름", 33.4762, 126.8229, 0.198, "최적", id="동부 중산간"),
+        pytest.param("저지오름", 33.3312, 126.2541, 0.481, "양호", id="23m 앞 가로등"),
+        pytest.param("제주시청", 33.4996, 126.5312, 0.823, "밝은 별 한정", id="도심"),
+    ],
+)
+def test_종합_점수_회귀_픽스처(name, lat, lon, expected_score, expected_cap):
+    # Given: decisions.md §1.7 에 고정된 지점들이 주어졌을 때
+    site = darkness.assess_site(lat, lon)
+    # When: 어둡기 종합 점수와 등급 상한을 구하면
+    # Then: 대장의 값이 그대로 재현된다 — 가중치·경계를 바꾸면 여기가 먼저 깨진다
+    assert site.score == expected_score, f"{name} 점수가 픽스처와 다르다"
+    assert site.cap == expected_cap
+
+
 def test_Falchi_iv부터_은하수_문구가_붙는다():
     # Given: 은하수가 흐릿해지는 Falchi iv 지점(용눈이오름)에서
     result = assess(33.4762, 126.8229)

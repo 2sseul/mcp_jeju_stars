@@ -10,7 +10,7 @@ core 는 API·LLM 을 호출하지 않고, 이 파일이 둘을 조립한다.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from langgraph.graph import END, START, StateGraph
 
@@ -238,8 +238,12 @@ def run_tonight(lat: float, lon: float, when: datetime) -> dict:
     start, end = window
 
     # 외부 I/O 는 실패해도 스키마를 깨지 않는다(순간 그래프의 weather_node 와 같은 규율).
+    # 밤 창의 시작·끝은 대개 정시가 아니다(예: 20:03~05:15). fetch_series 는 구간을
+    # 정시로 내림하므로 그대로 쓰면 ① 창 앞 정시(20:00)가 딸려 들어오고 ② 창 안의
+    # 마지막 정시(05:00)가 빠진다. 끝을 한 시간 넉넉히 받아 두고, 창 안에 실제로
+    # 들어오는 정시만 아래에서 걸러낸다(decisions.md §2.8).
     try:
-        series = open_meteo.fetch_series(lat, lon, start, end)
+        series = open_meteo.fetch_series(lat, lon, start, end + timedelta(hours=1))
         attribution.append("기상: Open-Meteo (open-meteo.com)")
     except Exception:  # noqa: BLE001 — 외부 I/O 경계, 스키마 보장이 우선
         return _result(_iso_window(start, end), None, ["기상: Open-Meteo (조회 실패)"])
@@ -247,6 +251,8 @@ def run_tonight(lat: float, lon: float, when: datetime) -> dict:
     hours = []
     for row in series:
         t = row["time"]
+        if t < start or t >= end:  # 밤 창 밖 정시는 집계에서 제외
+            continue
         state = astro.twilight_state(lat, lon, t)
         result = _judge.judge(state, row["cloud_cover"], row["visibility"])
         hours.append(

@@ -16,3 +16,4 @@ LAMPS_SEOGWIPO = DATA / "streetlight" / "seogwipo_streetlight.csv"
 
 # 발표용 산출물(HTML). 저장소에 커밋하지 않는다 — 스크립트로 언제든 재생성한다.
 LIGHT_MAP   = OUTPUTS / "jeju_light_map.html"
+SPOT_REPORT = OUTPUTS / "jeju_spot_report.html"

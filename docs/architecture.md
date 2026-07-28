@@ -73,9 +73,10 @@ weather 는 예외를 밖으로 던지지 않으며, judge 는 API·장소를 �
 | **천체력 (Ephemeris)** | JPL DE421 (via Skyfield) | `data/ephem/de421.bsp` (로컬 고정) | ✅ | 태양 고도 → 박명 구간·완전한 밤/박명 포함 밤 구간 |
 | **기상 예보** | Open-Meteo Forecast API | `api.open-meteo.com/v1/forecast` (캐시 1h + 재시도 5회) | ✅ | 정시별 **총운량(%)**·**시정(m)**. 한 시각(`fetch`) 또는 밤 구간 시계열(`fetch_series`) |
 | **지오코딩** | Photon (Komoot, OSM 기반) | `photon.komoot.io/api/` (키 불필요) | ✅ | 주소·지명 → 좌표 (`evaluate_place`) |
-| **광공해 — Sky Brightness** | NASA Black Marble(VNP46A4/VJ146A4) 기반, lightpollutionmap.info 산출(sb_2025) | `data/light_pollution/jeju_2025_GeoTIFF_raw.tif` → 전처리 `data/darkness/jeju_sb_grid.npz` | ✅ | 장소 어둡기 — 인공 밝기(mcd/m²) → **SQM·Falchi 등급**(어둡기 축) |
+| **광공해 — Sky Brightness** | NASA Black Marble(VNP46A4/VJ146A4) 기반, lightpollutionmap.info 산출(sb_2025). 귀속: "Jurij Stare, www.lightpollutionmap.info" + "NASA's Black Marble nighttime lights product" | `data/light_pollution/jeju_2025_GeoTIFF_raw.tif` → 전처리 `data/darkness/jeju_sb_grid.npz` | ✅ | 어둡기 축의 **광역 하늘밝기** 성분(주 기준) — 인공 밝기(mcd/m²) → **SQM·Falchi 등급** |
 | **다크스카이 관측지 큐레이션** | 관광공사·비짓제주·위키·문화대전 교차확인 | `data/jeju_spots.json` (20곳) | ⚠️ 참고자료 | 제주 대표 관측지 20곳 좌표·정성 정보. **엔진엔 아직 미연결** — 관측지 탐색 단계에서 크롤링으로 확장 후 연결 예정 |
-| **야간광 (VIIRS)** | VIIRS/NPP 야간광 복사휘도 | `data/light_pollution/jeju_2025_viirs_npp.tif` | ⏳ 이후 단계 | "어느 방향이 어두운가" 방위 분석용. 절댓값 불신·d⁻ᵖ 민감도 처리 필요 |
+| **야간광 (VIIRS)** | NASA Black Marble VNP46A4 (CC0) | `data/light_pollution/jeju_2025_viirs_npp.tif` → 전처리 `jeju_viirs_grid.npz` | ✅ | 어둡기 축의 **국지 지상광** 성분 — 반경 1·3km 최대 복사휘도. 픽셀 절댓값은 판정에 쓰지 않는다(유효 픽셀 71.9%가 0) |
+| **가로등·보안등** | 공공데이터포털 제주시(52,019) · 서귀포시(38,022). **이용허락범위 제한 없음** | `data/streetlight/*.csv` (import 시 직접 로드) | ✅ | 어둡기 축의 **발밑 광원** 성분 — 최근접 거리·반경 100m/500m/1km 개수. 제주시 파일의 위경도 뒤바뀜 15,514행을 교정해 쓴다(`decisions.md` §1.8) |
 
 > **이전 버전과의 차이**: 표고 기반 운해 보정을 위해 쓰던 Open-Meteo **Elevation API**와
 > **기압면 운량**은 제거했다(§2.5). 구름은 이제 집계 총운량 한 값으로만 평가한다.

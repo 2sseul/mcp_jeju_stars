@@ -54,7 +54,9 @@ uv run pytest
 ## 구조
 
 ```
-server/core/      순수 함수 (astro · judge · darkness · tonight) — 네트워크 호출 금지
+server/core/      순수 함수 — 네트워크 호출 금지
+                  astro · judge · tonight
+                  darkness(SQM·종합) · nightlight(VIIRS) · lamps(가로등)
 server/clients/   외부 I/O (open_meteo · geocode) — 예외를 밖으로 던지지 않는다
 server/engine/    LangGraph 조립
 scripts/          오프라인 배치 (연 1회 래스터 전처리)
@@ -77,4 +79,7 @@ data/             정적 데이터 (.py 없음)
 - 천체력 — JPL DE421 (via Skyfield)
 - 기상 — Open-Meteo Forecast API
 - 지오코딩 — Photon (Komoot, OpenStreetMap 기반)
-- 광공해 — NASA Black Marble(VNP46A4/VJ146A4) 기반 lightpollutionmap.info 산출(sb_2025)
+- 광공해 (하늘밝기) — Jurij Stare, www.lightpollutionmap.info · NASA's Black Marble
+  nighttime lights product(VNP46A4/VJ146A4) 기반 산출 레이어(sb_2025)
+- 야간광 — NASA's Black Marble nighttime lights product (VNP46A4)
+- 가로등·보안등 — 공공데이터포털 제주시(52,019) · 서귀포시(38,022), 이용허락범위 제한 없음

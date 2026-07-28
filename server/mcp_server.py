@@ -416,10 +416,9 @@ def _evaluate_night(
         numbers.update(darkness)
 
     reasons = _night_reasons(summary, window, label)
-    # 어둡기 설명 한 줄 + (은하수 제약 시) 주의 문구. 관측 가능한 밤일 때만 덧붙인다.
+    # 어둡기 설명(SQM·야간광·가로등) + 은하수 주의 문구. 관측 가능한 밤일 때만.
     if summary is not None and summary.get("observable_hours"):
-        if result.get("darkness_reason"):
-            reasons.append(result["darkness_reason"])
+        reasons.extend(result.get("darkness_reasons", []))
         if result.get("milky_way_caveat"):
             reasons.append(result["milky_way_caveat"])
 

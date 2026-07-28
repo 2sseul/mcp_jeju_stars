@@ -118,3 +118,48 @@ def test_결측은_불가가_아니라_알_수_없음이다():
     #       (모르는 것과 나쁜 것을 같은 등급에 두면 관측지 추천 순위가 왜곡된다)
     assert result.verdict == UNKNOWN
     assert result.possible is None
+
+
+# --- 광공해 상한 (darkness_cap) -----------------------------------------------
+
+
+def test_광공해_상한이_없으면_기존_판정_그대로다():
+    # Given: 완전한 밤 + 맑음이라 '최적'이 나오는 조건에서
+    # When: 광공해 상한을 주지 않으면
+    # Then: 기존 동작과 같다 (인자를 늘려도 기본 경로는 안 바뀐다)
+    assert judge(0, 5.0, 20_000.0).verdict == judge(0, 5.0, 20_000.0, None).verdict
+
+
+def test_광공해_상한은_등급을_끌어내린다():
+    # Given: 하늘·날씨만 보면 '최적'인 조건에서
+    # When: 광공해가 '양호'까지로 상한을 걸면
+    result = judge(0, 5.0, 20_000.0, "양호")
+    # Then: 등급이 그 상한으로 내려가고, 이유가 장소에 있음을 밝힌다
+    assert result.verdict == "양호"
+    assert any("광공해" in r for r in result.reasons)
+
+
+def test_광공해_상한은_등급을_올리지_못한다():
+    # Given: 항해박명이라 하늘만으로 이미 '밝은 별 한정'인 조건에서
+    # When: 광공해가 아무리 좋아('최적') 상한이 느슨해도
+    result = judge(2, 5.0, 20_000.0, "최적")
+    # Then: 등급은 올라가지 않는다 — 상한은 내리기만 한다
+    assert result.verdict == LIMITED
+
+
+def test_구름_게이트는_광공해보다_우선한다():
+    # Given: 제주에서 가장 어두운 곳이라 상한이 '최적'이어도
+    # When: 구름이 하늘을 덮으면
+    result = judge(0, 90.0, 20_000.0, "최적")
+    # Then: '불가'다 — 구름은 물리적 필연이라 어둡기로 상쇄되지 않는다
+    #       (그래서 어둡기를 구름·박명과 가중합하지 않고 상한으로만 받는다)
+    assert result.verdict == IMPOSSIBLE
+    assert result.possible is False
+
+
+def test_알_수_없음은_광공해_상한에_영향받지_않는다():
+    # Given: 총운량이 결측이라 '알 수 없음'인 조건에서
+    # When: 광공해 상한을 걸어도
+    result = judge(0, None, 20_000.0, "밝은 별 한정")
+    # Then: 여전히 '알 수 없음'이다 — 등급이 아니라 별개 상태이기 때문
+    assert result.verdict == UNKNOWN

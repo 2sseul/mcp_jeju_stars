@@ -14,6 +14,13 @@ clear sky 를 "운량 10% 미만 AND 투과율 변동 10% 미만" 으로 두 조
 가중합으로 단일 점수를 만들면 검증할 수 없는 계수가 생기므로 쓰지 않는다.
 (Kerber et al. 2014 — A&A 2022, 10.1051/0004-6361/202142493 에서 재인용)
 
+**광공해(어둡기 장소 속성)는 예외로 등급에 관여한다** — 단, 위 원칙을 지키려고
+가중합에 끼워 넣지 않고 **상한(cap)** 으로만 받는다(`darkness_cap` 인자). 구름·박명이
+정한 등급을 끌어내릴 수는 있어도 올리지는 못한다. 광공해 안쪽(SQM·VIIRS·가로등)의
+가중합은 `darkness.py` 소관이고, 이 모듈은 그 결과 등급 하나만 받는다. 셋은 같은
+물리량(인공 광원)을 다른 규모로 잰 값이라 합치는 것이 성립하지만, 구름·박명은 성격이
+다른 축이라 여전히 합치지 않는다.
+
 
 1. 어둡기 축
 --------------------------------------------------------------------------
@@ -184,6 +191,7 @@ def judge(
     state: int,
     cloud_cover: float | None,
     visibility_m: float | None,
+    darkness_cap: str | None = None,
 ) -> Judgement:
     """태양 고도 상태·총운량·시정으로 관측 등급을 판정한다.
 
@@ -192,6 +200,8 @@ def judge(
         cloud_cover: 총운량 비율(%, 0~100). 없으면 None. 지면 기준이라 고지대에서는
                      관측자 발밑의 운해도 포함된다(모듈 docstring 2절의 한계).
         visibility_m: 시정(m). 없으면 None.
+        darkness_cap: 광공해가 정한 등급 **상한**(darkness.cap_of 반환값). None 이면
+                     제한 없음. 등급을 끌어내리기만 하고 올리지는 않는다.
 
     Returns:
         Judgement(verdict, possible, reasons).
@@ -213,7 +223,13 @@ def judge(
     # 어둡기 축과 차폐 축 중 나쁜 쪽을 따른다.
     verdict = _BY_RANK[max(_RANK[sky_verdict], _RANK[cloud_grade])]
 
-    if verdict == IMPOSSIBLE:
+    # 광공해 상한도 같은 방식으로 나쁜 쪽만 취한다 — 끌어내리기만 하고 올리지 않는다.
+    # (구름이 '불가'인데 어두운 장소라고 '양호'로 올라가면 안 된다.)
+    capped = verdict
+    if darkness_cap in _RANK:
+        capped = _BY_RANK[max(_RANK[verdict], _RANK[darkness_cap])]
+
+    if capped == IMPOSSIBLE:
         return Judgement(
             IMPOSSIBLE,
             False,
@@ -235,5 +251,13 @@ def judge(
     else:
         reasons.append(f"공기 맑음 (수평시정 {_km(visibility_m)})")
 
-    return Judgement(verdict, True, reasons)
+    # 광공해가 실제로 등급을 끌어내렸을 때만 그 사실을 밝힌다 — 하늘·구름은 좋은데
+    # 등급이 낮은 이유가 장소에 있음을 알려야 '다른 곳으로'를 택할 수 있다.
+    if capped != verdict:
+        reasons.append(
+            f"하늘과 날씨는 '{verdict}'이지만 이 지점은 광공해가 있어 "
+            f"'{capped}'까지로 봅니다 — 더 어두운 곳으로 가면 나아져요"
+        )
+
+    return Judgement(capped, True, reasons)
 

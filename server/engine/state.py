@@ -32,6 +32,7 @@ class EngineState(TypedDict, total=False):
     visibility: float | None  # 시정 m
     verdict: str | None  # 판정 등급(최적/양호/밝은 별 한정/불가)
     possible: bool | None  # 밝은 별이라도 볼 수 있는가
+    darkness_cap: str | None  # 광공해가 정한 등급 상한(darkness → judge 로 전달)
 
     # 누적(리듀서)
     numbers: Annotated[dict, _merge]

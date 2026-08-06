@@ -3,6 +3,11 @@ __pycache__/
 *.py[cod]
 .venv/
 
+# API 키 (카카오 · 기상청). 절대 커밋하지 않는다
+.env
+.env.*
+!.env.example
+
 # Open-Meteo requests_cache DB
 .cache.sqlite
 
@@ -17,3 +22,8 @@ cr.json
 
 # 발표용 시각화 산출물 (scripts/build_*_map.py · build_spot_report.py 로 재생성)
 outputs/
+
+# 표고 격자 (FABDEM). CC BY-NC-SA 4.0 이라 재배포하면 파생물도 같은 조건에 묶인다.
+# 원본 tif 도 거기서 만든 npz 도 커밋하지 않는다 — 저장소가 나르는 것은
+# `scripts/build_elevation_grid.py` 뿐이고, 받은 사람이 한 번 돌리면 된다.
+data/elevation/

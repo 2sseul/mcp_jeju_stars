@@ -9,10 +9,46 @@ SB_RAW     = DATA / "light_pollution" / "jeju_2025_GeoTIFF_raw.tif"
 VIIRS_GRID = DATA / "light_pollution" / "jeju_viirs_grid.npz"
 VIIRS_RAW  = DATA / "light_pollution" / "jeju_2025_viirs_npp.tif"
 EPHEM      = DATA / "ephem" / "de421.bsp"
+
+# 표고 격자 — FABDEM(1초각 ~30m, 수관·건물 제거된 **맨땅**)을 제주만 잘라 담은 것.
+# 도보 경로의 고도차·경사를 여기서 읽는다. 라이선스(CC BY-NC-SA)상 재배포하지
+# 않으므로 **둘 다 커밋하지 않는다**(`.gitignore` 가 `data/elevation/` 전체를 뺀다).
+# `scripts/build_elevation_grid.py` 를 한 번 돌리면 만들어진다.
+DEM_GRID   = DATA / "elevation" / "jeju_dem_grid.npz"
+DEM_RAW    = DATA / "elevation" / "N33E126_FABDEM_V1-2.tif"
 SPOTS      = DATA / "jeju_spots.json"
 
 LAMPS_JEJU     = DATA / "streetlight" / "jeju_streetlight.csv"
 LAMPS_SEOGWIPO = DATA / "streetlight" / "seogwipo_streetlight.csv"
+
+PARKING_JEJU     = DATA / "car_parking" / "jeju_car_parking.csv"
+PARKING_SEOGWIPO = DATA / "car_parking" / "seogwipo_car_parking.csv"
+
+# OpenStreetMap `amenity=parking`(Overpass). 공영 표준데이터가 담지 않는
+# 오름·해변·관광지 주차장이 여기 있다. `scripts/fetch_osm_parking.py` 로 재수집한다.
+PARKING_OSM = DATA / "car_parking" / "jeju_parking_osm.csv"
+
+# 공중화장실 표준데이터. 원본에 좌표가 없어 `scripts/geocode_toilets.py` 가
+# 위도·경도 컬럼을 채워 넣은 뒤부터 반경 조회에 쓸 수 있다.
+TOILET = DATA / "toilet" / "jeju_toilet.csv"
+
+# OSM 도로망(Overpass)과 세그먼트별 어둡기. 후보 발굴에서 '차로 닿는가'를 판정한다.
+ROADS_OSM      = DATA / "road" / "jeju_roads_osm.json"
+ROAD_DARKNESS  = DATA / "road" / "jeju_road_darkness.npz"
+
+# 도로별 폭·차선·노면. 30MB 짜리 OSM 원본을 `core` 가 열 수 없어
+# `scripts/build_road_tags.py` 가 잰 값만 작은 배열로 줄여 둔 것.
+ROAD_TAGS      = DATA / "road" / "jeju_road_tags.npz"
+
+# 카카오 로컬 API 로 긁어 둔 장소(공원·휴게소 등).
+# `scripts/fetch_kakao_places.py` 로 재수집한다.
+KAKAO_PLACES = DATA / "kakao_places"
+
+# 사람이 검토해 남긴 판단. 재생성할 수 없으므로 산출물이 아니라 **입력 데이터**다.
+PARKING_REVIEW = DATA / "candidates" / "parking_review.jsonl"
+
+# 지도에서 사람이 직접 찍어 둔 지점(주차장 목록에 없는 자리). 위와 같은 입력 데이터.
+SPOT_PINS = DATA / "candidates" / "spot_pins.jsonl"
 
 # 발표용 산출물(HTML). 저장소에 커밋하지 않는다 — 스크립트로 언제든 재생성한다.
 LIGHT_MAP   = OUTPUTS / "jeju_light_map.html"

@@ -1,33 +1,3918 @@
 {
   "meta": {
-    "title": "제주 다크스카이 관측지 큐레이션 목록",
-    "generated": "2026-07-24",
-    "source": "general-purpose 리서치 — 한국관광공사(대한민국 구석구석)·비짓제주·위키백과(KO/EN)·디지털문화대전 교차확인",
-    "coordinate_note": "위도(lat)·경도(lon)는 각각 별도 필드. 좌표는 위키/문화대전/관광포털 교차확인했으나 다수 오름·시설은 공표 십진좌표가 없어 주소 기반 추정. coord_confidence(high/medium/low)로 표기. 특히 용눈이오름·다랑쉬오름은 위키백과 좌표 중복 오류로 low/medium — 정밀 판정 전 지도 재검증 필요.",
+    "title": "제주 다크스카이 관측지 큐레이션 목록 (194곳)",
+    "generated": "2026-08-04",
+    "source": "1차 20곳: 한국관광공사(대한민국 구석구석)·비짓제주·위키백과(KO/EN)·디지털문화대전 교차확인. 2차 30곳(2026-08-04 추가): 웹검색으로 모은 후보를 카카오맵 로컬 API 로 지오코딩하고 core.darkness.assess_site 로 어둡기를 실측해, 야간 접근 불가(한라산국립공원·야간 여객선 없는 섬)· 중복·과다밝음을 제외하고 남긴 것. 어둡기 점수는 파생값이라 이 파일에 싣지 않는다. 3차 5곳(2026-08-05 추가): 제주를 다녀 본 사람이 직접 알려 준 곳을 카카오맵으로 지오코딩하고 core.darkness.assess_site 로 어둡기를 실측해 실었다. 자동 발굴분과 달리 **사람이 이미 본** 곳이라 discovery 키를 붙이지 않는다.",
+    "coordinate_note": "위도(lat)·경도(lon)는 각각 별도 필드. 좌표는 위키/문화대전/관광포털 교차확인했으나 다수 오름·시설은 공표 십진좌표가 없어 주소 기반 추정. coord_confidence(high/medium/low)로 표기. 특히 용눈이오름·다랑쉬오름은 위키백과 좌표 중복 오류로 low/medium — 정밀 판정 전 지도 재검증 필요. 2026-08-05: 카카오맵 장소검색으로 106곳을 전수 대조해(scripts/check_spot_coords.py) 300m 넘게 어긋난 17곳을 추렸고, 그중 관측지가 스스로 적어 둔 주소의 지오코딩과도 일치한 8곳(백약이·아부·물영아리·따라비오름, 제주마방목지, 제주별빛누리공원, 서귀포천문과학문화관, 절물자연휴양림)을 옮겼다. 나머지는 동명 오름·다른 입구·도로 구간이라 오류가 아니다.",
     "darkness_note": "제주 개별 지점 SQM/Bortle 실측 공표값은 거의 없어 notes 는 정성적 광공해 정보. 어둡기 실검증(광공해 래스터)은 후속 확장 대상.",
-    "jeju_bounds": {"lat_min": 33.1908, "lat_max": 33.5639, "lon_min": 126.1452, "lon_max": 126.9723},
-    "count": 20
+    "jeju_bounds": {
+      "lat_min": 33.1908,
+      "lat_max": 33.5639,
+      "lon_min": 126.1452,
+      "lon_max": 126.9723
+    },
+    "count": 194,
+    "status": "엔진 미연결 참고자료. 주차 좌표·도보 소요시간·야간 개방·화장실·주의사항은 아직 비어 있고 로드뷰 데스크 검증(plan.md P9)에서 채운다.",
+    "fields": "모르는 항목은 키를 만들지 않는다 — 없는 키가 곧 '미확인'이고 로드뷰 검증(plan.md P9)의 작업 목록이다. access·walk_type·walk_minutes·amenities·hours·fee·night_access·cautions 는 출처가 실제로 말한 것만 적었고, 근거 URL 은 sources 에 있다. 어둡기 점수는 core.darkness 가 재계산하는 파생값이라 싣지 않는다(notes 의 실측 서술은 선별 근거 기록). 도보 경로는 walk_routes 에 담는다 — [{points, minutes, segments}] 로, 한 관측지에 고를 수 있는 길이 여럿일 수 있어서다(다랑쉬오름의 급경사길·완만한 길). 2026-08-06 에 옛 walk_route(점 목록 하나)에서 옮겼고, 그때 walk_minutes 도 길 안으로 넣었다 — 길마다 다른 값이라 관측지에 두면 어느 쪽이 맞는지 알 수 없다. 구간(segments)은 자르는 자리마다 난이도(level)와 노면(surface: 정비·계단·맨땅)을 적은 것이다(decisions.md §2.16).",
+    "discovery": "`discovery` 키가 있는 항목은 `scripts/sweep_place_candidates.py` 의 자동 발굴분이다 — 카카오맵 로컬 API 전수 수집에서 어둡기(core.darkness) ∩ 주차 근접 ∩ 주행 가능 도로 근접을 통과하고 근접 묶음으로 합친 뒤 score ≤ 0.45 로 자른 것. **사람이 아직 보지 않았다** — plan.md P9 의 로드뷰 데스크 검증을 통과하기 전에는 추천에 노출하지 않는다. 키가 없는 항목은 웹서치·관광포털 큐레이션분이다. notes 가 '제보:' 로 시작하는 항목은 현장 경험분이다 — 실측 어둡기를 함께 적어 두었으니, 점수가 밝게 나온 곳은 그 사실을 보고 판단한다. `discovery`가 `kakao_parking` 인 항목은 `scripts/merge_upland_parking.py` 가 카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)만 골라 넣은 것이다 — 어둡기로 자르지 않았으므로 밝은 자리가 섞여 있고, notes 의 실측 점수를 보고 판단한다. 좌표가 곧 주차 지점이라 `parking` 키가 없다."
   },
   "spots": [
-    {"name_ko": "용눈이오름", "name_en": "Yongnuni Oreum", "lat": 33.4762, "lon": 126.8229, "coord_confidence": "medium", "region": "동", "type": "오름", "why": "동부 중산간의 대표 별 명소. 부드러운 능선과 사방 개활, 주변 밝은 빛 적고 공기 맑아 은하수 관측지로 꼽힘", "notes": "위키백과(KO/EN)가 다랑쉬오름과 동일 좌표를 표기해 좌표 신뢰도 하향. 동부 중산간 Bortle 3~4급 추정, 측정 SQM 공표값 없음"},
-    {"name_ko": "다랑쉬오름", "name_en": "Darangshi Oreum", "lat": 33.4630, "lon": 126.8510, "coord_confidence": "low", "region": "동", "type": "오름", "why": "'오름의 여왕'. 표고 382m 정상 360도 파노라마, 주변 광원 적어 동부 다크스카이 촬영지로 인기", "notes": "위키 좌표가 용눈이오름과 중복(오류 추정)이라 세화리 산6 주소 기반 추정치. 야간 산행은 급경사 주의"},
-    {"name_ko": "아부오름", "name_en": "Abu Oreum", "lat": 33.4356, "lon": 126.7291, "coord_confidence": "medium", "region": "동", "type": "오름", "why": "완만해 정상까지 10분, 넓은 원형 분화구와 트인 시야. 송당 일대 어두운 하늘로 접근성 좋은 관측지", "notes": ""},
-    {"name_ko": "백약이오름", "name_en": "Baegyagi Oreum", "lat": 33.3897, "lon": 126.8070, "coord_confidence": "medium", "region": "동", "type": "오름", "why": "성읍·가시리 동부 중산간의 어두운 초지대에 위치, 넓은 개활지와 낮은 광공해로 별·은하수 관측 양호", "notes": "주소 성읍리 산1 기반 추정 좌표"},
-    {"name_ko": "우도(우도봉 일대)", "name_en": "Udo (Udobong area)", "lat": 33.5033, "lon": 126.9536, "coord_confidence": "medium", "region": "동", "type": "해안/섬", "why": "본섬과 분리된 섬이라 육지 광공해 영향 적고 해안 수평선까지 트임. 저녁 배편 이후 조용한 관측 가능", "notes": "우도 취락지 가로등 인접 시 국지적 광공해. 좌표는 우도봉 부근"},
-    {"name_ko": "산굼부리", "name_en": "Sangumburi Crater", "lat": 33.4340, "lon": 126.6870, "coord_confidence": "medium", "region": "중산간", "type": "오름/분화구", "why": "교래리 중산간 개활 초지, 사방이 트여 계절 별자리 조망 용이. 접근 도로 양호", "notes": "유료 관람지로 야간 개방은 시기·행사에 따라 제한될 수 있음"},
-    {"name_ko": "절물자연휴양림", "name_en": "Jeolmul Natural Recreation Forest", "lat": 33.4497, "lon": 126.6320, "coord_confidence": "medium", "region": "중산간", "type": "숲", "why": "봉개 중산간 삼나무 숲, 야간 숙박객 대상 별 관측 프로그램 운영 사례. 도심에서 벗어난 어두운 환경", "notes": "제주시 도심에서 남쪽 8~10km, 시가지 방향 저고도에 광공해 잔존"},
-    {"name_ko": "사려니숲길(비자림로 입구)", "name_en": "Saryeoni Forest Trail", "lat": 33.4180, "lon": 126.6597, "coord_confidence": "medium", "region": "중산간", "type": "숲", "why": "해발 500~600m 중산간 숲길, 주변 인공광 거의 없어 매우 어두움. 개활지는 적으나 다크스카이 환경 우수", "notes": "숲 캐노피로 시야 제한, 개방 구간·시간 확인 필요. 좌표는 비자림로측 입구"},
-    {"name_ko": "제주마방목지", "name_en": "Jeju Mabang Pasture", "lat": 33.4353, "lon": 126.5658, "coord_confidence": "medium", "region": "중산간", "type": "목장/초지", "why": "5·16도로변 드넓은 초원, 동서남북 사방 개활로 사계절 별자리와 5~8월 은하수 육안 관측 가능", "notes": "도로변 차량 헤드라이트 유의. 관광공사 소개 은하수 스팟"},
-    {"name_ko": "1100고지 휴게소", "name_en": "1100 Highland Rest Area", "lat": 33.3583, "lon": 126.4658, "coord_confidence": "medium", "region": "중산간", "type": "고지/전망", "why": "해발 1100m 한라산 중턱, 도심 광공해 위로 올라가 은하수 중심부까지 선명. 제주 대표 별 성지", "notes": "가로등 없는 산길 야간 운전 주의, 겨울 결빙. 습도 낮은 겨울 투명도 우수"},
-    {"name_ko": "제주별빛누리공원", "name_en": "Jeju Starlight World Park", "lat": 33.4636, "lon": 126.5386, "coord_confidence": "medium", "region": "북", "type": "관측소/천문공원", "why": "천체망원경 관측실·플라네타리움 갖춘 공식 천문시설, 초보자 관측 교육에 적합", "notes": "제주시 오등동 도심 인접 언덕이라 광공해 큼 — 심층 관측보다 교육·입문용. 주소 선돌목동길 60"},
-    {"name_ko": "새별오름", "name_en": "Saebyeol Oreum", "lat": 33.3664, "lon": 126.3568, "coord_confidence": "medium", "region": "서", "type": "오름", "why": "서부 중산간 초원 위 대표 은하수 명소. '나홀로 나무' 실루엣과 별 조합, 주변 불빛 거의 없음", "notes": "평화로 인접이나 오름 뒤편 초지는 어두움. 관광공사·여행기 다수 추천"},
-    {"name_ko": "금오름", "name_en": "Geum Oreum", "lat": 33.3559, "lon": 126.3056, "coord_confidence": "high", "region": "서", "type": "오름", "why": "한림 금악리 정상 굼부리(호수)와 트인 지평선, 서부 중산간의 어두운 하늘로 일몰·별 관측 인기", "notes": "좌표 위키백과 교차확인(33.3559, 126.3056)"},
-    {"name_ko": "저지오름", "name_en": "Jeoji Oreum", "lat": 33.3312, "lon": 126.2541, "coord_confidence": "high", "region": "서", "type": "오름", "why": "한경면 서부 내륙, 아름다운 숲 오름상 수상지. 인근 마을 광원 적어 서부 관측 후보지", "notes": "좌표 위키백과 교차확인(33.3312, 126.2541). 분화구는 숲으로 시야 제한, 둘레길에서 관측"},
-    {"name_ko": "성이시돌목장(테쉬폰)", "name_en": "St. Isidore Ranch (Teshpon)", "lat": 33.3531, "lon": 126.3260, "coord_confidence": "medium", "region": "서", "type": "목장", "why": "한림 금악리 넓은 목초지와 이국적 테쉬폰 건물, 광공해 적어 은하수 촬영 배경지로 유명", "notes": "야간 사유지 출입·주차 매너 필요"},
-    {"name_ko": "따라비오름", "name_en": "Ttarabi Oreum", "lat": 33.3608, "lon": 126.7808, "coord_confidence": "high", "region": "남", "type": "오름", "why": "가시리 중산간 '오름의 여왕', 세 개 굼부리와 억새·개활. 동남부 어두운 하늘로 관측·촬영 인기", "notes": "좌표 위키백과 교차확인(33.3608, 126.7808)"},
-    {"name_ko": "유채꽃프라자·녹산로", "name_en": "Yuchaekkot Plaza & Noksan-ro", "lat": 33.3846, "lon": 126.7433, "coord_confidence": "medium", "region": "남", "type": "공원/도로", "why": "가시리 광활한 중산간 평원·전망대, 사방 트이고 광원 적어 은하수 파노라마 관측지", "notes": "녹산로 일대 가로등 적음. 전망대 주차장 기준 좌표"},
-    {"name_ko": "물영아리오름", "name_en": "Mulyeongari Oreum", "lat": 33.3302, "lon": 126.7010, "coord_confidence": "medium", "region": "남", "type": "오름/습지", "why": "남원 수망리 람사르 습지 오름, 주변 목장·중산간으로 어둡고 조용. 능선 개활지에서 관측", "notes": "정상 습지·숲 구간 시야 제한, 야간 산행 안전 주의"},
-    {"name_ko": "서귀포천문과학문화관", "name_en": "Seogwipo Astronomical Science & Culture Center", "lat": 33.2820, "lon": 126.4665, "coord_confidence": "medium", "region": "남", "type": "관측소", "why": "하원동 1100로변 공식 천문대, 주망원경 상시 관측·카노푸스(노인성) 관측 이벤트 등 대중 관측 프로그램", "notes": "서귀포 도심 북측 중산간, 도심 방향 저고도 광공해. 주소 1100로 506-1"},
-    {"name_ko": "알뜨르비행장", "name_en": "Alddreu Airfield", "lat": 33.1985, "lon": 126.2735, "coord_confidence": "medium", "region": "남", "type": "평야/역사터", "why": "대정 상모리 탁 트인 벌판, 제주 현지인이 꼽는 은하수 스팟. 남쪽 하늘 저고도까지 개활", "notes": "위도 33.199로 공식 하한(33.19)에 근접. 인근 마을·모슬포 방향 광공해 일부"}
+    {
+      "name_ko": "용눈이오름",
+      "name_en": "Yongnuni Oreum",
+      "lat": 33.45987399291166,
+      "lon": 126.83273355024946,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "오름",
+      "why": "동부 중산간의 대표 별 명소. 부드러운 능선과 사방 개활, 주변 밝은 빛 적고 공기 맑아 은하수 관측지로 꼽힘",
+      "notes": "동부 중산간 Bortle 3~4급 추정",
+      "access": "도로변 주차장.  용눈이오름 입구 바로 앞 넓은 무료 공영주차장 · 입구에 매점",
+      "walk_type": "등반",
+      "amenities": {
+        "toilet": true
+      },
+      "cautions": [
+        "정상 분화구 일주에 10분 더 걸린다"
+      ],
+      "sources": [
+        "https://www.welfarehello.com/community/hometownNews/fae25a66-f680-4308-aa91-48b7bffe8db0",
+        "https://www.kkday.com/ko/blog/20051/jeju_orum_spots_5"
+      ],
+      "parking": {
+        "name": "용눈이오름 주차장",
+        "lat": 33.4630705,
+        "lon": 126.8316087
+      },
+      "elevation_m": 185,
+      "slope_deg": 9.0,
+      "campsite": false,
+      "rest_year": false,
+      "pets": "전구역 동반가능, \t전 견종 동반 가능, 목줄 착용, 맹견의 경우 입마개 착용 필수, 배변봉투 지참 및 배변처리 필수",
+      "night_access": "상시 개방",
+      "fee": "무료",
+      "hours": "상시 개방",
+      "toilet": {
+        "name": "용눈이오름 화장실",
+        "lat": 33.463238226926656,
+        "lon": 126.83197947162527
+      },
+      "store": false,
+      "walk_routes": [
+        {
+          "points": [
+            [
+              33.46307319493591,
+              126.83161942824195
+            ],
+            [
+              33.46289937998155,
+              126.83143151597943
+            ],
+            [
+              33.462874348017834,
+              126.83125676247941
+            ],
+            [
+              33.46315149663572,
+              126.83118630449522
+            ],
+            [
+              33.46309009563647,
+              126.83078841193522
+            ],
+            [
+              33.46299701939337,
+              126.83030452516195
+            ],
+            [
+              33.46291302006938,
+              126.8298663391428
+            ],
+            [
+              33.462824414948344,
+              126.829358242256
+            ],
+            [
+              33.46270065503976,
+              126.8295117722905
+            ],
+            [
+              33.4627216501533,
+              126.8300280683362
+            ],
+            [
+              33.4624490175853,
+              126.83010389933591
+            ],
+            [
+              33.46219666372386,
+              126.83017431183764
+            ],
+            [
+              33.46184051094416,
+              126.83016156014601
+            ],
+            [
+              33.461515906986044,
+              126.83014336859031
+            ],
+            [
+              33.461254463332,
+              126.83016001371686
+            ],
+            [
+              33.46099305281461,
+              126.83020086149882
+            ],
+            [
+              33.4610195072627,
+              126.82976784817612
+            ],
+            [
+              33.46083672885037,
+              126.82962029953255
+            ],
+            [
+              33.46046929108195,
+              126.8295968156113
+            ],
+            [
+              33.4605725207215,
+              126.8292658433344
+            ],
+            [
+              33.460383050071414,
+              126.82916940411877
+            ],
+            [
+              33.45998883068287,
+              126.82933959509832
+            ],
+            [
+              33.45957440253311,
+              126.82956629641916
+            ],
+            [
+              33.45916002561331,
+              126.82983064351873
+            ],
+            [
+              33.45863739634939,
+              126.83005217316804
+            ],
+            [
+              33.45905715147408,
+              126.83042245591828
+            ],
+            [
+              33.459319359124635,
+              126.83096515394182
+            ],
+            [
+              33.459545697406824,
+              126.8316531391523
+            ],
+            [
+              33.45981695940699,
+              126.83222809648511
+            ],
+            [
+              33.45987399291166,
+              126.83273355024946
+            ]
+          ],
+          "minutes": 20,
+          "climb_m": 86.7,
+          "slope_deg": 4.2,
+          "over_m": 1175.1
+        }
+      ]
+    },
+    {
+      "name_ko": "다랑쉬오름",
+      "name_en": "Darangshi Oreum",
+      "lat": 33.47768585996772,
+      "lon": 126.82153592461563,
+      "coord_confidence": "low",
+      "region": "동",
+      "type": "오름",
+      "why": "'오름의 여왕'. 표고 382m 정상 360도 파노라마, 주변 광원 적어 동부 다크스카이 촬영지로 인기. 한라산과 성산 일출봉까지 조망 가능. 정상에 올라가면 깊이 115m의 거대한 분화구 관람 가",
+      "notes": "야간 산행은 급경사 주의",
+      "elevation_m": 336,
+      "slope_deg": 23.8,
+      "parking": {
+        "name": "다랑쉬오름 주차장",
+        "lat": 33.4749631,
+        "lon": 126.8266475
+      },
+      "toilet": {
+        "name": "다랑쉬오름 화장실",
+        "lat": 33.47443767451749,
+        "lon": 126.82651138316567
+      },
+      "store": {
+        "name": "다랑쉬오름 자판기",
+        "lat": 33.47442185126996,
+        "lon": 126.8264791392934
+      },
+      "hours": "상시 개방",
+      "fee": "무료",
+      "night_access": "상시 개방",
+      "rest_year": false,
+      "pets": "반려견 동반 가능",
+      "campsite": false,
+      "cautions": [
+        "쓰레기는 되가져가야함",
+        "흡연 및 음주 금"
+      ],
+      "walk_type": "등반",
+      "access": "도로변 주차장.  다랑쉬오름 입구 바로 앞 무료 공영주차장",
+      "walk_routes": [
+        {
+          "points": [
+            [
+              33.4749631,
+              126.8266475
+            ],
+            [
+              33.474915622473105,
+              126.82658036110736
+            ],
+            [
+              33.474987317654055,
+              126.82627091029933
+            ]
+          ],
+          "segments": [
+            {
+              "from": 0,
+              "surface": "포장"
+            },
+            {
+              "from": 1,
+              "surface": "포장"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name_ko": "아부오름",
+      "name_en": "Abu Oreum",
+      "lat": 33.448828,
+      "lon": 126.777202,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "오름",
+      "why": "완만해 정상까지 10분, 넓은 원형 분화구와 트인 시야. 송당 일대 어두운 하늘로 접근성 좋은 관측지",
+      "notes": "좌표 교정(2026-08-05): 33.4356, 126.7291 → 33.448828, 126.777202. 카카오맵 장소검색과 '제주특별자치도 제주시 구좌읍 송당리 2263' 주소 지오코딩이 30m 안에서 일치(scripts/check_spot_coords.py). 이전 신뢰도 medium.",
+      "elevation_m": 231,
+      "slope_deg": 7.9,
+      "parking": {
+        "name": "아부오름 주차장",
+        "lat": 33.4470947,
+        "lon": 126.7812412
+      },
+      "sources": [
+        "http://place.map.kakao.com/766297462"
+      ]
+    },
+    {
+      "name_ko": "백약이오름",
+      "name_en": "Baegyagi Oreum",
+      "lat": 33.437313,
+      "lon": 126.791778,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "오름",
+      "why": "성읍·가시리 동부 중산간의 어두운 초지대에 위치, 넓은 개활지와 낮은 광공해로 별·은하수 관측 양호",
+      "notes": "주소 성읍리 산1 기반 추정 좌표 좌표 교정(2026-08-05): 33.3897, 126.807 → 33.437313, 126.791778. 카카오맵 장소검색과 '제주특별자치도 서귀포시 표선면 성읍리 산 1' 주소 지오코딩이 30m 안에서 일치(scripts/check_spot_coords.py). 이전 신뢰도 medium.",
+      "night_access": "자연휴식년제 탐방 제한 (별도 고시일까지, 경향신문 2024-12-30 보도)",
+      "elevation_m": 334,
+      "slope_deg": 4.5,
+      "parking": {
+        "name": "백약이오름 주차장",
+        "lat": 33.4411213,
+        "lon": 126.7942743
+      },
+      "sources": [
+        "http://place.map.kakao.com/604691863",
+        "http://place.map.kakao.com/1156906834"
+      ]
+    },
+    {
+      "name_ko": "비양도망대",
+      "name_en": "Biyangdo Watchtower",
+      "lat": 33.5152254482323,
+      "lon": 126.969387535878,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "해안/섬",
+      "why": "우도 동쪽 끝 비양도의 망대 — 사방이 바다로 트인 저지대라 해안 수평선까지 보이고, 섬이라 본섬 불빛과 떨어져 있다(SQM 21.18 · Bortle 4). 입도해 묵어야 볼 수 있다",
+      "notes": "좌표는 망대 자리 — 카카오맵 「비양도망대」와 27m (2026-08-06 대조). 가장 가까운 가로등이 28m 이고 100m 안 2개 · 1km 83개다 — 하늘은 어두워도 발밑에 광원이 있어 망대 그늘로 불빛을 등져야 한다.",
+      "elevation_m": 2,
+      "slope_deg": 1.7,
+      "night_access": "도항선이 일몰 후 운항하지 않는다 — 배가 끊긴 뒤가 곧 밤이라 **입도해 묵어야** 볼 수 있다. 막배 시각은 계절·기상에 따라 다르고 아직 1차 자료로 확인하지 못했다(성산대합실 064-782-5671)."
+    },
+    {
+      "name_ko": "산굼부리",
+      "name_en": "Sangumburi Crater",
+      "lat": 33.434,
+      "lon": 126.687,
+      "coord_confidence": "medium",
+      "region": "중산간",
+      "type": "오름/분화구",
+      "why": "교래리 중산간 개활 초지, 사방이 트여 계절 별자리 조망 용이. 접근 도로 양호",
+      "notes": "유료 관람지로 야간 개방은 시기·행사에 따라 제한될 수 있음",
+      "elevation_m": 408,
+      "slope_deg": 1.9,
+      "parking": {
+        "name": "산굼부리 대형주차장",
+        "lat": 33.4348623,
+        "lon": 126.6872901
+      },
+      "sources": [
+        "http://place.map.kakao.com/17580691",
+        "http://place.map.kakao.com/18111437"
+      ]
+    },
+    {
+      "name_ko": "절물자연휴양림",
+      "name_en": "Jeolmul Natural Recreation Forest",
+      "lat": 33.440049,
+      "lon": 126.625204,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "숲",
+      "why": "봉개 중산간 삼나무 숲, 야간 숙박객 대상 별 관측 프로그램 운영 사례. 도심에서 벗어난 어두운 환경",
+      "notes": "제주시 도심에서 남쪽 8~10km, 시가지 방향 저고도에 광공해 잔존 좌표 교정(2026-08-05): 33.4497, 126.632 → 33.440049, 126.625204. 카카오맵 장소검색과 '제주특별자치도 제주시 명림로 584' 주소 지오코딩이 30m 안에서 일치(scripts/check_spot_coords.py). 이전 신뢰도 medium.",
+      "parking": {
+        "name": "절물자연휴양림 공영주차장",
+        "lat": 33.440295091361,
+        "lon": 126.628969963074
+      },
+      "amenities": {
+        "toilet": true
+      },
+      "sources": [
+        "http://place.map.kakao.com/8067359",
+        "http://place.map.kakao.com/26395566",
+        "http://place.map.kakao.com/27470678"
+      ],
+      "elevation_m": 540,
+      "slope_deg": 3.8
+    },
+    {
+      "name_ko": "사려니숲길(비자림로 입구)",
+      "name_en": "Saryeoni Forest Trail",
+      "lat": 33.418,
+      "lon": 126.6597,
+      "coord_confidence": "medium",
+      "region": "중산간",
+      "type": "숲",
+      "why": "해발 500~600m 중산간 숲길, 주변 인공광 거의 없어 매우 어두움. 개활지는 적으나 다크스카이 환경 우수",
+      "notes": "숲 캐노피로 시야 제한, 개방 구간·시간 확인 필요. 좌표는 비자림로측 입구",
+      "elevation_m": 464,
+      "slope_deg": 6.1
+    },
+    {
+      "name_ko": "제주마방목지",
+      "name_en": "Jeju Mabang Pasture",
+      "lat": 33.427639,
+      "lon": 126.603595,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "목장/초지",
+      "why": "5·16도로변 드넓은 초원, 동서남북 사방 개활로 사계절 별자리와 5~8월 은하수 육안 관측 가능",
+      "notes": "도로변 차량 헤드라이트 유의. 관광공사 소개 은하수 스팟 좌표 교정(2026-08-05): 33.4353, 126.5658 → 33.427639, 126.603595. 카카오맵 장소검색과 '제주특별자치도 제주시 516로 2480' 주소 지오코딩이 30m 안에서 일치(scripts/check_spot_coords.py). 이전 신뢰도 medium.",
+      "access": "5·16도로변. 주차장이 널찍하다",
+      "walk_type": "평지",
+      "cautions": [
+        "사방이 트여 바람이 강하다"
+      ],
+      "sources": [
+        "https://korean.visitkorea.or.kr/detail/rem_detail.do?cotid=054247db-9860-480e-83ea-899b19fb8b53",
+        "http://place.map.kakao.com/19975290"
+      ],
+      "elevation_m": 623,
+      "slope_deg": 2.3,
+      "parking": {
+        "name": "축산진흥원목마장 주차장",
+        "lat": 33.427061,
+        "lon": 126.6038137
+      }
+    },
+    {
+      "name_ko": "1100고지 휴게소",
+      "name_en": "1100 Highland Rest Area",
+      "lat": 33.3583,
+      "lon": 126.4658,
+      "coord_confidence": "medium",
+      "region": "중산간",
+      "type": "고지/전망",
+      "why": "해발 1100m 한라산 중턱, 도심 광공해 위로 올라가 은하수 중심부까지 선명. 제주 대표 별 성지",
+      "notes": "가로등 없는 산길 야간 운전 주의, 겨울 결빙. 습도 낮은 겨울 투명도 우수",
+      "access": "1100고지 전용 주차장. 2층 전망대",
+      "walk_type": "평지",
+      "walk_minutes": 1,
+      "cautions": [
+        "안개가 잦아 별을 보러 갔다가 허탕 치는 경우가 적지 않다",
+        "한라산 중턱 야간 산악도로 — 초행 운전 주의"
+      ],
+      "sources": [
+        "https://www.tourtoctoc.com/news/articleView.html?idxno=2281",
+        "https://v.daum.net/v/jzqcJzxf3e",
+        "https://www.visitjeju.net/kr/detail/view?contentsid=CNTS_200000000013886",
+        "http://place.map.kakao.com/7923716",
+        "http://place.map.kakao.com/20848368"
+      ],
+      "parking": {
+        "name": "1100고지휴게소 주차장",
+        "lat": 33.35768576943481,
+        "lon": 126.46279797833289
+      },
+      "elevation_m": 1104,
+      "slope_deg": 4.9
+    },
+    {
+      "name_ko": "제주별빛누리공원",
+      "name_en": "Jeju Starlight World Park",
+      "lat": 33.444576,
+      "lon": 126.549186,
+      "coord_confidence": "high",
+      "region": "북",
+      "type": "관측소/천문공원",
+      "why": "천체망원경 관측실·플라네타리움 갖춘 공식 천문시설, 초보자 관측 교육에 적합",
+      "notes": "제주시 오등동 도심 인접 언덕이라 광공해 큼 — 심층 관측보다 교육·입문용. 주소 선돌목동길 60 좌표 교정(2026-08-05): 33.4636, 126.5386 → 33.444576, 126.549186. 카카오맵 장소검색과 '제주특별자치도 제주시 선돌목동길 60' 주소 지오코딩이 30m 안에서 일치(scripts/check_spot_coords.py). 이전 신뢰도 medium.",
+      "access": "제주시 선돌목동길 60",
+      "hours": "화~일 14:00~21:00 (하절기 15:00~22:00), 월요일 휴관",
+      "fee": "성인 5,000원",
+      "amenities": {
+        "toilet": true
+      },
+      "night_access": "운영시간 내에만 관측실 이용 가능",
+      "cautions": [
+        "관측실이 닫혀도 언덕 위라 야외 관측은 가능하다는 언급이 있다 — 확인 필요"
+      ],
+      "sources": [
+        "https://v.daum.net/v/jzqcJzxf3e",
+        "https://korean.visitkorea.or.kr/detail/rem_detail.do?cotid=054247db-9860-480e-83ea-899b19fb8b53",
+        "http://place.map.kakao.com/20588447",
+        "http://place.map.kakao.com/17556681",
+        "http://place.map.kakao.com/639806382",
+        "http://place.map.kakao.com/17556705",
+        "http://place.map.kakao.com/503529219",
+        "http://place.map.kakao.com/27583339"
+      ],
+      "elevation_m": 392,
+      "slope_deg": 7.9,
+      "parking": {
+        "name": "한라산리조트주차장",
+        "lat": 33.4445572,
+        "lon": 126.5463472
+      }
+    },
+    {
+      "name_ko": "새별오름",
+      "name_en": "Saebyeol Oreum",
+      "lat": 33.3664,
+      "lon": 126.3568,
+      "coord_confidence": "medium",
+      "region": "서",
+      "type": "오름",
+      "why": "서부 중산간 초원 위 대표 은하수 명소. '나홀로 나무' 실루엣과 별 조합, 주변 불빛 거의 없음",
+      "notes": "평화로 인접이나 오름 뒤편 초지는 어두움. 관광공사·여행기 다수 추천",
+      "access": "주차장 넓음. **주차장에서도 별이 보인다** — 정상까지 오르지 않아도 된다",
+      "walk_type": "등반",
+      "walk_minutes": 30,
+      "cautions": [
+        "정상까지 가파르다 — 야간 등반 시 랜턴 필수"
+      ],
+      "sources": [
+        "https://korean.visitkorea.or.kr/detail/rem_detail.do?cotid=054247db-9860-480e-83ea-899b19fb8b53",
+        "https://www.visitjeju.net/kr/detail/view?contentsid=CNTS_200000000013886",
+        "http://place.map.kakao.com/1749886626"
+      ],
+      "elevation_m": 483,
+      "slope_deg": 14.3,
+      "parking": {
+        "name": "새별오름 주차장",
+        "lat": 33.3651381,
+        "lon": 126.361085
+      }
+    },
+    {
+      "name_ko": "금오름",
+      "name_en": "Geum Oreum",
+      "lat": 33.3559,
+      "lon": 126.3056,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "오름",
+      "why": "한림 금악리 정상 굼부리(호수)와 트인 지평선, 서부 중산간의 어두운 하늘로 일몰·별 관측 인기",
+      "notes": "좌표 위키백과 교차확인(33.3559, 126.3056)",
+      "access": "패러글라이딩 이용 시 차로 정상까지 올라간다는 언급이 있다 — 일반 차량 가부 확인 필요",
+      "walk_type": "등반",
+      "sources": [
+        "https://www.kkday.com/ko/blog/20051/jeju_orum_spots_5",
+        "http://place.map.kakao.com/2142378352"
+      ],
+      "elevation_m": 386,
+      "slope_deg": 4.0,
+      "parking": {
+        "name": "금오름주차장",
+        "lat": 33.3510465,
+        "lon": 126.3057326
+      }
+    },
+    {
+      "name_ko": "저지오름",
+      "name_en": "Jeoji Oreum",
+      "lat": 33.3312,
+      "lon": 126.2541,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "오름",
+      "why": "한경면 서부 내륙, 아름다운 숲 오름상 수상지. 인근 마을 광원 적어 서부 관측 후보지",
+      "notes": "좌표 위키백과 교차확인(33.3312, 126.2541). 분화구는 숲으로 시야 제한, 둘레길에서 관측",
+      "parking": {
+        "name": "저지오름 주차장",
+        "lat": 33.3349027109263,
+        "lon": 126.248020571093
+      },
+      "sources": [
+        "http://place.map.kakao.com/13725890"
+      ],
+      "elevation_m": 164,
+      "slope_deg": 24.7
+    },
+    {
+      "name_ko": "성이시돌목장(테쉬폰)",
+      "name_en": "St. Isidore Ranch (Teshpon)",
+      "lat": 33.3531,
+      "lon": 126.326,
+      "coord_confidence": "medium",
+      "region": "서",
+      "type": "목장",
+      "why": "한림 금악리 넓은 목초지와 이국적 테쉬폰 건물, 광공해 적어 은하수 촬영 배경지로 유명",
+      "notes": "야간 사유지 출입·주차 매너 필요",
+      "cautions": [
+        "사유 목장 부지 — 야간 출입 가부 확인 필요"
+      ],
+      "sources": [
+        "https://ohou.se/advices/9485",
+        "https://korean.visitkorea.or.kr/detail/rem_detail.do?cotid=054247db-9860-480e-83ea-899b19fb8b53"
+      ],
+      "elevation_m": 359,
+      "slope_deg": 1.6
+    },
+    {
+      "name_ko": "따라비오름",
+      "name_en": "Ttarabi Oreum",
+      "lat": 33.387851,
+      "lon": 126.75392,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "오름",
+      "why": "가시리 중산간 '오름의 여왕', 세 개 굼부리와 억새·개활. 동남부 어두운 하늘로 관측·촬영 인기",
+      "notes": "좌표 위키백과 교차확인(33.3608, 126.7808) 좌표 교정(2026-08-05): 33.3608, 126.7808 → 33.387851, 126.75392. 카카오맵 장소검색과 '제주특별자치도 서귀포시 표선면 가시리 산 63' 주소 지오코딩이 30m 안에서 일치(scripts/check_spot_coords.py). 이전 신뢰도 high.",
+      "elevation_m": 306,
+      "slope_deg": 6.5,
+      "parking": {
+        "name": "따라비오름 주차장",
+        "lat": 33.384346,
+        "lon": 126.7579822
+      },
+      "sources": [
+        "http://place.map.kakao.com/793329232"
+      ]
+    },
+    {
+      "name_ko": "유채꽃프라자·녹산로",
+      "name_en": "Yuchaekkot Plaza & Noksan-ro",
+      "lat": 33.3846,
+      "lon": 126.7433,
+      "coord_confidence": "medium",
+      "region": "남",
+      "type": "공원/도로",
+      "why": "가시리 광활한 중산간 평원·전망대, 사방 트이고 광원 적어 은하수 파노라마 관측지",
+      "notes": "녹산로 일대 가로등 적음. 전망대 주차장 기준 좌표",
+      "cautions": [
+        "풍력발전기 항공장애등(적색 점멸)이 시야에 들어온다 — 확인 필요"
+      ],
+      "sources": [
+        "https://www.visitjeju.net/kr/detail/view?contentsid=CNTS_200000000013886"
+      ],
+      "elevation_m": 245,
+      "slope_deg": 2.5
+    },
+    {
+      "name_ko": "물영아리오름",
+      "name_en": "Mulyeongari Oreum",
+      "lat": 33.367782,
+      "lon": 126.691706,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "오름/습지",
+      "why": "남원 수망리 람사르 습지 오름, 주변 목장·중산간으로 어둡고 조용. 능선 개활지에서 관측",
+      "notes": "정상 습지·숲 구간 시야 제한, 야간 산행 안전 주의 좌표 교정(2026-08-05): 33.3302, 126.701 → 33.367782, 126.691706. 카카오맵 장소검색과 '제주특별자치도 서귀포시 남원읍 수망리 산 188' 주소 지오코딩이 30m 안에서 일치(scripts/check_spot_coords.py). 이전 신뢰도 medium.",
+      "elevation_m": 495,
+      "slope_deg": 18.7
+    },
+    {
+      "name_ko": "서귀포천문과학문화관",
+      "name_en": "Seogwipo Astronomical Science & Culture Center",
+      "lat": 33.288852,
+      "lon": 126.460414,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "관측소",
+      "why": "하원동 1100로변 공식 천문대, 주망원경 상시 관측·카노푸스(노인성) 관측 이벤트 등 대중 관측 프로그램",
+      "notes": "서귀포 도심 북측 중산간, 도심 방향 저고도 광공해. 주소 1100로 506-1 좌표 교정(2026-08-05): 33.282, 126.4665 → 33.288852, 126.460414. 카카오맵 장소검색과 '제주특별자치도 서귀포시 1100로 506-1' 주소 지오코딩이 30m 안에서 일치(scripts/check_spot_coords.py). 이전 신뢰도 medium.",
+      "access": "서귀포시 1100로 506-1, 해발 400m",
+      "hours": "화~일 14:00~22:00, 월요일 휴관",
+      "fee": "성인 2,000원",
+      "amenities": {
+        "toilet": true
+      },
+      "night_access": "운영시간 내에만 관측실 이용 가능",
+      "cautions": [
+        "한국에서 노인성(카노푸스)을 볼 수 있는 거의 유일한 위도대"
+      ],
+      "sources": [
+        "https://v.daum.net/v/jzqcJzxf3e"
+      ],
+      "elevation_m": 403,
+      "slope_deg": 8.3
+    },
+    {
+      "name_ko": "알뜨르비행장",
+      "name_en": "Alddreu Airfield",
+      "lat": 33.1985,
+      "lon": 126.2735,
+      "coord_confidence": "medium",
+      "region": "남",
+      "type": "평야/역사터",
+      "why": "대정 상모리 탁 트인 벌판, 제주 현지인이 꼽는 은하수 스팟. 남쪽 하늘 저고도까지 개활",
+      "notes": "위도 33.199로 공식 하한(33.19)에 근접. 인근 마을·모슬포 방향 광공해 일부",
+      "access": "185만㎡ 규모의 너른 벌판. 사방 차폐가 거의 없다",
+      "walk_type": "평지",
+      "sources": [
+        "https://v.daum.net/v/jzqcJzxf3e",
+        "http://place.map.kakao.com/26094848"
+      ],
+      "elevation_m": 6,
+      "slope_deg": 0.7
+    },
+    {
+      "name_ko": "안돌오름",
+      "name_en": "Andol Oreum",
+      "lat": 33.4578,
+      "lon": 126.7559,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "오름",
+      "why": "동부 중산간 오름군 한복판. 반경 1km 가로등 0개로 큐레이션 20곳 중 최암부인 1100고지에 준한다",
+      "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.133 실측(1100고지 0.132 수준)",
+      "elevation_m": 346,
+      "slope_deg": 21.5,
+      "parking": {
+        "name": "안돌오름 주차장",
+        "lat": 33.4546603,
+        "lon": 126.7599232
+      },
+      "sources": [
+        "http://place.map.kakao.com/1455998290"
+      ]
+    },
+    {
+      "name_ko": "밧돌오름",
+      "name_en": "Batdol Oreum",
+      "lat": 33.4607,
+      "lon": 126.7601,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "오름",
+      "why": "안돌오름과 능선으로 이어진 쌍둥이 오름. 주변 조명이 사실상 없다",
+      "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.161 실측",
+      "elevation_m": 340,
+      "slope_deg": 17.3
+    },
+    {
+      "name_ko": "성불오름",
+      "name_en": "Seongbul Oreum",
+      "lat": 33.4221,
+      "lon": 126.75,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "오름",
+      "why": "번영로 남측 중산간. 도로 접근이 좋으면서 주변이 어둡다",
+      "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.191 실측",
+      "elevation_m": 352,
+      "slope_deg": 7.2,
+      "parking": {
+        "name": "제주아트랜드 주차장2",
+        "lat": 33.4240337,
+        "lon": 126.7446856
+      },
+      "sources": [
+        "http://place.map.kakao.com/17571850"
+      ]
+    },
+    {
+      "name_ko": "아끈다랑쉬오름",
+      "name_en": "Akkeun Darangshi Oreum",
+      "lat": 33.4741,
+      "lon": 126.8306,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "오름",
+      "why": "다랑쉬오름 남측의 낮은 오름. 표고가 낮아 정상까지 도보 부담이 작다",
+      "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.200 실측",
+      "elevation_m": 191,
+      "slope_deg": 9.1
+    },
+    {
+      "name_ko": "금백조로",
+      "name_en": "Geumbaekjo-ro",
+      "lat": 33.43,
+      "lon": 126.755,
+      "coord_confidence": "low",
+      "region": "동",
+      "type": "도로",
+      "why": "동부 중산간을 가로지르는 무조명 도로. 사진가들이 은하수 구도로 쓰는 구간이다",
+      "notes": "도로라 장소검색이 스누피가든으로 잘못 잡혀 중간 지점 좌표를 직접 지정 — 실제 정차 지점은 로드뷰 검증 필요. 어둡기 종합 0.219 실측",
+      "elevation_m": 257,
+      "slope_deg": 2.5,
+      "parking": {
+        "name": "천미천 주차장",
+        "lat": 33.4339297,
+        "lon": 126.7517345
+      },
+      "sources": [
+        "http://place.map.kakao.com/2129614108",
+        "http://place.map.kakao.com/1905195959"
+      ]
+    },
+    {
+      "name_ko": "지미봉",
+      "name_en": "Jimibong",
+      "lat": 33.4993,
+      "lon": 126.9024,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "오름",
+      "why": "종달리 해안 오름. 정상에서 성산 방면까지 사방이 트인다",
+      "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.316 실측 — 종달리 마을 조명 영향",
+      "elevation_m": 98,
+      "slope_deg": 23.3
+    },
+    {
+      "name_ko": "비자림",
+      "name_en": "Bijarim Forest",
+      "lat": 33.4904,
+      "lon": 126.81,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "숲",
+      "why": "동부 대표 관광지이면서 주변 조명이 적다. 여러 매체가 별 관측지로 함께 꼽는다",
+      "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.308 실측. 숲이라 시야는 별도 확인 필요",
+      "elevation_m": 131,
+      "slope_deg": 3.1
+    },
+    {
+      "name_ko": "성산일출봉",
+      "name_en": "Seongsan Ilchulbong",
+      "lat": 33.4591,
+      "lon": 126.9405,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "해안",
+      "why": "여러 매체가 별 관측지로 꼽는 대표 관광지. 관광객 인지도가 가장 높다",
+      "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.323 실측 — 이름값에 비해 성산 시가지 조명이 있다",
+      "amenities": {
+        "toilet": true
+      },
+      "sources": [
+        "http://place.map.kakao.com/1718571277"
+      ],
+      "elevation_m": 143,
+      "slope_deg": 7.5
+    },
+    {
+      "name_ko": "섭지코지",
+      "name_en": "Seopjikoji",
+      "lat": 33.4239,
+      "lon": 126.9306,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "해안",
+      "why": "동쪽 일출 명소이나 밤에는 바다 방향 시야가 완전히 트여 은하수 스팟으로 꼽힌다",
+      "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.446 실측. 여름철 어화(고깃배 불빛) 주의",
+      "access": "섭지코지 전용 주차장. 18:30 이후 무료",
+      "walk_type": "평지",
+      "cautions": [
+        "여름철 어화(고깃배 불빛)가 수평선 쪽을 밝힌다"
+      ],
+      "sources": [
+        "https://www.visitjeju.net/kr/detail/view?contentsid=CNTS_200000000013886"
+      ],
+      "elevation_m": 12,
+      "slope_deg": 5.0
+    },
+    {
+      "name_ko": "표선해수욕장",
+      "name_en": "Pyoseon Beach",
+      "lat": 33.3275,
+      "lon": 126.8374,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "해안",
+      "why": "간조 시 백사장이 넓게 드러나 사방이 트인다",
+      "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.491 실측 — 반경 1km 가로등 814개로 후보 중 최다",
+      "elevation_m": 3,
+      "slope_deg": 1.9
+    },
+    {
+      "name_ko": "가시리 풍력발전단지",
+      "name_en": "Gasiri Wind Farm",
+      "lat": 33.3939,
+      "lon": 126.7341,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "평지",
+      "why": "가시리 초지 한복판. 이번 검산에서 육상 후보 중 가장 어두웠다",
+      "notes": "카카오맵 장소검색 일치(국산화 풍력발전단지). 어둡기 종합 0.114 실측 — 1100고지(0.132)보다 어둡다",
+      "elevation_m": 309,
+      "slope_deg": 3.1
+    },
+    {
+      "name_ko": "큰사슴이오름",
+      "name_en": "Keunsaseumi Oreum",
+      "lat": 33.3991,
+      "lon": 126.7295,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "오름",
+      "why": "가시리 풍력단지에 접한 오름. 따라비오름과 같은 권역이면서 더 어둡다",
+      "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.130 실측",
+      "elevation_m": 462,
+      "slope_deg": 3.6
+    },
+    {
+      "name_ko": "정석비행장",
+      "name_en": "Jeongseok Airfield",
+      "lat": 33.4044,
+      "lon": 126.7194,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "평지",
+      "why": "녹산로 인근의 넓은 평지. 사방 차폐가 거의 없어 은하수 촬영지로 알려져 있다",
+      "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.143 실측. 활주로 부지 접근 가부는 검증 필요",
+      "elevation_m": 350,
+      "slope_deg": 0.7
+    },
+    {
+      "name_ko": "붉은오름자연휴양림",
+      "name_en": "Bulgeun Oreum Recreational Forest",
+      "lat": 33.4015,
+      "lon": 126.6754,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "숲",
+      "why": "1112번(비자림로) 중산간. 주차장과 화장실이 갖춰진 시설이다",
+      "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.181 실측. 휴양림 야간 개방 여부 확인 필요",
+      "elevation_m": 454,
+      "slope_deg": 1.9
+    },
+    {
+      "name_ko": "서귀포자연휴양림",
+      "name_en": "Seogwipo Recreational Forest",
+      "lat": 33.3115,
+      "lon": 126.4588,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "숲",
+      "why": "1100도로 남측. 1100고지 권역이면서 서귀포에서 접근이 짧다",
+      "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.204 실측. 야간 개방 여부 확인 필요",
+      "amenities": {
+        "toilet": true
+      },
+      "campsite": true,
+      "sources": [
+        "http://place.map.kakao.com/17582067",
+        "http://place.map.kakao.com/17576596",
+        "http://place.map.kakao.com/8375194",
+        "http://place.map.kakao.com/25172867",
+        "http://place.map.kakao.com/13337646",
+        "http://place.map.kakao.com/17932900",
+        "http://place.map.kakao.com/17582413"
+      ],
+      "parking": {
+        "name": "서귀포자연휴양림 2주차장",
+        "lat": 33.31204006697977,
+        "lon": 126.45931968435593
+      },
+      "elevation_m": 714,
+      "slope_deg": 2.0
+    },
+    {
+      "name_ko": "서귀포치유의숲",
+      "name_en": "Seogwipo Healing Forest",
+      "lat": 33.2946,
+      "lon": 126.5252,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "숲",
+      "why": "산록남로변 중산간. 반경 1km 가로등 0개",
+      "notes": "'산록남로' 검색이 이 시설로 매칭됐다. 어둡기 종합 0.179 실측. 야간 개방 여부 확인 필요",
+      "elevation_m": 500,
+      "slope_deg": 7.8
+    },
+    {
+      "name_ko": "송악산",
+      "name_en": "Songaksan",
+      "lat": 33.1991,
+      "lon": 126.2898,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "오름",
+      "why": "남서 해안 오름. 바다 방향 시야가 완전히 트인다",
+      "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.242 실측",
+      "night_access": "정상부·일부 탐방로 자연휴식년제 2027년 7월까지 (경향신문 2024-12-30 보도)",
+      "access": "둘레길은 완만해 산책하듯 오를 수 있다",
+      "walk_type": "평지",
+      "cautions": [
+        "야간 트레킹 시 랜턴 필수",
+        "6월경 수국"
+      ],
+      "sources": [
+        "https://v.daum.net/v/jzqcJzxf3e"
+      ],
+      "elevation_m": 79,
+      "slope_deg": 8.2
+    },
+    {
+      "name_ko": "용머리해안",
+      "name_en": "Yongmeori Coast",
+      "lat": 33.2317,
+      "lon": 126.3147,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "해안",
+      "why": "여러 매체가 별 관측지로 꼽는 남서 해안",
+      "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.340 실측. 해안 탐방로는 만조·기상 시 통제된다",
+      "sources": [
+        "http://place.map.kakao.com/13723890"
+      ],
+      "elevation_m": 14,
+      "slope_deg": 4.7
+    },
+    {
+      "name_ko": "바농오름",
+      "name_en": "Banong Oreum",
+      "lat": 33.4538,
+      "lon": 126.6538,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "오름",
+      "why": "교래 권역 오름. 산굼부리·돌문화공원과 같은 축선이면서 조명에서 더 물러나 있다",
+      "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.306 실측",
+      "elevation_m": 538,
+      "slope_deg": 6.7,
+      "parking": {
+        "name": "바농오름 주차장",
+        "lat": 33.4513516,
+        "lon": 126.6555622
+      },
+      "sources": [
+        "http://place.map.kakao.com/1537523989",
+        "http://place.map.kakao.com/1304140509"
+      ]
+    },
+    {
+      "name_ko": "삼다수숲길",
+      "name_en": "Samdasu Forest Trail",
+      "lat": 33.4216,
+      "lon": 126.6665,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "숲",
+      "why": "교래 삼다수 취수원 일대 숲길. 중산간 도로에서 바로 닿는다",
+      "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.274 실측. 야간 개방 여부 확인 필요",
+      "elevation_m": 447,
+      "slope_deg": 6.1,
+      "parking": {
+        "name": "삼다수숲길 주차장",
+        "lat": 33.4276947,
+        "lon": 126.6740513
+      },
+      "sources": [
+        "http://place.map.kakao.com/839784256",
+        "http://place.map.kakao.com/705458989"
+      ]
+    },
+    {
+      "name_ko": "교래자연휴양림",
+      "name_en": "Gyorae Recreational Forest",
+      "lat": 33.4404,
+      "lon": 126.665,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "숲",
+      "why": "교래 곶자왈 휴양림. 주차장·화장실이 갖춰져 있다",
+      "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.287 실측. 야간 개방 여부 확인 필요",
+      "parking": {
+        "name": "교래자연휴양림 주차장",
+        "lat": 33.439550783207004,
+        "lon": 126.66758358387955
+      },
+      "campsite": true,
+      "sources": [
+        "http://place.map.kakao.com/26625268",
+        "http://place.map.kakao.com/20513626"
+      ],
+      "elevation_m": 456,
+      "slope_deg": 10.0
+    },
+    {
+      "name_ko": "한라생태숲",
+      "name_en": "Halla Ecological Forest",
+      "lat": 33.4313,
+      "lon": 126.5977,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "숲",
+      "why": "5·16도로변. 마방목지와 같은 축선이고 제주시에서 가장 가까운 중산간 후보 중 하나다",
+      "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.269 실측. 야간 개방 여부 확인 필요",
+      "sources": [
+        "http://place.map.kakao.com/25051219",
+        "http://place.map.kakao.com/17578366"
+      ],
+      "elevation_m": 577,
+      "slope_deg": 4.5,
+      "parking": {
+        "name": "한라생태숲 주차장",
+        "lat": 33.4303538,
+        "lon": 126.596005
+      }
+    },
+    {
+      "name_ko": "제주돌문화공원",
+      "name_en": "Jeju Stone Park",
+      "lat": 33.4486,
+      "lon": 126.6603,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "공원",
+      "why": "여러 매체가 '밤하늘을 색다르게 보는 곳'으로 꼽는다. 넓은 주차장이 있다",
+      "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.338 실측. 야간 개방 여부 확인 필요",
+      "access": "넓은 주차장. **주차장 쪽에서도 별 보기에 충분**하다는 언급",
+      "walk_type": "평지",
+      "night_access": "돌하르방과 함께 담으려면 야간 입장이 별도로 필요 — 개방 여부 확인 필요",
+      "sources": [
+        "https://korean.visitkorea.or.kr/detail/rem_detail.do?cotid=054247db-9860-480e-83ea-899b19fb8b53",
+        "http://place.map.kakao.com/13322621",
+        "http://place.map.kakao.com/17558040",
+        "http://place.map.kakao.com/1146905428",
+        "http://place.map.kakao.com/1136842895",
+        "http://place.map.kakao.com/1147041804",
+        "http://place.map.kakao.com/17556935",
+        "http://place.map.kakao.com/17562433",
+        "http://place.map.kakao.com/1137071807",
+        "http://place.map.kakao.com/17558922",
+        "http://place.map.kakao.com/18225004",
+        "http://place.map.kakao.com/18119055"
+      ],
+      "amenities": {
+        "toilet": true
+      },
+      "parking": {
+        "name": "제주돌문화공원 소형주차장5",
+        "lat": 33.4478408850812,
+        "lon": 126.661851743273
+      },
+      "elevation_m": 440,
+      "slope_deg": 3.6
+    },
+    {
+      "name_ko": "노꼬메오름",
+      "name_en": "Nokkome Oreum",
+      "lat": 33.3891,
+      "lon": 126.4115,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "오름",
+      "why": "애월 중산간 큰노꼬메오름. 반경 1km 가로등 0개",
+      "notes": "카카오맵 장소검색 일치(큰노꼬메오름). 어둡기 종합 0.166 실측",
+      "night_access": "국·공유지 오름 차마 출입·취사·야영 금지 대상 27곳에 포함 (제주투데이 보도)",
+      "parking": {
+        "name": "족은노꼬메오름 주차장",
+        "lat": 33.3988051589766,
+        "lon": 126.423967083297
+      },
+      "sources": [
+        "http://place.map.kakao.com/958753707",
+        "http://place.map.kakao.com/26923144"
+      ],
+      "elevation_m": 808,
+      "slope_deg": 17.4
+    },
+    {
+      "name_ko": "나홀로나무",
+      "name_en": "Lone Tree (Saebyeol Oreum)",
+      "lat": 33.3595,
+      "lon": 126.3617,
+      "coord_confidence": "low",
+      "region": "서",
+      "type": "평지",
+      "why": "새별오름 남측 초지의 단독 나무. 은하수 사진의 정석 구도로 쓰인다",
+      "notes": "장소검색에 등록돼 있지 않아 새별오름 남측 좌표를 직접 지정 — 로드뷰 검증 필요. 어둡기 종합 0.329 실측",
+      "elevation_m": 454,
+      "slope_deg": 2.2,
+      "parking": {
+        "name": "새빌 주차장",
+        "lat": 33.3641824,
+        "lon": 126.3633569
+      },
+      "sources": [
+        "http://place.map.kakao.com/20580879",
+        "http://place.map.kakao.com/1129304406"
+      ]
+    },
+    {
+      "name_ko": "청수곶자왈",
+      "name_en": "Cheongsu Gotjawal",
+      "lat": 33.3014,
+      "lon": 126.262,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "숲",
+      "why": "반딧불이 서식지로 야간 무조명이 실제로 유지되는 곳. 6~7월 반딧불이 야간체험이 열린다",
+      "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.347 실측. 숲이라 시야는 별도 확인 필요",
+      "elevation_m": 113,
+      "slope_deg": 3.8
+    },
+    {
+      "name_ko": "곶자왈도립공원",
+      "name_en": "Gotjawal Provincial Park",
+      "lat": 33.2889,
+      "lon": 126.2717,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "숲",
+      "why": "한경·안덕 곶자왈. 주차장·화장실이 갖춰진 도립공원이다",
+      "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.377 실측. 야간 개방 여부 확인 필요",
+      "elevation_m": 114,
+      "slope_deg": 2.3
+    },
+    {
+      "name_ko": "수월봉",
+      "name_en": "Suwolbong",
+      "lat": 33.2948,
+      "lon": 126.1631,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "해안/오름",
+      "why": "서쪽 끝 해안 절벽. 육지 방향 조명을 등지고 바다를 향해 설 수 있다",
+      "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.356 실측",
+      "access": "정상 부근까지 차로 올라갈 수 있다",
+      "walk_type": "평지",
+      "sources": [
+        "https://www.kkday.com/ko/blog/20051/jeju_orum_spots_5",
+        "http://place.map.kakao.com/25294439",
+        "http://place.map.kakao.com/465729084"
+      ],
+      "elevation_m": 31,
+      "slope_deg": 26.3
+    },
+    {
+      "name_ko": "자구내포구",
+      "name_en": "Jagunae Port",
+      "lat": 33.3093,
+      "lon": 126.1654,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "해안",
+      "why": "차귀도 조망 포구. 여러 매체가 차귀도를 별 관측지로 꼽는다",
+      "notes": "카카오맵 장소검색 일치(차귀도포구). 어둡기 종합 0.442 실측. 여름철 어화 주의",
+      "elevation_m": 0,
+      "slope_deg": 1.3
+    },
+    {
+      "name_ko": "신창풍차해안도로",
+      "name_en": "Sinchang Windmill Coastal Road",
+      "lat": 33.3431,
+      "lon": 126.1742,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "해안도로",
+      "why": "풍력발전기와 바다 위 다리·등대가 이어지는 해안도로",
+      "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.494 실측 — 후보 중 밝은 편",
+      "sources": [
+        "http://place.map.kakao.com/17384512"
+      ],
+      "elevation_m": 2,
+      "slope_deg": 1.3
+    },
+    {
+      "name_ko": "거린사슴전망대",
+      "name_en": "Georinsaseum Observatory",
+      "lat": 33.3075,
+      "lon": 126.4546,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "전망",
+      "why": "1100도로변 전망대. 비짓제주가 별 관측지로 소개했고, 1100고지로 가는 길목이라 안개로 고지가 막혔을 때 대안이 된다",
+      "notes": "카카오맵 일치(서귀포시 1100로 823 — 출처 표기 791과 차이). 어둡기 종합 0.284 실측",
+      "access": "무료 주차장. 전망대 옆 간이매점 앞에 주차",
+      "walk_type": "평지",
+      "walk_minutes": 1,
+      "cautions": [
+        "서귀포 시내 야경 방향(남쪽)은 광원이 있다"
+      ],
+      "sources": [
+        "https://www.visitjeju.net/kr/detail/view?contentsid=CNTS_200000000013886",
+        "http://place.map.kakao.com/20512978"
+      ],
+      "elevation_m": 702,
+      "slope_deg": 13.5
+    },
+    {
+      "name_ko": "군산오름",
+      "name_en": "Gunsan Oreum",
+      "lat": 33.2532,
+      "lon": 126.37,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "오름",
+      "why": "현지인 추천 별밤 목록에 오르는 곳. 사방이 트이고 지대가 높으면서 **차로 8부능선까지 올라간다** — 밤에 오를 수 있는 몇 안 되는 오름이다",
+      "notes": "카카오맵 일치(안덕면 창천리 산3-1). 어둡기 종합 0.301 실측",
+      "access": "8부능선까지 차량 진입. 다만 정상부 주차공간이 3~4대로 매우 협소",
+      "walk_type": "평지",
+      "walk_minutes": 8,
+      "amenities": {
+        "toilet": true
+      },
+      "cautions": [
+        "진입로가 좁아 교행·후진이 어렵다 — 초행 야간운전 주의",
+        "주차 3~4대뿐이라 자리가 없으면 회차해야 한다"
+      ],
+      "sources": [
+        "https://v.daum.net/v/jzqcJzxf3e",
+        "https://brunch.co.kr/@northalps/50",
+        "https://www.ohmynews.com/NWS_Web/View/at_pg.aspx?CNTN_CD=A0002773837",
+        "http://place.map.kakao.com/939156933"
+      ],
+      "elevation_m": 318,
+      "slope_deg": 10.1,
+      "parking": {
+        "name": "군산오름 주차장",
+        "lat": 33.2528699,
+        "lon": 126.368535
+      }
+    },
+    {
+      "name_ko": "무끈모루",
+      "name_en": "Mukkeunmoru",
+      "lat": 33.4566,
+      "lon": 126.7715,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "숲",
+      "why": "송당 일대의 알려지지 않은 숲길. 트리플이 '로컬 숨은 스팟'으로 꼽았고 안돌·밧돌오름과 같은 권역이라 어둡다",
+      "notes": "카카오맵 일치(구좌읍 송당리 2793). 어둡기 종합 0.270 실측",
+      "cautions": [
+        "숲이라 하늘 시야가 막힐 수 있다 — 개활도 확인 필요"
+      ],
+      "sources": [
+        "https://triple.guide/articles/27accdc5-bbed-4160-87c0-6f97a6710eb2"
+      ],
+      "elevation_m": 231,
+      "slope_deg": 1.4
+    },
+    {
+      "name_ko": "비자림로",
+      "name_en": "Bijarim-ro",
+      "lat": 33.4354,
+      "lon": 126.732,
+      "coord_confidence": "medium",
+      "region": "중산간",
+      "type": "도로",
+      "why": "1112번 삼나무 도로. '대한민국에서 가장 아름다운 도로'로 꼽히며 사려니숲길·붉은오름과 같은 축선이다",
+      "notes": "도로라 검색이 노변 시설로 잡혀 좌표가 대표점이다 — 실제 정차 지점은 검증 필요. 어둡기 종합 0.318 실측",
+      "cautions": [
+        "삼나무가 양쪽을 막아 하늘 시야가 좁다",
+        "주행 차량이 있는 도로 — 정차 지점 확인 필요"
+      ],
+      "elevation_m": 313,
+      "slope_deg": 0.3
+    },
+    {
+      "name_ko": "소금막해변",
+      "name_en": "Sogeummak Beach",
+      "lat": 33.3312,
+      "lon": 126.8425,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "해안",
+      "why": "표선 인근의 덜 알려진 한적한 해변. 트리플이 '로컬 숨은 스팟'으로 꼽았다",
+      "notes": "카카오맵 일치(표선면 표선리). 어둡기 종합 0.406 실측 — 표선해수욕장(0.493)보다 어둡다",
+      "cautions": [
+        "여름철 어화(고깃배 불빛)가 수평선 쪽을 밝힌다"
+      ],
+      "sources": [
+        "https://triple.guide/articles/27accdc5-bbed-4160-87c0-6f97a6710eb2"
+      ],
+      "elevation_m": 0,
+      "slope_deg": 3.4
+    },
+    {
+      "name_ko": "법환포구",
+      "name_en": "Beophwan Port",
+      "lat": 33.2373,
+      "lon": 126.5156,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "해안",
+      "why": "'제주 토박이가 알려주는 은하수 비밀 스팟'으로 소개된 곳. 서귀포 시내에서 차로 5분이라 접근성이 가장 좋다",
+      "notes": "카카오맵 일치(서귀포시 법환동 286-3). **어둡기 종합 0.637 실측 — 이번 후보 중 최악**. 반경 1km 가로등 382개, SQM 20.17. 출처의 '숨은 스팟'은 접근성 얘기지 어둡기가 아니다",
+      "cautions": [
+        "서귀포 시가지 조명이 직접 들어온다 — 밝은 별 한정"
+      ],
+      "sources": [
+        "https://ohou.se/advices/9485"
+      ],
+      "elevation_m": 10,
+      "slope_deg": 3.1
+    },
+    {
+      "name_ko": "고근산",
+      "name_en": "Gogeunsan",
+      "lat": 33.2668,
+      "lon": 126.5129,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "오름",
+      "why": "서귀포 신시가지 북측 오름. 시내에서 가장 가까운 오름 전망대다",
+      "notes": "카카오맵 일치(서귀포시 서호동 1286-1). 어둡기 종합 0.459 실측 — 신시가지 조명 영향",
+      "elevation_m": 371,
+      "slope_deg": 16.8,
+      "parking": {
+        "name": "고근산 주차장",
+        "lat": 33.2637654,
+        "lon": 126.5111114
+      },
+      "sources": [
+        "http://place.map.kakao.com/1932532096"
+      ]
+    },
+    {
+      "name_ko": "도두봉",
+      "name_en": "Dodubong",
+      "lat": 33.5079,
+      "lon": 126.4684,
+      "coord_confidence": "high",
+      "region": "북",
+      "type": "오름",
+      "why": "현지인 추천 별밤 목록에 오르지만 제주공항 바로 옆이다. 높이 65m로 오르기 쉽다",
+      "notes": "카카오맵 일치(제주시 도두일동 산2). **어둡기 종합 0.612 실측 — 후보 중 두 번째로 밝다**. 공항·시가지 조명 직격이라 별 관측지로는 부적합하다는 것이 실측 결과다",
+      "walk_type": "등반",
+      "walk_minutes": 15,
+      "cautions": [
+        "제주공항 인접 — 항공기 조명·시가지 광원이 직접 들어온다"
+      ],
+      "sources": [
+        "https://v.daum.net/v/jzqcJzxf3e"
+      ],
+      "elevation_m": 48,
+      "slope_deg": 12.7
+    },
+    {
+      "name_ko": "물오름",
+      "lat": 33.384299628888456,
+      "lon": 126.62325291037207,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "오름",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 오름)",
+      "notes": "어둡기 종합 0.120 실측. 최근접 주차 308m · 주행 가능 도로 254m. 제주특별자치도 제주시 조천읍 교래리 산 137-4",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/11289720",
+        "http://place.map.kakao.com/1904650365",
+        "http://place.map.kakao.com/11216478",
+        "http://place.map.kakao.com/1718145962",
+        "http://place.map.kakao.com/1710048072",
+        "http://place.map.kakao.com/504391581"
+      ],
+      "elevation_m": 791,
+      "slope_deg": 23.8,
+      "parking": {
+        "name": "성판악 공영주차장 전기차충전소",
+        "lat": 33.3844998,
+        "lon": 126.6194067
+      }
+    },
+    {
+      "name_ko": "법정악",
+      "lat": 33.31361083929963,
+      "lon": 126.46960606758398,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "오름",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 오름)",
+      "notes": "어둡기 종합 0.150 실측. 최근접 주차 380m · 주행 가능 도로 206m. 제주특별자치도 서귀포시 하원동 산 1-1",
+      "discovery": "kakao_sweep",
+      "campsite": true,
+      "sources": [
+        "http://place.map.kakao.com/7901044",
+        "http://place.map.kakao.com/79642288"
+      ],
+      "elevation_m": 751,
+      "slope_deg": 2.6,
+      "parking": {
+        "name": "법정악 주차장",
+        "lat": 33.3146111,
+        "lon": 126.4656987
+      }
+    },
+    {
+      "name_ko": "캄포휴게소",
+      "lat": 33.3722652819893,
+      "lon": 126.380830613898,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "기타",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 휴게소)",
+      "notes": "어둡기 종합 0.248 실측. 최근접 주차 142m · 주행 가능 도로 31m. 제주특별자치도 제주시 애월읍 평화로 1738-116",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/21492010",
+        "http://place.map.kakao.com/1867448824"
+      ],
+      "elevation_m": 528,
+      "slope_deg": 3.8,
+      "parking": {
+        "name": "엘리시안제주CC 주차장",
+        "lat": 33.3733485,
+        "lon": 126.3800127
+      }
+    },
+    {
+      "name_ko": "등대휴게소",
+      "lat": 33.493181673595,
+      "lon": 126.964596943879,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "해안",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 휴게소)",
+      "notes": "어둡기 종합 0.263 실측. 최근접 주차 483m · 주행 가능 도로 100m. 제주특별자치도 제주시 우도면 우도봉길 105",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/18488951",
+        "http://place.map.kakao.com/11041974"
+      ],
+      "elevation_m": 77,
+      "slope_deg": 8.8
+    },
+    {
+      "name_ko": "일출랜드 수변공원",
+      "lat": 33.3824507590782,
+      "lon": 126.841823556767,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "공원",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 관광지부속시설)",
+      "notes": "어둡기 종합 0.269 실측. 최근접 주차 146m · 주행 가능 도로 194m. 제주특별자치도 서귀포시 성산읍 중산간동로 4150-30",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/17573659"
+      ],
+      "elevation_m": 88,
+      "slope_deg": 2.2
+    },
+    {
+      "name_ko": "고사포진지",
+      "lat": 33.2065245459935,
+      "lon": 126.281092138105,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "기타",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 유적지)",
+      "notes": "어둡기 종합 0.271 실측. 최근접 주차 371m · 주행 가능 도로 179m. 제주특별자치도 서귀포시 대정읍 상모리",
+      "discovery": "kakao_sweep",
+      "parking": {
+        "name": "섯알오름 주차장",
+        "lat": 33.2049084459389,
+        "lon": 126.277287227312
+      },
+      "amenities": {
+        "toilet": true
+      },
+      "sources": [
+        "http://place.map.kakao.com/13725608",
+        "http://place.map.kakao.com/25284265"
+      ],
+      "elevation_m": 27,
+      "slope_deg": 5.5
+    },
+    {
+      "name_ko": "모구리야영장",
+      "lat": 33.4062662592985,
+      "lon": 126.821970197736,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "야영장",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 야영,캠핑장)",
+      "notes": "어둡기 종합 0.273 실측. 최근접 주차 182m · 주행 가능 도로 152m. 제주특별자치도 서귀포시 성산읍 서성일로 260",
+      "discovery": "kakao_sweep",
+      "parking": {
+        "name": "모구리야영장 주차장",
+        "lat": 33.4063752367321,
+        "lon": 126.820013462335
+      },
+      "amenities": {
+        "toilet": true
+      },
+      "campsite": true,
+      "sources": [
+        "http://place.map.kakao.com/10331832"
+      ],
+      "elevation_m": 160,
+      "slope_deg": 4.2
+    },
+    {
+      "name_ko": "섭지오름",
+      "lat": 33.4296331024355,
+      "lon": 126.931396127176,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "오름",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 오름)",
+      "notes": "어둡기 종합 0.286 실측. 최근접 주차 232m · 주행 가능 도로 245m. 제주특별자치도 서귀포시 성산읍 고성리 26",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/1565295947"
+      ],
+      "elevation_m": 14,
+      "slope_deg": 3.6
+    },
+    {
+      "name_ko": "휴애리자연생활공원",
+      "lat": 33.309410458656,
+      "lon": 126.635409752107,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "공원",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 도시근린공원)",
+      "notes": "어둡기 종합 0.307 실측. 최근접 주차 176m · 주행 가능 도로 187m. 제주특별자치도 서귀포시 남원읍 신례동로 256",
+      "discovery": "kakao_sweep",
+      "parking": {
+        "name": "휴애리자연생활공원 주차장",
+        "lat": 33.3089399070451,
+        "lon": 126.633603425607
+      },
+      "sources": [
+        "http://place.map.kakao.com/27581976",
+        "http://place.map.kakao.com/17556899"
+      ],
+      "elevation_m": 235,
+      "slope_deg": 3.0
+    },
+    {
+      "name_ko": "수산체육공원",
+      "lat": 33.446232064085,
+      "lon": 126.854437498134,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "공원",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 도시근린공원)",
+      "notes": "어둡기 종합 0.308 실측. 최근접 주차 81m · 주행 가능 도로 169m. 제주특별자치도 서귀포시 성산읍 수송로 144",
+      "discovery": "kakao_sweep",
+      "parking": {
+        "name": "수산체육공원 주차장",
+        "lat": 33.4463753187728,
+        "lon": 126.853585462013
+      },
+      "sources": [
+        "http://place.map.kakao.com/14935499"
+      ],
+      "elevation_m": 102,
+      "slope_deg": 1.4
+    },
+    {
+      "name_ko": "종달리 고망난돌 쉼터",
+      "lat": 33.510193823299446,
+      "lon": 126.90683624249823,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "공원",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 공원)",
+      "notes": "어둡기 종합 0.310 실측. 최근접 주차 270m · 주행 가능 도로 46m. 제주특별자치도 제주시 구좌읍 종달리 112-4",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/20433579"
+      ],
+      "elevation_m": 0,
+      "slope_deg": 3.2
+    },
+    {
+      "name_ko": "두강봉",
+      "lat": 33.3358856986806,
+      "lon": 126.223301277581,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "오름",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 오름)",
+      "notes": "어둡기 종합 0.313 실측. 최근접 주차 478m · 주행 가능 도로 196m. 제주특별자치도 제주시 한경면 조수리 1277",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/26455799"
+      ],
+      "elevation_m": 59,
+      "slope_deg": 4.3
+    },
+    {
+      "name_ko": "밝은오름",
+      "lat": 33.44015025441445,
+      "lon": 126.46472825564625,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "오름",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 오름)",
+      "notes": "어둡기 종합 0.316 실측. 최근접 주차 428m · 주행 가능 도로 238m. 제주특별자치도 제주시 해안동 465",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/8385072",
+        "http://place.map.kakao.com/125635765"
+      ],
+      "elevation_m": 342,
+      "slope_deg": 5.6,
+      "parking": {
+        "name": "노형동 무료 주차장",
+        "lat": 33.4400068,
+        "lon": 126.4601318
+      }
+    },
+    {
+      "name_ko": "마중오름",
+      "lat": 33.33465243190071,
+      "lon": 126.27060872040079,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "오름",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 오름)",
+      "notes": "어둡기 종합 0.330 실측. 최근접 주차 346m · 주행 가능 도로 228m. 제주특별자치도 제주시 한경면 저지리 2143-8",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/10337128"
+      ],
+      "elevation_m": 150,
+      "slope_deg": 13.6
+    },
+    {
+      "name_ko": "저지곶자왈",
+      "lat": 33.3182677189476,
+      "lon": 126.272620238485,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "숲",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 숲)",
+      "notes": "어둡기 종합 0.340 실측. 최근접 주차 280m · 주행 가능 도로 97m. 제주특별자치도 제주시 한경면 저지리 3108",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/243953803",
+        "http://place.map.kakao.com/8293848"
+      ],
+      "elevation_m": 139,
+      "slope_deg": 1.6
+    },
+    {
+      "name_ko": "제주4.3평화공원",
+      "lat": 33.4512683466763,
+      "lon": 126.617926781579,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "공원",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 유적지)",
+      "notes": "어둡기 종합 0.340 실측. 최근접 주차 247m · 주행 가능 도로 117m. 제주특별자치도 제주시 명림로 430",
+      "discovery": "kakao_sweep",
+      "campsite": true,
+      "sources": [
+        "http://place.map.kakao.com/8067272",
+        "http://place.map.kakao.com/24372919",
+        "http://place.map.kakao.com/77309498",
+        "http://place.map.kakao.com/21929555",
+        "http://place.map.kakao.com/845010405",
+        "http://place.map.kakao.com/27588363",
+        "http://place.map.kakao.com/27588364"
+      ],
+      "elevation_m": 459,
+      "slope_deg": 3.4,
+      "parking": {
+        "name": "제주한라경찰수련원 주차장1",
+        "lat": 33.455826,
+        "lon": 126.6199806
+      }
+    },
+    {
+      "name_ko": "케이웨건",
+      "lat": 33.4131415568507,
+      "lon": 126.392783585497,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "야영장",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 오토캠핑장)",
+      "notes": "어둡기 종합 0.342 실측. 최근접 주차 180m · 주행 가능 도로 128m. 제주특별자치도 제주시 애월읍 평화로 2157",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/1705515540",
+        "http://place.map.kakao.com/1651687008",
+        "http://place.map.kakao.com/17573066",
+        "http://place.map.kakao.com/17575314",
+        "http://place.map.kakao.com/20563586",
+        "http://place.map.kakao.com/17582215",
+        "http://place.map.kakao.com/23445950"
+      ],
+      "elevation_m": 406,
+      "slope_deg": 3.2,
+      "parking": {
+        "name": "렛츠런파크제주 주차장1",
+        "lat": 33.4096122,
+        "lon": 126.3945282
+      }
+    },
+    {
+      "name_ko": "용수저수지",
+      "lat": 33.31748538883677,
+      "lon": 126.18769157262217,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "저수지",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 저수지)",
+      "notes": "어둡기 종합 0.343 실측. 최근접 주차 131m · 주행 가능 도로 184m. 제주특별자치도 제주시 한경면 용수리 404",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/13725859"
+      ],
+      "elevation_m": 24,
+      "slope_deg": 0.0
+    },
+    {
+      "name_ko": "상효원수목원 캠핑장",
+      "lat": 33.3051291424157,
+      "lon": 126.582560149135,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "야영장",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 야영,캠핑장)",
+      "notes": "어둡기 종합 0.345 실측. 최근접 주차 473m · 주행 가능 도로 106m. 제주특별자치도 서귀포시 상효동 1562",
+      "discovery": "kakao_sweep",
+      "campsite": true,
+      "sources": [
+        "http://place.map.kakao.com/26527581",
+        "http://place.map.kakao.com/27588037",
+        "http://place.map.kakao.com/20594586",
+        "http://place.map.kakao.com/20580721"
+      ],
+      "elevation_m": 332,
+      "slope_deg": 6.2,
+      "parking": {
+        "name": "상효원식물원 주차장",
+        "lat": 33.305423,
+        "lon": 126.5852388
+      }
+    },
+    {
+      "name_ko": "매오름",
+      "lat": 33.31768039422536,
+      "lon": 126.81361929655243,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "오름",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 오름)",
+      "notes": "어둡기 종합 0.353 실측. 최근접 주차 294m · 주행 가능 도로 152m. 제주특별자치도 서귀포시 표선면 세화리 산 7",
+      "discovery": "kakao_sweep",
+      "parking": {
+        "name": "매오름 주차장",
+        "lat": 33.3150507229081,
+        "lon": 126.81327265852
+      },
+      "sources": [
+        "http://place.map.kakao.com/25229887"
+      ],
+      "elevation_m": 103,
+      "slope_deg": 9.0
+    },
+    {
+      "name_ko": "잃어버린 마을 하늬골",
+      "lat": 33.33786249562,
+      "lon": 126.254274502014,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "기타",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 유적지)",
+      "notes": "어둡기 종합 0.357 실측. 최근접 주차 489m · 주행 가능 도로 29m. 제주특별자치도 제주시 한경면 저지리 1980",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/1199397808"
+      ],
+      "elevation_m": 118,
+      "slope_deg": 1.6
+    },
+    {
+      "name_ko": "동알오름",
+      "lat": 33.20741703618458,
+      "lon": 126.28813033831715,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "오름",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 오름)",
+      "notes": "어둡기 종합 0.358 실측. 최근접 주차 175m · 주행 가능 도로 122m. 제주특별자치도 서귀포시 대정읍 상모리 152",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/7849255",
+        "http://place.map.kakao.com/1713888526"
+      ],
+      "elevation_m": 34,
+      "slope_deg": 5.0
+    },
+    {
+      "name_ko": "거리못",
+      "lat": 33.43625154218445,
+      "lon": 126.38352302908862,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "저수지",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 저수지)",
+      "notes": "어둡기 종합 0.361 실측. 최근접 주차 487m · 주행 가능 도로 29m. 제주특별자치도 제주시 애월읍 소길리 442-1",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/8168831"
+      ],
+      "elevation_m": 200,
+      "slope_deg": 2.5
+    },
+    {
+      "name_ko": "백리악",
+      "lat": 33.306030195269,
+      "lon": 126.714683040237,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "오름",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 오름)",
+      "notes": "어둡기 종합 0.363 실측. 최근접 주차 452m · 주행 가능 도로 251m. 제주특별자치도 서귀포시 남원읍 의귀리 1401-23",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/228825285"
+      ],
+      "elevation_m": 133,
+      "slope_deg": 11.1
+    },
+    {
+      "name_ko": "파평 윤씨공원",
+      "lat": 33.519776237156,
+      "lon": 126.956052336428,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "공원",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 공원)",
+      "notes": "어둡기 종합 0.365 실측. 최근접 주차 334m · 주행 가능 도로 172m. 제주특별자치도 제주시 우도면 연평리",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/13723553"
+      ],
+      "elevation_m": 13,
+      "slope_deg": 1.6
+    },
+    {
+      "name_ko": "돔배오름",
+      "lat": 33.427858609710164,
+      "lon": 126.66922492985984,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "오름",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 오름)",
+      "notes": "어둡기 종합 0.370 실측. 최근접 주차 449m · 주행 가능 도로 151m. 제주특별자치도 제주시 조천읍 교래리 산 64",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/7834108"
+      ],
+      "elevation_m": 457,
+      "slope_deg": 2.4
+    },
+    {
+      "name_ko": "아쿠아플라넷제주 오름언덕",
+      "lat": 33.4333015801492,
+      "lon": 126.926347741725,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "오름",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 테마파크시설)",
+      "notes": "어둡기 종합 0.377 실측. 최근접 주차 43m · 주행 가능 도로 91m. 제주특별자치도 서귀포시 성산읍 섭지코지로 93-15",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/23121312"
+      ],
+      "elevation_m": 10,
+      "slope_deg": 2.0
+    },
+    {
+      "name_ko": "항파두리 항몽유적지",
+      "lat": 33.4527478729655,
+      "lon": 126.407922584204,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "해안",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 유적지)",
+      "notes": "어둡기 종합 0.381 실측. 최근접 주차 101m · 주행 가능 도로 68m. 제주특별자치도 제주시 애월읍 항파두리로 50",
+      "discovery": "kakao_sweep",
+      "parking": {
+        "name": "항몽유적지 주차장 전기차충전소",
+        "lat": 33.45243300987145,
+        "lon": 126.4088238875436
+      },
+      "sources": [
+        "http://place.map.kakao.com/8641860"
+      ],
+      "elevation_m": 172,
+      "slope_deg": 2.2
+    },
+    {
+      "name_ko": "일랑일랑 캠핑제주",
+      "lat": 33.4459491655603,
+      "lon": 126.398040002613,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "야영장",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 오토캠핑장)",
+      "notes": "어둡기 종합 0.385 실측. 최근접 주차 495m · 주행 가능 도로 10m. 제주특별자치도 제주시 애월읍 유수암북길 19-36",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/1685177715"
+      ],
+      "elevation_m": 191,
+      "slope_deg": 4.5
+    },
+    {
+      "name_ko": "득생곶등대",
+      "lat": 33.525044859830764,
+      "lon": 126.95269860482573,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "해안",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 등대)",
+      "notes": "어둡기 종합 0.395 실측. 최근접 주차 96m · 주행 가능 도로 87m. 제주특별자치도 제주시 우도면 연평리",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/27601929"
+      ],
+      "elevation_m": 0,
+      "slope_deg": 0.6
+    },
+    {
+      "name_ko": "갈마못",
+      "lat": 33.3665107006033,
+      "lon": 126.836720513292,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "오름",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 오름)",
+      "notes": "어둡기 종합 0.398 실측. 최근접 주차 225m · 주행 가능 도로 61m. 제주특별자치도 서귀포시 성산읍 신풍리",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/12969030"
+      ],
+      "elevation_m": 75,
+      "slope_deg": 1.4
+    },
+    {
+      "name_ko": "하도해변",
+      "lat": 33.5130567680421,
+      "lon": 126.899230006514,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "해안",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 해수욕장,해변)",
+      "notes": "어둡기 종합 0.400 실측. 최근접 주차 117m · 주행 가능 도로 70m. 제주특별자치도 제주시 구좌읍 하도리",
+      "discovery": "kakao_sweep",
+      "amenities": {
+        "toilet": true
+      },
+      "sources": [
+        "http://place.map.kakao.com/11340501",
+        "http://place.map.kakao.com/11700411"
+      ],
+      "elevation_m": 0,
+      "slope_deg": 2.6
+    },
+    {
+      "name_ko": "중문색달해수욕장",
+      "lat": 33.2450381505136,
+      "lon": 126.411498674889,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "해안",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 해수욕장,해변)",
+      "notes": "어둡기 종합 0.416 실측. 최근접 주차 256m · 주행 가능 도로 286m. 제주특별자치도 서귀포시 색달동 3039",
+      "discovery": "kakao_sweep",
+      "parking": {
+        "name": "중문색달해수욕장 공영주차장",
+        "lat": 33.24510023284819,
+        "lon": 126.41471942941868
+      },
+      "amenities": {
+        "toilet": true
+      },
+      "sources": [
+        "http://place.map.kakao.com/8069764"
+      ],
+      "elevation_m": 34,
+      "slope_deg": 13.9
+    },
+    {
+      "name_ko": "용암해수제1공원",
+      "lat": 33.5419021022092,
+      "lon": 126.811590097436,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "공원",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 도시근린공원)",
+      "notes": "어둡기 종합 0.418 실측. 최근접 주차 149m · 주행 가능 도로 64m. 제주특별자치도 제주시 구좌읍 한동리 4849-20",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/193269322"
+      ],
+      "elevation_m": 33,
+      "slope_deg": 2.3
+    },
+    {
+      "name_ko": "춘지등대",
+      "lat": 33.2261771498368,
+      "lon": 126.306353836455,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "해안",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 등대)",
+      "notes": "어둡기 종합 0.420 실측. 최근접 주차 253m · 주행 가능 도로 153m. 제주특별자치도 서귀포시 안덕면 사계리 2147-38",
+      "discovery": "kakao_sweep",
+      "parking": {
+        "name": "사계포구 공영주차장",
+        "lat": 33.2282876400124,
+        "lon": 126.305349133824
+      },
+      "amenities": {
+        "toilet": true
+      },
+      "sources": [
+        "http://place.map.kakao.com/1777379081"
+      ],
+      "elevation_m": 0,
+      "slope_deg": 0.0
+    },
+    {
+      "name_ko": "한림공원",
+      "lat": 33.39022512718131,
+      "lon": 126.23969118079854,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "숲",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 수목원,식물원)",
+      "notes": "어둡기 종합 0.423 실측. 최근접 주차 176m · 주행 가능 도로 175m. 제주특별자치도 제주시 한림읍 한림로 300",
+      "discovery": "kakao_sweep",
+      "parking": {
+        "name": "한림공원 주차장2",
+        "lat": 33.3905257016901,
+        "lon": 126.237836724086
+      },
+      "amenities": {
+        "toilet": true
+      },
+      "sources": [
+        "http://place.map.kakao.com/10941032"
+      ],
+      "elevation_m": 12,
+      "slope_deg": 1.0
+    },
+    {
+      "name_ko": "동일리포구",
+      "lat": 33.2255149384088,
+      "lon": 126.240219312287,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "해안",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 항구,포구)",
+      "notes": "어둡기 종합 0.426 실측. 최근접 주차 329m · 주행 가능 도로 157m. 제주특별자치도 서귀포시 대정읍 동일리",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/7849038"
+      ],
+      "elevation_m": 1,
+      "slope_deg": 0.3
+    },
+    {
+      "name_ko": "시흥공원",
+      "lat": 33.4771496260995,
+      "lon": 126.90633368376,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "공원",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 공원)",
+      "notes": "어둡기 종합 0.431 실측. 최근접 주차 210m · 주행 가능 도로 80m. 제주특별자치도 서귀포시 성산읍 시흥하동로 89",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/1402723839"
+      ],
+      "elevation_m": 3,
+      "slope_deg": 0.7
+    },
+    {
+      "name_ko": "세화포구",
+      "lat": 33.5282234083175,
+      "lon": 126.856995859553,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "해안",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 항구,포구)",
+      "notes": "어둡기 종합 0.435 실측. 최근접 주차 156m · 주행 가능 도로 148m. 제주특별자치도 제주시 구좌읍 세화리",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/17600328"
+      ],
+      "elevation_m": 0,
+      "slope_deg": 0.0
+    },
+    {
+      "name_ko": "생각하는정원",
+      "lat": 33.32558440508627,
+      "lon": 126.25500523698949,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "숲",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 수목원,식물원)",
+      "notes": "어둡기 종합 0.435 실측. 최근접 주차 90m · 주행 가능 도로 59m. 제주특별자치도 제주시 한경면 녹차분재로 675",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/27539430"
+      ],
+      "elevation_m": 119,
+      "slope_deg": 3.8
+    },
+    {
+      "name_ko": "황우치해변",
+      "lat": 33.237082483691,
+      "lon": 126.316994605687,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "해안",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 해수욕장,해변)",
+      "notes": "어둡기 종합 0.440 실측. 최근접 주차 421m · 주행 가능 도로 103m. 제주특별자치도 서귀포시 안덕면 사계리 79-4",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/17806435"
+      ],
+      "elevation_m": 13,
+      "slope_deg": 6.0
+    },
+    {
+      "name_ko": "이스트몽블루카라반캠핑",
+      "lat": 33.4915497692241,
+      "lon": 126.907117695416,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "야영장",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 야영,캠핑장)",
+      "notes": "어둡기 종합 0.440 실측. 최근접 주차 420m · 주행 가능 도로 57m. 제주특별자치도 제주시 구좌읍 종달동길 73-1",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/1022332575"
+      ],
+      "elevation_m": 2,
+      "slope_deg": 0.3
+    },
+    {
+      "name_ko": "인정오름",
+      "lat": 33.284191213440664,
+      "lon": 126.5848637446096,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "오름",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 오름)",
+      "notes": "어둡기 종합 0.442 실측. 최근접 주차 301m · 주행 가능 도로 256m. 제주특별자치도 서귀포시 토평동 1952",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/8551890",
+        "http://place.map.kakao.com/800929558"
+      ],
+      "elevation_m": 216,
+      "slope_deg": 5.0,
+      "parking": {
+        "name": "서귀포시장애인사회복지관 주차장",
+        "lat": 33.2868944,
+        "lon": 126.5846223
+      }
+    },
+    {
+      "name_ko": "해거름마을공원",
+      "lat": 33.3708661972959,
+      "lon": 126.206558791575,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "공원",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 공원)",
+      "notes": "어둡기 종합 0.443 실측. 최근접 주차 151m · 주행 가능 도로 59m. 제주특별자치도 제주시 한경면 판포리 1602-1",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/25537283"
+      ],
+      "elevation_m": 3,
+      "slope_deg": 2.8
+    },
+    {
+      "name_ko": "월라산",
+      "lat": 33.2713683910772,
+      "lon": 126.605673192431,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "오름",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 오름)",
+      "notes": "어둡기 종합 0.443 실측. 최근접 주차 260m · 주행 가능 도로 152m. 제주특별자치도 서귀포시 월라봉로 76-40",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/8471394"
+      ],
+      "elevation_m": 131,
+      "slope_deg": 7.3
+    },
+    {
+      "name_ko": "헤르메스가든",
+      "lat": 33.2895159647249,
+      "lon": 126.588856878261,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "공원",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 공원)",
+      "notes": "어둡기 종합 0.443 실측. 최근접 주차 449m · 주행 가능 도로 21m. 제주특별자치도 서귀포시 토평공단로 78-27",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/1186135221"
+      ],
+      "elevation_m": 205,
+      "slope_deg": 4.0
+    },
+    {
+      "name_ko": "미와미못",
+      "lat": 33.376651913684306,
+      "lon": 126.84354488464827,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "저수지",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 저수지)",
+      "notes": "어둡기 종합 0.447 실측. 최근접 주차 359m · 주행 가능 도로 53m. 제주특별자치도 서귀포시 성산읍 삼달리 1154-1",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/7889783"
+      ],
+      "elevation_m": 69,
+      "slope_deg": 1.0
+    },
+    {
+      "name_ko": "수산저수지",
+      "lat": 33.47094745073362,
+      "lon": 126.38734176902348,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "저수지",
+      "why": "카카오맵 전수 수집에서 어둡기·주차·도로 접근을 모두 통과한 지점 (분류: 저수지)",
+      "notes": "어둡기 종합 0.448 실측. 최근접 주차 169m · 주행 가능 도로 150m. 제주특별자치도 제주시 애월읍 수산리 738",
+      "discovery": "kakao_sweep",
+      "sources": [
+        "http://place.map.kakao.com/7962202"
+      ],
+      "elevation_m": 50,
+      "slope_deg": 4.7
+    },
+    {
+      "name_ko": "어리목입구주차장",
+      "name_en": "Eorimok Entrance Parking",
+      "lat": 33.3900672266463,
+      "lon": 126.485190974114,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "고지/전망",
+      "why": "1100도로 어리목 입구. 반경 1km 안에 가로등이 하나도 없어 1100고지와 같은 급으로 어둡고, 지방도 바로 옆이라 접근이 쉽다",
+      "notes": "제보: 현장 관측 경험(2026-08-05). 어둡기 종합 0.137 실측(최적) · Falchi iv · SQM 21.12 · 은하수 흐릿. 1km 안 가로등 0개 · 최근접 1km 밖 · 200m 안 화장실 1곳 · 주행 가능 도로 주요 지방도 53m. 제주특별자치도 제주시 해안동 산 220-2",
+      "sources": [
+        "http://place.map.kakao.com/1724910507"
+      ],
+      "elevation_m": 927,
+      "slope_deg": 7.8
+    },
+    {
+      "name_ko": "어리목휴게소",
+      "name_en": "Eorimok Rest Area",
+      "lat": 33.39178056985064,
+      "lon": 126.49425229261792,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "고지/전망",
+      "why": "한라산 북사면 어리목 탐방로 초입. 1km 안 가로등 0개에 화장실이 가까워 오래 머물기 좋다",
+      "notes": "제보: 현장 관측 경험(2026-08-05). 어둡기 종합 0.146 실측(최적) · Falchi iv · SQM 21.06 · 은하수 흐릿. 1km 안 가로등 0개 · 최근접 1km 밖 · 200m 안 화장실 3곳 · 주행 가능 도로 마을 연결도로 48m. 제주특별자치도 제주시 1100로 2070-61",
+      "sources": [
+        "http://place.map.kakao.com/8486614",
+        "http://place.map.kakao.com/1529641686",
+        "http://place.map.kakao.com/20588448",
+        "http://place.map.kakao.com/75269236"
+      ],
+      "elevation_m": 975,
+      "slope_deg": 9.8,
+      "parking": {
+        "name": "어리목 공영주차장 전기차충전소",
+        "lat": 33.3926864,
+        "lon": 126.4948403
+      }
+    },
+    {
+      "name_ko": "족은대비악",
+      "name_en": "Jogeun Daebiak Oreum",
+      "lat": 33.330452669973944,
+      "lon": 126.36904993006848,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "오름",
+      "why": "새별오름에서 더 안쪽으로 들어간 중산간 오름. 새별오름보다 도로에서 물러나 있어 주변이 조용하다",
+      "notes": "제보: 현장 관측 경험(2026-08-05). 어둡기 종합 0.261 실측(최적) · Falchi iv · SQM 20.97 · 은하수 흐릿. 1km 안 가로등 17개 · 최근접 433m · 200m 안 화장실 0곳 · 주행 가능 도로 주거지 도로 253m. 제주특별자치도 서귀포시 안덕면 광평리 산 59",
+      "sources": [
+        "http://place.map.kakao.com/11153555"
+      ],
+      "elevation_m": 524,
+      "slope_deg": 9.5
+    },
+    {
+      "name_ko": "제주공천포전지훈련센터",
+      "name_en": "Gongcheonpo Training Center",
+      "lat": 33.27542005996003,
+      "lon": 126.64006793427546,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "평지",
+      "why": "남원 해안 가까운 넓은 운동장. 사방이 트여 하늘 시야가 넓다",
+      "notes": "제보: 현장 관측 경험(2026-08-05). 어둡기 종합 0.445 실측(양호) · Falchi iv · SQM 20.68 · 은하수 흐릿. 1km 안 가로등 238개 · 최근접 100m · 200m 안 화장실 2곳 · 주행 가능 도로 주거지 도로 103m. 제주특별자치도 서귀포시 남원읍 신례로 96 종합 점수가 큐레이션 상위권보다 밝다 — 은하수보다 밝은 별·행성에 맞는 자리다.",
+      "sources": [
+        "http://place.map.kakao.com/19431295"
+      ],
+      "elevation_m": 54,
+      "slope_deg": 2.9
+    },
+    {
+      "name_ko": "삼매봉",
+      "name_en": "Sammaebong",
+      "lat": 33.243971920946706,
+      "lon": 126.54630884192959,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "오름",
+      "why": "서귀포 시내에 붙은 낮은 봉우리. 시내에서 걸어 올라갈 수 있는 접근성이 장점이고, 바다 쪽 시야가 트인다",
+      "notes": "제보: 현장 관측 경험(2026-08-05). 어둡기 종합 0.592 실측(양호) · Falchi v · SQM 19.86 · 은하수 보기 어려움. 1km 안 가로등 248개 · 최근접 167m · 200m 안 화장실 1곳 · 주행 가능 도로 지방도 179m. 제주특별자치도 서귀포시 서홍동 819 종합 점수가 큐레이션 상위권보다 밝다 — 은하수보다 밝은 별·행성에 맞는 자리다.",
+      "sources": [
+        "http://place.map.kakao.com/7919832"
+      ],
+      "elevation_m": 135,
+      "slope_deg": 12.5
+    },
+    {
+      "name_ko": "부영CC 주차장",
+      "lat": 33.358289,
+      "lon": 126.7122413,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.112 실측 · 해발 273m. 제주특별자치도 서귀포시 남원읍 남조로 960",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/20516851"
+      ],
+      "elevation_m": 273,
+      "slope_deg": 2.6
+    },
+    {
+      "name_ko": "영실입구 주차장",
+      "lat": 33.3463328,
+      "lon": 126.4959504,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.114 실측 · 해발 1223m. 제주특별자치도 서귀포시 도순동 산 1",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/20519375"
+      ],
+      "elevation_m": 1223,
+      "slope_deg": 5.2
+    },
+    {
+      "name_ko": "영실 공영주차장 전기차충전소",
+      "lat": 33.340104,
+      "lon": 126.4805128,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 전기차 충전소)",
+      "notes": "어둡기 종합 0.115 실측 · 해발 1027m. 제주특별자치도 서귀포시 영실로 246",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/423505521",
+        "http://place.map.kakao.com/20848378"
+      ],
+      "parking": {
+        "name": "한라산국립공원 영실매표소 주차장",
+        "lat": 33.3404777,
+        "lon": 126.4804042
+      },
+      "elevation_m": 1027,
+      "slope_deg": 6.3
+    },
+    {
+      "name_ko": "주차장(서귀포시 남원읍 하례리)",
+      "lat": 33.3282122,
+      "lon": 126.6062422,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.128 실측 · 해발 458m. 제주특별자치도 서귀포시 남원읍 하례리 산 30-1",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/20580659"
+      ],
+      "elevation_m": 458,
+      "slope_deg": 8.3
+    },
+    {
+      "name_ko": "거슨세미오름 주차장",
+      "lat": 33.4457247,
+      "lon": 126.7572827,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "오름",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.135 실측 · 해발 263m. 제주특별자치도 제주시 구좌읍 송당리 산 145",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/786275823"
+      ],
+      "elevation_m": 263,
+      "slope_deg": 0.9
+    },
+    {
+      "name_ko": "스누피가든 주차장",
+      "lat": 33.4433122,
+      "lon": 126.7785836,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.143 실측 · 해발 257m. 제주특별자치도 제주시 구좌읍 송당리 산 166-5",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/1649418016"
+      ],
+      "elevation_m": 257,
+      "slope_deg": 3.0
+    },
+    {
+      "name_ko": "해비치CC제주 주차장",
+      "lat": 33.3599558,
+      "lon": 126.7276733,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.143 실측 · 해발 232m. 제주특별자치도 서귀포시 남원읍 원님로399번길 319",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/20588682"
+      ],
+      "elevation_m": 232,
+      "slope_deg": 2.2
+    },
+    {
+      "name_ko": "타미우스CC 주차장",
+      "lat": 33.3519669,
+      "lon": 126.3870679,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.164 실측 · 해발 578m. 제주특별자치도 제주시 애월읍 화전길 201",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/20596043"
+      ],
+      "elevation_m": 578,
+      "slope_deg": 1.0
+    },
+    {
+      "name_ko": "볼카노골프앤리조트 주차장",
+      "lat": 33.3024363,
+      "lon": 126.4346621,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.168 실측 · 해발 524m. 제주특별자치도 서귀포시 산록남로 1391",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/203572551"
+      ],
+      "elevation_m": 524,
+      "slope_deg": 7.1
+    },
+    {
+      "name_ko": "스카이워터쇼 주차장",
+      "lat": 33.4243848,
+      "lon": 126.7435222,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.184 실측 · 해발 272m. 제주특별자치도 제주시 구좌읍 송당리 2764-2",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/1065054399",
+        "http://place.map.kakao.com/17570738"
+      ],
+      "elevation_m": 272,
+      "slope_deg": 2.3
+    },
+    {
+      "name_ko": "부소오름주차장",
+      "lat": 33.4463677,
+      "lon": 126.7201117,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "오름",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.186 실측 · 해발 370m. 제주특별자치도 제주시 조천읍 교래리 산 2-1",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/528133288"
+      ],
+      "elevation_m": 370,
+      "slope_deg": 3.1
+    },
+    {
+      "name_ko": "나인브릿지CC 퍼블릭코스 주차장",
+      "lat": 33.3448998,
+      "lon": 126.3958337,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.196 실측 · 해발 586m. 제주특별자치도 제주시 애월읍 화전길 370",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/1102189477"
+      ],
+      "elevation_m": 586,
+      "slope_deg": 1.4
+    },
+    {
+      "name_ko": "나인브릿지CC 주차장",
+      "lat": 33.3423845,
+      "lon": 126.4059646,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.197 실측 · 해발 625m. 제주특별자치도 서귀포시 안덕면 광평로 34-156",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/20514132"
+      ],
+      "elevation_m": 625,
+      "slope_deg": 2.9
+    },
+    {
+      "name_ko": "바리메주차장",
+      "lat": 33.3774637,
+      "lon": 126.3922859,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.213 실측 · 해발 626m. 제주특별자치도 제주시 애월읍 상가리 산 123",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/1671405298"
+      ],
+      "elevation_m": 626,
+      "slope_deg": 20.5
+    },
+    {
+      "name_ko": "더시에나CC제주 주차장",
+      "lat": 33.4306441,
+      "lon": 126.5823947,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.232 실측 · 해발 562m. 제주특별자치도 제주시 516로 2695",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/812789441"
+      ],
+      "elevation_m": 562,
+      "slope_deg": 6.5
+    },
+    {
+      "name_ko": "마보기오름주차장",
+      "lat": 33.3175467,
+      "lon": 126.3888274,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "오름",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.237 실측 · 해발 468m. 제주특별자치도 서귀포시 안덕면 산록남로 863",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/660144327",
+        "http://place.map.kakao.com/1745456906"
+      ],
+      "parking": {
+        "name": "포도뮤지엄 주차장",
+        "lat": 33.3192588,
+        "lon": 126.3855131
+      },
+      "elevation_m": 468,
+      "slope_deg": 6.7
+    },
+    {
+      "name_ko": "메밀밭주차장",
+      "lat": 33.4265608,
+      "lon": 126.5038354,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.245 실측 · 해발 496m. 제주특별자치도 제주시 연동 산 132",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/524112283"
+      ],
+      "elevation_m": 496,
+      "slope_deg": 5.5
+    },
+    {
+      "name_ko": "롯데스카이힐CC 제주 주차장",
+      "lat": 33.287813,
+      "lon": 126.4039783,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.256 실측 · 해발 312m. 제주특별자치도 서귀포시 색달동 240",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/396333292"
+      ],
+      "elevation_m": 312,
+      "slope_deg": 3.4
+    },
+    {
+      "name_ko": "위호텔 주차장",
+      "lat": 33.2855504,
+      "lon": 126.4453729,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.262 실측 · 해발 347m. 제주특별자치도 서귀포시 1100로 453-95",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/27432460"
+      ],
+      "elevation_m": 347,
+      "slope_deg": 6.4
+    },
+    {
+      "name_ko": "아르떼뮤지엄 제주 주차장",
+      "lat": 33.3966985,
+      "lon": 126.3449762,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.281 실측 · 해발 246m. 제주특별자치도 제주시 애월읍 어림비로 478",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/1936486320"
+      ],
+      "elevation_m": 246,
+      "slope_deg": 5.0
+    },
+    {
+      "name_ko": "9.81파크 주차장",
+      "lat": 33.3909016,
+      "lon": 126.3655289,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.282 실측 · 해발 393m. 제주특별자치도 제주시 애월읍 천덕로 880-24",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/225783009"
+      ],
+      "elevation_m": 393,
+      "slope_deg": 4.5
+    },
+    {
+      "name_ko": "국립제주호국원 주차장",
+      "lat": 33.4138686,
+      "lon": 126.4937158,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.290 실측 · 해발 641m. 제주특별자치도 제주시 노형동 3829",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/462600483",
+        "http://place.map.kakao.com/22019633"
+      ],
+      "parking": {
+        "name": "한라산 충혼묘지주차장분기점",
+        "lat": 33.4109761,
+        "lon": 126.4943529
+      },
+      "elevation_m": 641,
+      "slope_deg": 4.6
+    },
+    {
+      "name_ko": "플라자CC 제주주차장",
+      "lat": 33.4501949,
+      "lon": 126.6338753,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.290 실측 · 해발 442m. 제주특별자치도 제주시 회천동 3-18",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/20588255"
+      ],
+      "elevation_m": 442,
+      "slope_deg": 3.8
+    },
+    {
+      "name_ko": "본태박물관 주차장",
+      "lat": 33.3039513,
+      "lon": 126.392502,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.297 실측 · 해발 391m. 제주특별자치도 서귀포시 안덕면 산록남로762번길 69",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/1065621603",
+        "http://place.map.kakao.com/1976229056",
+        "http://place.map.kakao.com/1957615895",
+        "http://place.map.kakao.com/1139399906"
+      ],
+      "parking": {
+        "name": "SK핀크스(직원주차장) 전기차충전소",
+        "lat": 33.30536,
+        "lon": 126.3936852
+      },
+      "elevation_m": 391,
+      "slope_deg": 5.7
+    },
+    {
+      "name_ko": "에버리스골프리조트 주차장",
+      "lat": 33.3712214,
+      "lon": 126.3658652,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.305 실측 · 해발 451m. 제주특별자치도 제주시 애월읍 평화로 1693-75",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/26383797"
+      ],
+      "elevation_m": 451,
+      "slope_deg": 6.4
+    },
+    {
+      "name_ko": "삼위일체대성당 주차장",
+      "lat": 33.3478808,
+      "lon": 126.323831,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.309 실측 · 해발 341m. 제주특별자치도 제주시 한림읍 새미소길 15",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/1432968807",
+        "http://place.map.kakao.com/691190098",
+        "http://place.map.kakao.com/1227320199",
+        "http://place.map.kakao.com/1062456268"
+      ],
+      "parking": {
+        "name": "성이시돌목장 주차장",
+        "lat": 33.3477896,
+        "lon": 126.3283017
+      },
+      "elevation_m": 341,
+      "slope_deg": 3.4
+    },
+    {
+      "name_ko": "제피로스GC 주차장",
+      "lat": 33.4643279,
+      "lon": 126.6461264,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.313 실측 · 해발 347m. 제주특별자치도 제주시 조천읍 번영로 1040-70",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/20590623"
+      ],
+      "elevation_m": 347,
+      "slope_deg": 1.9
+    },
+    {
+      "name_ko": "블랙스톤제주CC 주차장",
+      "lat": 33.3379398,
+      "lon": 126.3110569,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.314 실측 · 해발 283m. 제주특별자치도 제주시 한림읍 한창로 925-122",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/25610373"
+      ],
+      "elevation_m": 283,
+      "slope_deg": 2.8
+    },
+    {
+      "name_ko": "돈내코주차장",
+      "lat": 33.3104916,
+      "lon": 126.5708042,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.330 실측 · 해발 485m. 제주특별자치도 서귀포시 상효동 1986",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/20848370",
+        "http://place.map.kakao.com/423568787",
+        "http://place.map.kakao.com/20515282"
+      ],
+      "parking": {
+        "name": "서귀포시 충혼묘지 주차장 전기차충전소",
+        "lat": 33.3081024,
+        "lon": 126.567456
+      },
+      "elevation_m": 485,
+      "slope_deg": 6.3
+    },
+    {
+      "name_ko": "물영아리주차장 전기차충전소",
+      "lat": 33.3607481,
+      "lon": 126.6924485,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 전기차 충전소)",
+      "notes": "어둡기 종합 0.342 실측 · 해발 338m. 제주특별자치도 서귀포시 남원읍 남조로 988-3",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/1537839980"
+      ],
+      "elevation_m": 338,
+      "slope_deg": 2.8
+    },
+    {
+      "name_ko": "에코랜드CC 주차장",
+      "lat": 33.4555386,
+      "lon": 126.6661082,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.342 실측 · 해발 399m. 제주특별자치도 제주시 조천읍 대흘리 1221-1",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/1846407712"
+      ],
+      "elevation_m": 399,
+      "slope_deg": 3.3
+    },
+    {
+      "name_ko": "정석항공관 대형주차장",
+      "lat": 33.3922978,
+      "lon": 126.724047,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "해안",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.348 실측 · 해발 327m. 제주특별자치도 서귀포시 표선면 가시리 산 52-4",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/456229536"
+      ],
+      "elevation_m": 327,
+      "slope_deg": 1.8
+    },
+    {
+      "name_ko": "남송이오름 주차장",
+      "lat": 33.3119771,
+      "lon": 126.3019941,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "오름",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.350 실측 · 해발 220m. 제주특별자치도 서귀포시 안덕면 서광리 산 31",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/125832946"
+      ],
+      "elevation_m": 220,
+      "slope_deg": 6.3
+    },
+    {
+      "name_ko": "에코랜드테마파크 주차장",
+      "lat": 33.4463894,
+      "lon": 126.6668853,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.364 실측 · 해발 427m. 제주특별자치도 제주시 조천읍 남조로 1982",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/1304562839"
+      ],
+      "elevation_m": 427,
+      "slope_deg": 1.9
+    },
+    {
+      "name_ko": "김만일기념관 주차장",
+      "lat": 33.3361151,
+      "lon": 126.6903674,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.365 실측 · 해발 230m. 제주특별자치도 서귀포시 남원읍 한남리 992",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/1965522915"
+      ],
+      "elevation_m": 230,
+      "slope_deg": 5.8
+    },
+    {
+      "name_ko": "헬로키티아일랜드 주차장",
+      "lat": 33.2897816,
+      "lon": 126.3521649,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.372 실측 · 해발 231m. 제주특별자치도 서귀포시 안덕면 상창리 1963-2",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/1507367454"
+      ],
+      "elevation_m": 231,
+      "slope_deg": 4.1
+    },
+    {
+      "name_ko": "안세미오름 주차장",
+      "lat": 33.466583,
+      "lon": 126.6046947,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "오름",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.373 실측 · 해발 336m. 제주특별자치도 제주시 봉개동 산 2",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/1176739238"
+      ],
+      "elevation_m": 336,
+      "slope_deg": 7.9
+    },
+    {
+      "name_ko": "도깨비공원 주차장",
+      "lat": 33.4641521,
+      "lon": 126.6924173,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "공원",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.378 실측 · 해발 331m. 제주특별자치도 제주시 조천읍 선흘리 4058",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/17561645"
+      ],
+      "elevation_m": 331,
+      "slope_deg": 5.0
+    },
+    {
+      "name_ko": "거문오름주차장",
+      "lat": 33.4571204,
+      "lon": 126.7146237,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "오름",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.381 실측 · 해발 339m. 제주특별자치도 제주시 조천읍 선교로 569-36",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/788380491",
+        "http://place.map.kakao.com/1896249223"
+      ],
+      "parking": {
+        "name": "오름나그네 주차장",
+        "lat": 33.4591067,
+        "lon": 126.7119442
+      },
+      "elevation_m": 339,
+      "slope_deg": 2.6
+    },
+    {
+      "name_ko": "그리스박물관 주차장",
+      "lat": 33.3489634,
+      "lon": 126.3575828,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.382 실측 · 해발 425m. 제주특별자치도 제주시 한림읍 광산로 942",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/1943453139",
+        "http://place.map.kakao.com/1427445955"
+      ],
+      "parking": {
+        "name": "스타벅스 제주금악DT점 주차장",
+        "lat": 33.3479425,
+        "lon": 126.3589331
+      },
+      "elevation_m": 425,
+      "slope_deg": 4.3
+    },
+    {
+      "name_ko": "동광육거리주차장",
+      "lat": 33.3119195,
+      "lon": 126.3426633,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.391 실측 · 해발 317m. 제주특별자치도 서귀포시 안덕면 동광리 830",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/1075774992",
+        "http://place.map.kakao.com/1081340191",
+        "http://place.map.kakao.com/1942315141"
+      ],
+      "parking": {
+        "name": "동광 R 주차장 전기차충전소",
+        "lat": 33.3109156,
+        "lon": 126.3415809
+      },
+      "elevation_m": 317,
+      "slope_deg": 2.7
+    },
+    {
+      "name_ko": "선녀와나무꾼 테마공원 주차장",
+      "lat": 33.4800557,
+      "lon": 126.702479,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "공원",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.391 실측 · 해발 244m. 제주특별자치도 제주시 조천읍 선흘리 1998",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/17951912"
+      ],
+      "elevation_m": 244,
+      "slope_deg": 2.4
+    },
+    {
+      "name_ko": "사려니숲 탐방안내소 주차장",
+      "lat": 33.4341064,
+      "lon": 126.6374851,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "숲",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.400 실측 · 해발 518m. 제주특별자치도 제주시 봉개동 2750-2",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/1865208314",
+        "http://place.map.kakao.com/1252717092"
+      ],
+      "elevation_m": 518,
+      "slope_deg": 3.0
+    },
+    {
+      "name_ko": "골프존카운티 오라 주차장",
+      "lat": 33.4481911,
+      "lon": 126.5145534,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.403 실측 · 해발 302m. 제주특별자치도 제주시 오라남로 130-16",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/20519499"
+      ],
+      "elevation_m": 302,
+      "slope_deg": 3.2
+    },
+    {
+      "name_ko": "와흘메밀마을 주차장",
+      "lat": 33.4827008,
+      "lon": 126.6531712,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.406 실측 · 해발 251m. 제주특별자치도 제주시 조천읍 와흘리 362-16",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/2016774028"
+      ],
+      "elevation_m": 251,
+      "slope_deg": 4.2
+    },
+    {
+      "name_ko": "카멜리아힐 주차장",
+      "lat": 33.2904215,
+      "lon": 126.3680392,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.408 실측 · 해발 267m. 제주특별자치도 서귀포시 안덕면 병악로 166",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/17582427",
+        "http://place.map.kakao.com/1055436043"
+      ],
+      "elevation_m": 267,
+      "slope_deg": 4.6
+    },
+    {
+      "name_ko": "사려니숲길 붉은오름 입구 주차장",
+      "lat": 33.3955136,
+      "lon": 126.6849116,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "오름",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.415 실측 · 해발 449m. 제주특별자치도 서귀포시 표선면 가시리 산 158-4",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/166327192",
+        "http://place.map.kakao.com/1122906837"
+      ],
+      "parking": {
+        "name": "사려니숲길 주차장",
+        "lat": 33.3945768,
+        "lon": 126.6852589
+      },
+      "elevation_m": 449,
+      "slope_deg": 3.5
+    },
+    {
+      "name_ko": "세계자동차&피아노박물관 주차장",
+      "lat": 33.2825083,
+      "lon": 126.3497465,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.418 실측 · 해발 219m. 제주특별자치도 서귀포시 안덕면 중산간서로 1610",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/17571843",
+        "http://place.map.kakao.com/652702990"
+      ],
+      "parking": {
+        "name": "피규어뮤지엄제주 주차장",
+        "lat": 33.281825,
+        "lon": 126.3556491
+      },
+      "elevation_m": 219,
+      "slope_deg": 4.4
+    },
+    {
+      "name_ko": "관음사 공영주차장 전기차충전소",
+      "lat": 33.4219397,
+      "lon": 126.5505904,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 전기차 충전소)",
+      "notes": "어둡기 종합 0.444 실측 · 해발 574m. 제주특별자치도 제주시 산록북로 588",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/1576379715",
+        "http://place.map.kakao.com/20346790"
+      ],
+      "parking": {
+        "name": "한라산국립공원 관음사탐방로 주차장",
+        "lat": 33.4221272,
+        "lon": 126.5498357
+      },
+      "elevation_m": 574,
+      "slope_deg": 1.9
+    },
+    {
+      "name_ko": "제주캠핑클럽 주차장",
+      "lat": 33.4178281,
+      "lon": 126.3998382,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "야영장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.444 실측 · 해발 372m. 제주특별자치도 제주시 애월읍 유수암리 1319",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/20344536",
+        "http://place.map.kakao.com/20342502"
+      ],
+      "parking": {
+        "name": "제주뉴코리아리조트 주차장",
+        "lat": 33.4171018,
+        "lon": 126.3987896
+      },
+      "elevation_m": 372,
+      "slope_deg": 4.7
+    },
+    {
+      "name_ko": "당오름 주차장",
+      "lat": 33.4693208,
+      "lon": 126.7770329,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "오름",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.445 실측 · 해발 200m. 제주특별자치도 제주시 구좌읍 송당리 산 199-1",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/317372954"
+      ],
+      "elevation_m": 200,
+      "slope_deg": 2.3
+    },
+    {
+      "name_ko": "한라산아래첫마을 주차장",
+      "lat": 33.3278187,
+      "lon": 126.3798896,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.447 실측 · 해발 495m. 제주특별자치도 서귀포시 안덕면 광평리 211-1",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/1066163589"
+      ],
+      "elevation_m": 495,
+      "slope_deg": 2.2
+    },
+    {
+      "name_ko": "제주신화월드 주차장2",
+      "lat": 33.3069696,
+      "lon": 126.3146292,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.448 실측 · 해발 225m. 제주특별자치도 서귀포시 안덕면 신화역사로304번길 98",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/2045551499",
+        "http://place.map.kakao.com/1642505864",
+        "http://place.map.kakao.com/1844590956",
+        "http://place.map.kakao.com/740596899",
+        "http://place.map.kakao.com/258894016",
+        "http://place.map.kakao.com/1863921508",
+        "http://place.map.kakao.com/85804488",
+        "http://place.map.kakao.com/1573895994",
+        "http://place.map.kakao.com/264052266",
+        "http://place.map.kakao.com/2012356157",
+        "http://place.map.kakao.com/394678885",
+        "http://place.map.kakao.com/2113716769",
+        "http://place.map.kakao.com/454043887",
+        "http://place.map.kakao.com/649344264",
+        "http://place.map.kakao.com/616278295",
+        "http://place.map.kakao.com/1534351674",
+        "http://place.map.kakao.com/1813652123"
+      ],
+      "parking": {
+        "name": "제주신화월드 주차장G",
+        "lat": 33.3079026,
+        "lon": 126.31557
+      },
+      "elevation_m": 225,
+      "slope_deg": 3.7
+    },
+    {
+      "name_ko": "솔오름주차장",
+      "lat": 33.2922975,
+      "lon": 126.5581261,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "오름",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.451 실측 · 해발 369m. 제주특별자치도 서귀포시 동홍동 2142-7",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/2076430951"
+      ],
+      "elevation_m": 369,
+      "slope_deg": 6.0
+    },
+    {
+      "name_ko": "가오리 공영주차장 전기차충전소",
+      "lat": 33.4547968,
+      "lon": 126.7060857,
+      "coord_confidence": "high",
+      "region": "동",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 전기차 충전소)",
+      "notes": "어둡기 종합 0.456 실측 · 해발 341m. 제주특별자치도 제주시 조천읍 번영로 1656",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/667140514"
+      ],
+      "elevation_m": 341,
+      "slope_deg": 3.8
+    },
+    {
+      "name_ko": "이승악탐방휴게소 주차장",
+      "lat": 33.3157326,
+      "lon": 126.6305123,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "오름",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.462 실측 · 해발 290m. 제주특별자치도 서귀포시 남원읍 신례리 산 12-19",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/890274520"
+      ],
+      "elevation_m": 290,
+      "slope_deg": 4.1
+    },
+    {
+      "name_ko": "관음사 주차장",
+      "lat": 33.4261591,
+      "lon": 126.5578362,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.464 실측 · 해발 564m. 제주특별자치도 제주시 아라일동 산 387-2",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/17570598"
+      ],
+      "elevation_m": 564,
+      "slope_deg": 5.0
+    },
+    {
+      "name_ko": "제주대학교 주차장11",
+      "lat": 33.4548871,
+      "lon": 126.5637353,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.467 실측 · 해발 309m. 제주특별자치도 제주시 제주대학로 102",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/17570412",
+        "http://place.map.kakao.com/17574333",
+        "http://place.map.kakao.com/17580049",
+        "http://place.map.kakao.com/17563005",
+        "http://place.map.kakao.com/17574405",
+        "http://place.map.kakao.com/1285562629",
+        "http://place.map.kakao.com/17570411",
+        "http://place.map.kakao.com/17574332",
+        "http://place.map.kakao.com/17580050",
+        "http://place.map.kakao.com/17563004",
+        "http://place.map.kakao.com/17574331",
+        "http://place.map.kakao.com/17570410",
+        "http://place.map.kakao.com/17580051"
+      ],
+      "parking": {
+        "name": "제주대학교 주차장10",
+        "lat": 33.4545268,
+        "lon": 126.5638317
+      },
+      "elevation_m": 309,
+      "slope_deg": 5.8
+    },
+    {
+      "name_ko": "교래흑돼지 본점 주차장",
+      "lat": 33.4239445,
+      "lon": 126.6749245,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.478 실측 · 해발 430m. 제주특별자치도 제주시 조천읍 교래리 216-3",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/654788401"
+      ],
+      "elevation_m": 430,
+      "slope_deg": 2.0
+    },
+    {
+      "name_ko": "제주미니미니랜드 주차장2",
+      "lat": 33.433466,
+      "lon": 126.6730749,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.480 실측 · 해발 421m. 제주특별자치도 제주시 조천읍 비자림로 606",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/17578355",
+        "http://place.map.kakao.com/78943926",
+        "http://place.map.kakao.com/20517878",
+        "http://place.map.kakao.com/17582419"
+      ],
+      "parking": {
+        "name": "교래손칼국수 주차장",
+        "lat": 33.4361175,
+        "lon": 126.6761351
+      },
+      "elevation_m": 421,
+      "slope_deg": 1.6
+    },
+    {
+      "name_ko": "도로 주차장 전기차충전소",
+      "lat": 33.3497996,
+      "lon": 126.3051,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 전기차 충전소)",
+      "notes": "어둡기 종합 0.482 실측 · 해발 270m. 제주특별자치도 제주시 한림읍 금악리 1242-8",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/1001909059"
+      ],
+      "elevation_m": 270,
+      "slope_deg": 6.2
+    },
+    {
+      "name_ko": "청재설헌주차장",
+      "lat": 33.2888381,
+      "lon": 126.5717991,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.486 실측 · 해발 249m. 제주특별자치도 서귀포시 토평동 3049-2",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/20587712"
+      ],
+      "elevation_m": 249,
+      "slope_deg": 5.6
+    },
+    {
+      "name_ko": "구좌상회작업실 주차장",
+      "lat": 33.4856511,
+      "lon": 126.698781,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.489 실측 · 해발 224m. 제주특별자치도 제주시 조천읍 선교로 198-5",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/1153897745"
+      ],
+      "elevation_m": 224,
+      "slope_deg": 1.6
+    },
+    {
+      "name_ko": "우동카덴 주차장",
+      "lat": 33.4357081,
+      "lon": 126.6792175,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.490 실측 · 해발 411m. 제주특별자치도 제주시 조천읍 교래리 550-1",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/1227380772"
+      ],
+      "elevation_m": 411,
+      "slope_deg": 0.5
+    },
+    {
+      "name_ko": "무로이 주차장",
+      "lat": 33.30735,
+      "lon": 126.3368746,
+      "coord_confidence": "high",
+      "region": "서",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.497 실측 · 해발 274m. 제주특별자치도 서귀포시 안덕면 동광리 962-7",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/1846457022"
+      ],
+      "elevation_m": 274,
+      "slope_deg": 1.4
+    },
+    {
+      "name_ko": "제주국제대학교 주차장",
+      "lat": 33.440904,
+      "lon": 126.5717204,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.504 실측 · 해발 438m. 제주특별자치도 제주시 516로 2870",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/109538566",
+        "http://place.map.kakao.com/17570431",
+        "http://place.map.kakao.com/574535448",
+        "http://place.map.kakao.com/2056551310",
+        "http://place.map.kakao.com/611278128"
+      ],
+      "parking": {
+        "name": "제주지방경찰학교 주차장",
+        "lat": 33.4415315,
+        "lon": 126.5655013
+      },
+      "elevation_m": 438,
+      "slope_deg": 5.7
+    },
+    {
+      "name_ko": "회천리조트 주차장2",
+      "lat": 33.4750639,
+      "lon": 126.6360601,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.513 실측 · 해발 273m. 제주특별자치도 제주시 번영로 940",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/17582518"
+      ],
+      "elevation_m": 273,
+      "slope_deg": 3.2
+    },
+    {
+      "name_ko": "영주고등학교 주차장",
+      "lat": 33.455439,
+      "lon": 126.5794277,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.516 실측 · 해발 327m. 제주특별자치도 제주시 월평동 684-1",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/618535530",
+        "http://place.map.kakao.com/34463187"
+      ],
+      "parking": {
+        "name": "JDC제주첨단리슈빌아파트 지하주차장",
+        "lat": 33.4574317,
+        "lon": 126.5747348
+      },
+      "elevation_m": 327,
+      "slope_deg": 3.4
+    },
+    {
+      "name_ko": "아침미소목장 제3주차장",
+      "lat": 33.4536333,
+      "lon": 126.5872752,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "목장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.534 실측 · 해발 380m. 제주특별자치도 제주시 월평동 2",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/284710112",
+        "http://place.map.kakao.com/1940467174",
+        "http://place.map.kakao.com/879850882"
+      ],
+      "parking": {
+        "name": "아침미소목장 제1주차장",
+        "lat": 33.4551263,
+        "lon": 126.5861818
+      },
+      "elevation_m": 380,
+      "slope_deg": 4.2
+    },
+    {
+      "name_ko": "제주시서부공설묘지 주차장",
+      "lat": 33.4545476,
+      "lon": 126.4890352,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.536 실측 · 해발 246m. 제주특별자치도 제주시 연동 1233",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/17938599",
+        "http://place.map.kakao.com/1441427076",
+        "http://place.map.kakao.com/20518574",
+        "http://place.map.kakao.com/8305425",
+        "http://place.map.kakao.com/741841278",
+        "http://place.map.kakao.com/17583439",
+        "http://place.map.kakao.com/17582204"
+      ],
+      "parking": {
+        "name": "제주도립미술관 주차장2",
+        "lat": 33.452965,
+        "lon": 126.4883131
+      },
+      "elevation_m": 246,
+      "slope_deg": 3.6
+    },
+    {
+      "name_ko": "화이트디어 해안1차 야외주차장 전기차충전소",
+      "lat": 33.4527031,
+      "lon": 126.4525328,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 전기차 충전소)",
+      "notes": "어둡기 종합 0.538 실측 · 해발 210m. 제주특별자치도 제주시 해안마을서4길 107-1",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/275259638"
+      ],
+      "elevation_m": 210,
+      "slope_deg": 5.1
+    },
+    {
+      "name_ko": "참솔식당 전용주차장",
+      "lat": 33.4235531,
+      "lon": 126.405606,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.540 실측 · 해발 325m. 제주특별자치도 제주시 애월읍 유수암리 1040-9",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/1554888502"
+      ],
+      "elevation_m": 325,
+      "slope_deg": 3.1
+    },
+    {
+      "name_ko": "제주중앙고등학교 주차장",
+      "lat": 33.4733033,
+      "lon": 126.5725723,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.548 실측 · 해발 208m. 제주특별자치도 제주시 아봉로 323",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/1002191922"
+      ],
+      "elevation_m": 208,
+      "slope_deg": 7.6
+    },
+    {
+      "name_ko": "돈내코유원지 주차장 전기차충전소",
+      "lat": 33.2999053,
+      "lon": 126.5855796,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 전기차 충전소)",
+      "notes": "어둡기 종합 0.553 실측 · 해발 254m. 제주특별자치도 서귀포시 돈내코로 114",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/1000731726"
+      ],
+      "elevation_m": 254,
+      "slope_deg": 4.1
+    },
+    {
+      "name_ko": "제주의료원 주차장2",
+      "lat": 33.445536,
+      "lon": 126.56076,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.555 실측 · 해발 382m. 제주특별자치도 제주시 산천단남길 10",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/17578926",
+        "http://place.map.kakao.com/971254635",
+        "http://place.map.kakao.com/1129744498",
+        "http://place.map.kakao.com/17572620"
+      ],
+      "parking": {
+        "name": "삼의악오름주차장",
+        "lat": 33.4424371,
+        "lon": 126.564844
+      },
+      "elevation_m": 382,
+      "slope_deg": 4.4
+    },
+    {
+      "name_ko": "야외주차장(제주시)",
+      "lat": 33.4585011,
+      "lon": 126.4797013,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.558 실측 · 해발 205m. 제주특별자치도 제주시 미리내길 84",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/20519004",
+        "http://place.map.kakao.com/2011346000"
+      ],
+      "parking": {
+        "name": "솔담한방병원 지하주차장",
+        "lat": 33.4590981,
+        "lon": 126.4851437
+      },
+      "elevation_m": 205,
+      "slope_deg": 5.5
+    },
+    {
+      "name_ko": "제주대학교병원 주차장1",
+      "lat": 33.4660487,
+      "lon": 126.5446389,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.559 실측 · 해발 207m. 제주특별자치도 제주시 아라일동 1857-3",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/278295995",
+        "http://place.map.kakao.com/1295901659",
+        "http://place.map.kakao.com/1440280163",
+        "http://place.map.kakao.com/643895509",
+        "http://place.map.kakao.com/1759099722",
+        "http://place.map.kakao.com/18083085",
+        "http://place.map.kakao.com/743587937",
+        "http://place.map.kakao.com/570304992",
+        "http://place.map.kakao.com/1294868639",
+        "http://place.map.kakao.com/20516137"
+      ],
+      "parking": {
+        "name": "제주대학교병원 주차장7",
+        "lat": 33.4660319,
+        "lon": 126.5469367
+      },
+      "elevation_m": 207,
+      "slope_deg": 5.3
+    },
+    {
+      "name_ko": "카카오스페이스닷원 주차장1",
+      "lat": 33.4499525,
+      "lon": 126.5706735,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.573 실측 · 해발 371m. 제주특별자치도 제주시 첨단로 242",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/17575729",
+        "http://place.map.kakao.com/17578826",
+        "http://place.map.kakao.com/22251295",
+        "http://place.map.kakao.com/983743866",
+        "http://place.map.kakao.com/22251296",
+        "http://place.map.kakao.com/22251292"
+      ],
+      "parking": {
+        "name": "카카오 스페이스닷원 주차장2",
+        "lat": 33.4494188,
+        "lon": 126.5706976
+      },
+      "elevation_m": 371,
+      "slope_deg": 2.8
+    },
+    {
+      "name_ko": "삼의악오름 주차장2",
+      "lat": 33.4400873,
+      "lon": 126.5551125,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "오름",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.587 실측 · 해발 425m. 제주특별자치도 제주시 아라일동 산 38-1",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/929638176"
+      ],
+      "elevation_m": 425,
+      "slope_deg": 7.0
+    },
+    {
+      "name_ko": "제주시각장애인복지관 주차장",
+      "lat": 33.4708332,
+      "lon": 126.5811101,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.620 실측 · 해발 242m. 제주특별자치도 제주시 월평동 420-1",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/909110152"
+      ],
+      "elevation_m": 242,
+      "slope_deg": 2.3
+    },
+    {
+      "name_ko": "강창학종합경기장 2주차장",
+      "lat": 33.2612608,
+      "lon": 126.5016039,
+      "coord_confidence": "high",
+      "region": "남",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.645 실측 · 해발 200m. 제주특별자치도 서귀포시 강정동 1517",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/17932757"
+      ],
+      "elevation_m": 200,
+      "slope_deg": 2.8
+    },
+    {
+      "name_ko": "방선문계곡 주차장",
+      "lat": 33.4530004,
+      "lon": 126.5178178,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.659 실측 · 해발 263m. 제주특별자치도 제주시 오라이동 3819-11",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/20516449"
+      ],
+      "elevation_m": 263,
+      "slope_deg": 4.4
+    },
+    {
+      "name_ko": "주차장(제주시 아라이동)",
+      "lat": 33.460016,
+      "lon": 126.5608483,
+      "coord_confidence": "high",
+      "region": "중산간",
+      "type": "주차장",
+      "why": "카카오맵 주차장 전수 수집에서 해발 200m 이상(중산간)에 있어 뽑힌 자리. 좌표가 곧 주차 지점이다 (분류: 주차장)",
+      "notes": "어둡기 종합 0.686 실측 · 해발 271m. 제주특별자치도 제주시 아라이동 37-1",
+      "discovery": "kakao_parking",
+      "sources": [
+        "http://place.map.kakao.com/297039191"
+      ],
+      "elevation_m": 271,
+      "slope_deg": 4.1
+    }
   ]
 }

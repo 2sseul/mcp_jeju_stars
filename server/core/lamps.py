@@ -52,11 +52,11 @@ FAR_M: float = 1_000.0
 _LAT_RANGE = (33.0, 33.7)
 _LON_RANGE = (126.0, 127.1)
 
-#: 원본 파일과 인코딩. 제주시는 UTF-8(BOM), 서귀포시는 CP949 로 배포된다.
-_SOURCES = (
-    (path.LAMPS_JEJU, "utf-8-sig"),
-    (path.LAMPS_SEOGWIPO, "cp949"),
-)
+#: 원본 파일. 포털은 기관마다 다른 인코딩으로 내려주지만(제주시 UTF-8, 서귀포시
+#: CP949) 저장소에 들일 때 `scripts/normalize_csv.py` 로 UTF-8(BOM) 에 맞춘다 —
+#: 파일마다 인코딩을 기억해야 하면 새 데이터를 붙일 때마다 같은 실수가 난다.
+_SOURCES = (path.LAMPS_JEJU, path.LAMPS_SEOGWIPO)
+_ENCODING = "utf-8-sig"
 
 #: attribution 최상위에 축어로 노출할 데이터 귀속.
 SOURCE: str = (
@@ -80,9 +80,9 @@ def normalize_coord(lat: float, lon: float) -> tuple[float, float] | None:
     return None
 
 
-def _read(csv_path, encoding: str) -> list[tuple[float, float]]:
+def _read(csv_path) -> list[tuple[float, float]]:
     """CSV 한 개에서 (위도, 경도) 목록을 뽑는다."""
-    text = csv_path.read_bytes().decode(encoding)
+    text = csv_path.read_bytes().decode(_ENCODING)
     rows = csv.DictReader(io.StringIO(text))
     points: list[tuple[float, float]] = []
     for row in rows:
@@ -100,8 +100,8 @@ def _read(csv_path, encoding: str) -> list[tuple[float, float]]:
 def _load() -> tuple[np.ndarray, np.ndarray]:
     """두 CSV 를 합쳐 (위도, 경도) 배열로. 모듈 로드 시 1회(≈0.1초)."""
     points: list[tuple[float, float]] = []
-    for csv_path, encoding in _SOURCES:
-        points.extend(_read(csv_path, encoding))
+    for csv_path in _SOURCES:
+        points.extend(_read(csv_path))
     arr = np.array(points, dtype=np.float64)
     return arr[:, 0].copy(), arr[:, 1].copy()
 

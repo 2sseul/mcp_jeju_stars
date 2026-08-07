@@ -13,7 +13,8 @@
 --------------------------------------------------------------------------
     광공해   `core.darkness.assess_site` 세 신호를 그대로 — 리포트·판정과 같은 숫자
     화장실   `core.toilet` 반경 200m. 없으면 가장 가까운 곳까지의 거리를 말한다
-    주차     `core.parking`(공영) + `core.places`(카카오) 1km 안 후보 — 눌러서 지정
+    주차     `core.parking`(공영) + `core.places`(카카오) 1km 안 후보 — 눌러서 지정.
+             들머리가 여럿이면 여럿 지정하고, 요금은 **자리마다** 적는다
     도보     주차 지점 → 관측 자리 경로를 **지도에서 직접 찍는다**(아래)
     로드뷰   지표로 안 잡히는 것(진입로·시야·조명)
     편집     위 칸들을 그 자리에서 적어 **바로 `jeju_spots.json` 에 쓴다**
@@ -47,22 +48,33 @@
 오르는 길이 하나뿐이라는 법이 없다 — 다랑쉬오름은 오른쪽으로 돌면 빨리 닿지만
 가파르고, 왼쪽으로 돌면 오래 걸리지만 완만하다. 그 둘은 같은 경로의 변형이 아니라
 **고를 수 있는 다른 길**이라 `walk_routes` 에 나란히 담는다(둘 이상이면 이름을
-받는다 — 이름 없이는 고를 수가 없다). 도보 시간도 길마다 따로 적는다. 그게 길을
-여럿 두는 이유다.
+받는다 — 이름 없이는 고를 수가 없다). 길마다 길이·경사·구간이 따로 나오고, 그래서
+탐방로 등급도 따로 나온다. 그게 길을 여럿 두는 이유다.
 
-한 길 안에서도 밟는 것이 달라진다(야자매트 → 데크계단 → 능선 흙길). 그래서 점
-목록에서 [나누기] 로 구간을 끊고 노면(정비·계단·맨땅)과 특색을 적는다. 구간은
-**자르는 자리**로만 잡는다 — `from` 은 그 구간이 시작하는 점 번호이고 끝은 다음
-구간이 시작하기 직전이다. 구간마다 시작·끝을 따로 적게 하면 틈과 겹침이 생기고,
-점을 하나 빼는 순간 둘이 어긋난다. 지도는 구간마다 노면 색으로 끊어 그린다.
+한 길 안에서도 밟는 것이 달라진다(데크계단 → 흙길 → 능선 돌길). 그것을 적는 자리가
+길마다 하나씩 있는 **[상세설정]** 이다 — 구간을 두고 노면상태·암릉암반·특색을 적고,
+등급 배점표를 고르는 지형도 여기서 고른다. [+ 구간] 을 한 번 누르면 길 전체가 한
+구간이 되고, 밟는 것이 바뀌는 자리에서 하나 더 두면 그 점부터 다음 구간이다.
 
-데스크에서 그린 선이라 현장 미검증이고, 길이에서 나오는 도보 시간은 초안일 뿐
-`walk_minutes` 에 남는 값은 사람이 확인해 적는다.
+구간은 **자르는 자리**로만 잡는다 — `from` 은 그 구간이 시작하는 점 번호이고 끝은
+다음 구간이 시작하기 직전이다. 구간마다 시작·끝을 따로 적게 하면 틈과 겹침이
+생기고, 점을 하나 빼는 순간 둘이 어긋난다. 지도는 구간마다 노면 색으로 끊어 그린다.
 
-구간마다 받는 것은 **밟는 것**(`surface`) 하나다. 한때 난이도 3단(쉬움·보통·어려움)이
-함께 있었는데 뺐다 — 걷는 길의 '보통'은 적는 사람마다 다른 말이라 손으로 채울 수가
-없었다. 노면은 위성·로드뷰로 **보이는 것**이라 누가 적어도 같은 답이 나온다.
-경위는 `docs/decisions.md` §2.16.
+점 목록은 **찍은 것을 되짚는 자리**로만 둔다(좌표와 앞 점에서의 거리, 그리고 잘못
+찍은 점을 빼는 [빼기]). 한때 그 목록의 [나누기] 가 노면을 적는 유일한 입구였는데,
+노면을 적으려고 점을 자른다는 것이 화면만 보고는 무슨 일인지 알 수가 없었다 —
+자르는 것은 상세를 적다 보니 따라오는 결과이지 목적이 아니다.
+
+데스크에서 그린 선이라 현장 미검증이다. **도보 시간은 적지 않는다** — 길이를 걸음
+속도로 나눈 분은 계단·오르막에서 실제와 크게 벌어지는데 여기 그리는 선은 대부분
+오름 등반로이고, 사람이 손으로 적어도 그건 눈대중이다. 힘든 정도를 말하는 것은
+경사·거리·노면·암릉으로 내는 **탐방로 등급**이지 분이 아니다.
+
+구간에 받는 것은 국립공원공단 탐방로 등급제의 두 항목(`surface`·`rock`)과 특색
+한 줄이다. 한때 난이도 3단(쉬움·보통·어려움)이 함께 있었는데 뺐다 — 걷는 길의
+'보통'은 적는 사람마다 다른 말이라 손으로 채울 수가 없었다. 노면과 암릉은 위성·
+로드뷰로 **보이는 것**이라 누가 적어도 같은 답이 나온다.
+경위는 `docs/decisions.md` §2.16 · §2.17.
 
 노면이 관측지가 아니라 **구간에 붙는** 이유는, 한 길에서 그것이 바뀌기 때문이다 —
 야자매트로 오르다 데크계단이 나오고 능선은 맨 흙길이다. 관측지에 한 값으로 적으면
@@ -73,6 +85,11 @@
 이 파일의 규약(`meta.fields`)은 **모르는 항목은 키를 만들지 않는다**는 것이다. 그래야
 남은 일이 파일에서 그대로 보인다. 그래서 화면에서 칸을 비우면 키를 지우고, 예·아니오
 칸은 3단(미확인·예·아니오)이다 — "아니오"와 "아직 안 봤다"는 다른 말이다.
+
+같은 규약이 **한 겹 안쪽에서도** 선다. 편의시설(`amenities`)은 항목마다 3단이라
+`{"toilet": false}` 가 "가 봤는데 없다"이고, 키가 아예 없는 것이 "아직 안 봤다"이다 —
+한때 '있다'만 적었는데, 그러면 화장실을 확인하러 간 관측지와 아직 안 본 관측지가
+파일에서 같아 보인다. 주차 자리의 요금(`유료`·`무료`)도 마찬가지로 없으면 미확인이다.
 
 컬럼을 늘릴 수 있다
 --------------------------------------------------------------------------
@@ -110,7 +127,6 @@ from server.core import (
     nightlight,
     parking,
     places,
-    road,
     toilet,
     trail,
 )
@@ -136,17 +152,10 @@ _STORE_M = 3_000.0
 #: 사실을 화면에 적는다** — 조용히 자르면 "1km 안에 이게 전부"로 읽힌다.
 _PARKING_LIMIT = 8
 _STORE_LIMIT = 6
-_LEG_LIMIT = 5
 _LAMP_LIMIT = 400
 
 #: 같은 주차장이 공영 목록과 카카오 검색에 다 있을 때 뒤엣것을 버리는 거리(m).
 _PARKING_DEDUP_M = 30.0
-
-#: 도보 시간 **초안**에 쓰는 걸음 속도(m/s). 판정에 들어가지 않는다 — 화면이 한 줄
-#: 내놓는 데만 쓰고, 파일에 남는 `walk_minutes` 는 사람이 확인해 적은 값이다.
-#: 밤에 손전등을 들고 초행 오솔길을 걷는 걸음이라 평지 성인 보행보다 느리게 잡았다.
-#: 오르막(`walk_type` = 등반)은 이 눈금으로 낼 수 없어 사람이 고쳐 적는다.
-_WALK_MPS = 1.0
 
 # --- 색 ----------------------------------------------------------------------
 #: 관측지 점 색 — 어둡기 등급 상한(`darkness.cap_of`)의 순서형 3단. 어두운 지도
@@ -206,6 +215,12 @@ _TERRAIN_HELP = {
     trail.SLOPE_SIDE: "산비탈을 곧장 오르는 길 — 오름 등반로는 대개 이쪽",
 }
 
+#: 주차 자리마다 받는 요금. 액수가 아니라 **돈을 받는가**만 둔다 — 밤에 대는 자리라
+#: 요금표가 있어도 무인정산이 도는지는 로드뷰로 알 수 없고, 계획이 갈리는 것은
+#: '현금을 챙겨야 하는가'까지다. 액수를 아는 자리는 `요금` 칸에 적는다.
+#: 없으면 미확인이다(이 파일의 규약 — 없는 키가 곧 '아직 안 봤다').
+PARKING_FEE = ("무료", "유료")
+
 
 # --- 컬럼 --------------------------------------------------------------------
 
@@ -217,8 +232,9 @@ class Column:
 
         text·textarea  문자열              choice  문자열(기존 값 추천, 자유 입력)
         number         숫자                bool    3단(미확인·예·아니오)
-        list           문자열 목록(줄 단위) flags   {이름: true} 묶음(편의시설)
+        list           문자열 목록(줄 단위) flags   {이름: 3단} 묶음(편의시설)
         point          {name, lat, lon}    coords  관측지 자신의 lat·lon
+        parking        주차 자리 여럿 — 자리마다 요금(위 `point` 의 세 상태 그대로)
         routes         도보 경로 묶음        — 지도에서 찍는 선(아래)
     """
 
@@ -250,20 +266,15 @@ _BUILTIN: tuple[Column, ...] = (
     Column("slope_deg", "경사도(°)", "number",
            "주변 90m 격자의 경사. 삼각대·주차 자리가 비탈인지"),
     Column("access", "접근", "text", "차로 어디까지 들어가나"),
-    Column("access_level", "찾아가기", "choice",
-           "초행 야간 운전 기준", options=("쉬움", "보통", "어려움")),
-    Column("road", "도로 상태", "text", "노면·폭·회차 — 아래 도로 정보를 보고 적는다"),
-    Column("parking", "주차 지점", "point",
-           "주차 후보에서 [지정] · 지도 우클릭 → [주차 지점으로] · 없으면 [없음]"),
+    Column("parking", "주차 지점", "parking",
+           "주차 후보에서 [지정] · 지도 우클릭 → [주차 지점으로] · 없으면 [없음]. "
+           "들머리가 갈리면 여럿 지정하고 요금은 자리마다 적는다"),
     Column("walk_routes", "도보 경로", "routes",
            "위 [경로] 칸에서 찍는다 — 우클릭한 순서가 곧 경로이고, "
            "첫 점은 주차 지점, 끝 점은 관측 자리에 코드가 놓는다. "
            "길이 갈리면 경로를 여러 개 둔다"),
     Column("walk_type", "도보 유형", "choice", "주차 지점에서 관측 자리까지의 오르내림",
            options=("평지", "등반", "차량")),
-    Column("walk_minutes", "도보 시간(분)", "number",
-           "주차 지점에서 관측 자리까지. **경로를 그렸으면 그 길에 적는다** — "
-           "길마다 다르기 때문이다. 여기는 경로가 없는 곳의 값이다"),
     Column("toilet", "화장실 위치", "point",
            "실제로 쓸 한 곳. 목록에 없으면 지도 우클릭으로 찍고, "
            "가 봤는데 없으면 [없음]"),
@@ -386,8 +397,28 @@ def coerce(column: Column, value):
         return items or None
 
     if column.type == "flags":
-        flags = {k: True for k, v in (value or {}).items() if v}
+        # 항목마다 세 상태다 — 키 없음(미확인) · true(있다) · false(가 봤는데 없다).
+        # 이 파일의 "없는 키가 곧 미확인"이 사전 한 겹 안쪽에서도 그대로 선다.
+        # 한때 true 만 남기고 false 를 버렸는데, 그러면 확인하러 간 관측지와 아직
+        # 안 본 관측지가 파일에서 같아 보인다.
+        flags = {}
+        for name, flag in (value or {}).items():
+            if flag is None or flag == "":
+                continue
+            if not isinstance(flag, bool):
+                raise ValueError(f"{column.label} {name}: 예·아니오가 아닙니다")
+            flags[name] = flag
         return flags or None
+
+    if column.type == "parking":
+        # `point` 의 세 상태에 **여럿**이 더해진 것 — 키 없음(미확인) ·
+        # false(확인했고 댈 데가 없다) · 자리 목록.
+        if value is False:
+            return False
+        lots = list(value or [])
+        if not lots:
+            return None
+        return [_parking(lot, f"{column.label} {i}") for i, lot in enumerate(lots, 1)]
 
     if column.type == "point":
         # 세 상태다 — 키 없음(미확인) · false(확인했고 없다) · 좌표(여기 있다).
@@ -422,6 +453,27 @@ def coerce(column: Column, value):
     raise ValueError(f"{column.label}: 모르는 형식 {column.type}")
 
 
+def _parking(value, label: str) -> dict:
+    """주차 자리 하나 — 어디이고, 돈을 받는가.
+
+    자리가 여럿인 이유는 오름 하나에 들머리가 여럿이기 때문이다(다랑쉬오름은
+    남쪽 주차장과 북동쪽 갓길로 갈린다). 그 둘은 같은 자리의 이표기가 아니라
+    **고를 수 있는 다른 들머리**이고, 요금도 따로 붙는다 — 한쪽만 유료인 경우가
+    있어서 관측지에 요금 한 값을 적으면 어느 자리 말인지 알 수 없다.
+    """
+    value = value or {}
+    lat, lon = _coord(value.get("lat"), value.get("lon"), label)
+    lot = {"name": _text(value.get("name")), "lat": lat, "lon": lon}
+    fee = _text(value.get("fee"))
+    if fee:
+        if fee not in PARKING_FEE:
+            raise ValueError(
+                f"{label}: 모르는 요금 '{fee}' — {' · '.join(PARKING_FEE)}"
+            )
+        lot["fee"] = fee
+    return lot
+
+
 def _route(value, label: str, named: bool) -> dict:
     """도보 경로 하나 — 점들과, 그 위를 자른 구간들.
 
@@ -445,17 +497,6 @@ def _route(value, label: str, named: bool) -> dict:
             raise ValueError(f"{label}: {i}번째 점이 [위도, 경도] 가 아닙니다")
         lat, lon = _coord(point[0], point[1], f"{label} {i}번째 점")
         route["points"].append([lat, lon])
-
-    # 도보 시간은 길마다 다르다 — 그게 길을 여럿 두는 이유다(빠른 급경사길 대
-    # 느린 완만한 길). 관측지 한 곳의 대표값(`walk_minutes`)과는 다른 값이다.
-    minutes = _text(value.get("minutes"))
-    if minutes:
-        try:
-            route["minutes"] = int(float(minutes))
-        except ValueError as exc:
-            raise ValueError(f"{label}: 도보 시간이 숫자가 아닙니다") from exc
-        if route["minutes"] < 1:
-            raise ValueError(f"{label}: 도보 시간이 1분보다 짧습니다")
 
     terrain = _text(value.get("terrain"))
     if terrain:
@@ -742,40 +783,19 @@ def lamps_near(lat: float, lon: float) -> dict:
     }
 
 
-def roads_near(lat: float, lon: float) -> dict:
-    """도착 전 1km 의 길들 — **잰 값만**.
-
-    등급(`highway`)도, 거기서 나온 판정("주행 불가")도 싣지 않는다. 그건 OSM
-    기여자가 고른 분류이지 도로를 잰 값이 아니고, 그걸로 들어갈 수 있다 없다를
-    말하면 짐작이 사실처럼 읽힌다. 밤에 초행으로 갈 수 있는지를 실제로 가르는
-    폭·교행 여지는 원본에 거의 없으므로(폭 0.8%), **없다고 말하고** 그 자리는
-    위성사진·로드뷰로 사람이 본다.
-    """
-    legs = road.approach(lat, lon)
-    return {
-        "approachM": road.APPROACH_M,
-        "total": len(legs),
-        "summary": road.describe_approach(legs),
-        "coverage": road.coverage(),
-        "legs": [
-            {
-                "name": leg.name,
-                "nearestM": round(leg.nearest_m),
-                "measured": road.measured(leg),
-            }
-            for leg in legs[:_LEG_LIMIT]
-        ],
-    }
-
-
 def context(lat: float, lon: float) -> dict:
-    """한 지점의 광공해 + 주변 전부. 관측지를 고르거나 지도를 우클릭할 때 부른다."""
+    """한 지점의 광공해 + 주변 전부. 관측지를 고르거나 지도를 우클릭할 때 부른다.
+
+    도로는 싣지 않는다. 한때 도착 전 1km 의 길을 잰 값(`core.road`)으로 늘어놓고
+    사람이 `도로 상태` 칸에 옮겨 적게 했는데, 그 칸을 걷어내면서 함께 뺐다 —
+    **밤에 초행으로 갈 수 있는지는 출발지가 있어야 나오는 답**이고, 관측지 한 곳에
+    한 줄로 적어 둘 것이 아니다. 그 판단은 출발지를 받는 별도 도구가 맡는다.
+    """
     return {
         "site": site_fields(lat, lon),
         "toilets": toilets_near(lat, lon),
         "parking": parking_near(lat, lon),
         "stores": stores_near(lat, lon),
-        "roads": roads_near(lat, lon),
         "lamps": lamps_near(lat, lon),
     }
 
@@ -943,7 +963,7 @@ _HTML = """<meta charset="utf-8">
     font-size: 12px; margin-bottom: 7px; background: rgba(255,255,255,0.06);
     color: var(--ink); border: 1px solid var(--hairline); border-radius: 6px;
     padding: 5px 7px; }
-  /* 구간 머리는 점 목록 안에 끼는 줄이라, 점 줄과 다르게 보여야 경계로 읽힌다. */
+  /* 구간 한 덩이. [상세설정] 안에 줄줄이 서는 것이라 점 줄과 다르게 보여야 한다. */
   .near li.seghead { display: block; padding: 8px 0 6px; border-bottom: 0; }
   .seghead .hd { display: flex; gap: 7px; align-items: baseline; margin-bottom: 4px; }
   .seghead .hd b { font-size: 12px; }
@@ -951,22 +971,35 @@ _HTML = """<meta charset="utf-8">
   .seghead .hd button { font: inherit; font-size: 10.5px; padding: 1px 6px;
                         cursor: pointer; background: transparent; color: var(--ink-2);
                         border: 1px solid var(--hairline); border-radius: 5px; }
+  .seghead .hd button.danger { color: var(--danger); border-color: var(--danger); }
+  /* 구간이 어느 점에서 시작하는지를 고르는 자리. 줄 안에 끼는 것이라 아래 입력칸과
+     달리 글자만큼만 차지한다. */
+  .seghead .hd select { flex: 0 0 auto; font: inherit; font-size: 10.5px;
+                        padding: 1px 4px; background: rgba(255,255,255,0.06);
+                        color: var(--ink); border: 1px solid var(--hairline);
+                        border-radius: 5px; }
   .seghead .seg { margin-bottom: 4px; }
   .seghead .seg button { font-size: 11px; }
   .seghead input { width: 100%; box-sizing: border-box; font: inherit;
                    font-size: 11.5px; background: rgba(255,255,255,0.06);
                    color: var(--ink); border: 1px solid var(--hairline);
                    border-radius: 6px; padding: 4px 7px; }
-  /* 계산이 만든 초안 한 줄. 사람이 그대로 쓰거나 고쳐 쓰라고 내놓는 것이라
-     저장된 값처럼 보이지 않게 점선으로 두른다. */
+  /* [상세설정] 을 펼친 덩이. 점 목록과 이어져 보이면 어디까지가 '찍은 것'이고
+     어디부터가 '적은 것'인지 흐려지므로 점선으로 가른다. */
+  .detbox { margin-top: 8px; padding-top: 8px;
+            border-top: 1px dashed var(--hairline); }
+  .detbox .addseg { width: 100%; font: inherit; font-size: 11.5px; padding: 4px 0;
+                    cursor: pointer; background: transparent; color: var(--ink-2);
+                    border: 1px dashed var(--hairline); border-radius: 6px; }
+  .detbox .addseg:hover { color: var(--ink); border-color: var(--save); }
+  .detbox .clearseg { width: 100%; margin-top: 5px; font: inherit; font-size: 11px;
+                      padding: 3px 0; cursor: pointer; background: transparent;
+                      color: var(--danger); border: 1px solid var(--danger);
+                      border-radius: 6px; }
+  /* 코드가 낸 값(탐방로 등급). 사람이 적은 값이 아니라는 것이 보여야 해서
+     저장된 칸들과 달리 점선으로 두른다. */
   .draft { margin-top: 10px; padding: 8px 10px; font-size: 12px;
-           border: 1px dashed var(--hairline); border-radius: 7px;
-           display: flex; gap: 8px; align-items: flex-start; }
-  .draft span { flex: 1 1 auto; color: var(--ink-2); }
-  .draft button { flex: 0 0 auto; font: inherit; font-size: 11px; padding: 3px 8px;
-                  cursor: pointer; background: transparent; color: var(--ink-2);
-                  border: 1px solid var(--hairline); border-radius: 5px; }
-  .draft button:hover { color: var(--ink); border-color: var(--save); }
+           border: 1px dashed var(--hairline); border-radius: 7px; }
 
   .field { margin-bottom: 9px; }
   .field > label { display: block; font-size: 11.5px; color: var(--ink-muted);
@@ -986,16 +1019,31 @@ _HTML = """<meta charset="utf-8">
                 cursor: pointer; background: transparent; color: var(--ink-2);
                 border: 1px solid var(--hairline); border-radius: 6px; }
   .seg button.on { background: #256abf; color: #fff; border-color: #256abf; }
-  .point { display: flex; gap: 6px; align-items: center; font-size: 12px; }
+  .point { display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+           font-size: 12px; }
   .point .val { flex: 1 1 auto; min-width: 0; overflow: hidden;
                 text-overflow: ellipsis; white-space: nowrap; }
   .point button { font: inherit; font-size: 11px; padding: 2px 7px; cursor: pointer;
                   background: transparent; color: var(--ink-2);
                   border: 1px solid var(--hairline); border-radius: 5px; }
+  .point button.on { color: var(--ink); border-color: var(--save); }
+  .point button.danger { color: var(--danger); border-color: var(--danger); }
   .flags { display: grid; gap: 5px; }
   .flags .one { display: flex; align-items: center; gap: 8px; font-size: 12px; }
   .flags .one .nm { flex: 1 1 auto; }
   .flags .one .seg { flex: 0 0 auto; width: 132px; }
+  /* 주차 자리 목록. 자리마다 요금 3단이 붙으므로 편의시설과 같은 줄 모양이지만,
+     이름이 길어질 수 있어(카카오 검색 이름) 넘치면 자른다. */
+  .parks { display: grid; gap: 7px; }
+  .parks .one { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .parks .one .nm { flex: 1 1 auto; min-width: 0; overflow: hidden;
+                    text-overflow: ellipsis; white-space: nowrap; }
+  .parks .one .seg { flex: 0 0 auto; width: 126px; }
+  .parks .one button { font: inherit; font-size: 11px; padding: 2px 7px;
+                       cursor: pointer; background: transparent; color: var(--ink-2);
+                       flex: 0 0 auto; border: 1px solid var(--hairline);
+                       border-radius: 5px; }
+  .parks .one button:hover { color: var(--danger); border-color: var(--danger); }
 
   .acts { display: flex; gap: 6px; margin-top: 10px; }
   .acts button { flex: 1; font: inherit; font-size: 12px; font-weight: 600;
@@ -1143,6 +1191,7 @@ function init() {
   let picking = null;       /* 우클릭 메뉴가 연 좌표 */
   let drawing = false;      /* 도보 경로를 찍는 중인가 */
   let active = 0;           /* 여러 길 중 지금 손대는 것 (화면 상태 — 저장 안 한다) */
+  let detailOpen = null;    /* [상세설정] 을 폈나. null 은 '아직 안 건드렸다' */
   const overlays = [];      /* 주변 레이어 — 고를 때마다 걷어낸다 */
   const marks = {};         /* index → 관측지 마커 */
   let rvClient = null, roadview = null, radius = null;
@@ -1219,7 +1268,7 @@ function init() {
     ctx.parking.list.forEach(function (p) {
       pin(p.lat, p.lon, DATA.colors.parking, 10,
         p.name + ' · ' + p.distanceM + 'm',
-        tap(function () { setPoint('parking', p); }));
+        tap(function () { addLot(p); }));
     });
     ctx.stores.list.forEach(function (s) {
       pin(s.lat, s.lon, DATA.colors.store, 9,
@@ -1232,8 +1281,14 @@ function init() {
         tap(function () { setPoint('toilet', t); }));
     });
     /* 지정해 둔 자리는 후보 위에 겹쳐 크게 찍는다 — 무엇을 이미 골랐는지가
-       목록을 다시 읽지 않아도 지도에서 바로 보여야 한다. */
-    ['parking', 'toilet', 'store'].forEach(function (key) {
+       목록을 다시 읽지 않아도 지도에서 바로 보여야 한다. 주차는 여럿일 수 있고,
+       요금은 자리마다 다르므로 꼬리표에 함께 적는다. */
+    lots().forEach(function (p, i) {
+      pin(p.lat, p.lon, DATA.colors.pick, 12,
+        '지정 주차 ' + (i + 1) + ': ' + (p.name || '이름 없음')
+        + ' · ' + (p.fee || '요금 미확인'));
+    });
+    ['toilet', 'store'].forEach(function (key) {
       const p = value(key);
       if (p) pin(p.lat, p.lon, DATA.colors.pick, 12, '지정: ' + (p.name || key));
     });
@@ -1316,6 +1371,38 @@ function init() {
 
   function dirty() { return Object.keys(draft).length > 0; }
 
+  /* --- 주차 자리 --------------------------------------------------------------
+     길이 여럿일 수 있는 것과 같은 이유로 자리도 여럿일 수 있다 — 오름 하나에
+     들머리가 갈리면 대는 자리도 갈리고, 그때 한쪽만 유료인 경우가 있다.
+     `false` 는 "확인했고 댈 데가 없다"라서 목록이 아니다(그때는 빈 목록으로 본다). */
+  function lots() {
+    const v = value('parking');
+    return Array.isArray(v) ? v : [];
+  }
+
+  function setLots(list) {
+    setValue('parking', list.length ? list : null);
+  }
+
+  /* 후보를 누르면 **더한다**(갈아 끼우지 않는다). 이미 같은 자리가 있으면 아무 일도
+     하지 않는다 — 같은 자리가 후보 목록과 지도 양쪽에 있어서 두 번 누르기 쉽고,
+     그러면 요금 3단이 둘로 늘어 어느 쪽이 값인지 흐려진다.
+     요금은 여기서 묻지 않는다 — 지도를 보고 아는 것이 아니라 출처를 봐야 아는
+     것이라 [기입] 칸에서 적는다. */
+  function addLot(p) {
+    const list = lots();
+    const same = list.some(function (x) {
+      return metersBetween([x.lat, x.lon], [p.lat, p.lon]) < 1;
+    });
+    if (!same) setLots(list.concat([{ name: p.name, lat: p.lat, lon: p.lon }]));
+    renderForm();
+  }
+
+  function dropLot(i) {
+    setLots(lots().filter(function (_, j) { return j !== i; }));
+    renderForm();
+  }
+
   /* --- 도보 경로 ------------------------------------------------------------
      찍을 때마다 다시 재는 값이라 서버에 묻지 않는다. 거리 식은
      `core.lamps._distances_m` 와 같은 등거리 평면 근사다 — 수백 m 규모에서
@@ -1395,25 +1482,47 @@ function init() {
     return (s && s.surface && DATA.colors.surface[s.surface]) || DATA.colors.route;
   }
 
-  function cut(i) {
-    const r = activeRoute();
-    const segs = segments(r).slice();
-    if (!segs.length) segs.push({ from: 0 });
-    let at = 0;
-    while (at < segs.length && segs[at].from < i) at++;
-    if (segs[at] && segs[at].from === i) return;   /* 이미 자른 자리다 */
-    segs.splice(at, 0, { from: i });
-    editRoute(active, { segments: segs });
+  /* 구간 머리로 아직 안 쓰인 점들. [+ 구간] 과 시작점 고르기가 이 목록에서 고른다 —
+     한 점에 구간 둘이 걸리면 앞엣것은 길이 0 이 되어 아무것도 말하지 않는다.
+     구간이 하나도 없으면 첫 구간뿐이고, 첫 구간은 언제나 경로 첫 점에서 시작한다. */
+  function freePoints(r) {
+    if (!segments(r).length) return [0];
+    const used = {};
+    segments(r).forEach(function (s) { used[s.from] = true; });
+    const out = [];
+    for (let i = 1; i < points(r).length; i++) if (!used[i]) out.push(i);
+    return out;
   }
 
-  function uncut(i) {
-    const segs = segments(activeRoute()).slice();
-    segs.splice(i, 1);
-    /* 하나만 남고 그 안에 적은 것이 없으면 자른 적 없는 것과 같다.
-       서버의 `_SAID` 와 같은 목록이다 — 둘이 갈리면 화면에서 지운 구간이 저장에서
-       되살아난다. */
-    const empty = segs.every(function (s) { return !s.surface && !s.note; });
-    editRoute(active, { segments: empty ? [] : segs });
+  function byFrom(a, b) { return a.from - b.from; }
+
+  function addSegment(from) {
+    editRoute(active, {
+      segments: segments(activeRoute()).concat([{ from: from }]).sort(byFrom)
+    });
+  }
+
+  /* 시작점을 옮기면 순서가 바뀔 수 있다 — 서버는 찍은 순서대로가 아닌 구간을 받지
+     않으므로 여기서 다시 세운다. */
+  function moveSegment(i, from) {
+    editRoute(active, {
+      segments: segments(activeRoute()).map(function (s, j) {
+        return j === i ? Object.assign({}, s, { from: from }) : s;
+      }).sort(byFrom)
+    });
+  }
+
+  /* 구간을 지우면 그 자리는 앞 구간이 물려받는다. 첫 구간을 지웠으면 다음 구간이
+     경로 첫 점으로 내려온다 — 첫 점에서 시작하지 않는 구간표를 서버가 받지 않기
+     때문이고, 그게 사실이기도 하다(앞이 비면 그 앞은 아무 구간도 아니다). */
+  function dropSegment(i) {
+    const segs = segments(activeRoute()).filter(function (_, j) { return j !== i; });
+    if (segs.length) segs[0] = Object.assign({}, segs[0], { from: 0 });
+    /* 남은 것이 아무것도 말하지 않으면 자른 적 없는 것과 같다. 서버의 `_SAID` 와
+       같은 목록이다 — 둘이 갈리면 화면에서 지운 구간이 저장에서 되살아나거나,
+       화면에만 있던 값이 저장에서 조용히 사라진다. */
+    const said = segs.some(function (s) { return s.surface || s.rock || s.note; });
+    editRoute(active, { segments: said ? segs : [] });
   }
 
   function editSegment(i, patch) {
@@ -1440,25 +1549,65 @@ function init() {
     return '<ul class="near">' + pts.map(function (p, i) {
       const tag = i === 0 ? ' <span class="cap">· 시작</span>'
         : (done && i === pts.length - 1 ? ' <span class="cap">· 끝</span>' : '');
-      return (head[i] === undefined ? '' : segHeadHtml(r, head[i]))
-        + '<li><span class="d">'
+      /* 구간 경계는 여기서 **말만 한다**. 자르고 적는 일은 [상세설정] 이 맡는다 —
+         한 줄이 좌표 확인과 구간 편집의 입구를 겸하면, 노면을 적으려고 점을
+         자른다는 것이 무슨 일인지 화면만 보고는 알 수가 없다. */
+      const at = head[i] === undefined ? ''
+        : ' <span class="cap">· 구간 ' + (head[i] + 1) + ' 시작</span>';
+      return '<li><span class="d">'
         + (i ? '+' + fmtDist(Math.round(metersBetween(pts[i - 1], p))) : '시작')
-        + '</span><span class="t"><b>' + (i + 1) + '번</b>' + tag
+        + '</span><span class="t"><b>' + (i + 1) + '번</b>' + tag + at
         + '<span>' + p[0].toFixed(6) + ', ' + p[1].toFixed(6) + '</span></span>'
-        + (i && head[i] === undefined
-            ? '<button data-cut="' + i + '" title="여기서부터 다른 구간">나누기'
-              + '</button>' : '')
         + '<button data-drop="' + i + '">빼기</button></li>';
     }).join('') + '</ul>';
   }
 
-  /* 구간 머리는 점 목록 **안에** 낀다. 난이도와 설명을 목록 밖에 따로 두면 어느
-     구간이 어느 점부터인지를 두 목록을 오가며 맞춰 봐야 한다. */
-  function segHeadHtml(r, i) {
+  /* --- 상세설정 ---------------------------------------------------------------
+     노면상태·암릉암반·특색·지형은 전부 **길 하나에 딸린 것**이라 길 단위로 한자리에
+     모은다. 구간은 그 안에서 "여기부터 밟는 것이 바뀐다"를 적다가 생기는 것이지,
+     구간을 만드는 것 자체가 목적인 적은 없다.
+
+     편 상태는 저장하지 않는다. `null` 은 '아직 사람이 안 건드렸다'라서, 이미 적어
+     둔 것이 있으면 펴진 채로 시작한다 — 값이 있는데 접혀 있으면 없는 것처럼 읽힌다. */
+  function detailOn(r) {
+    if (detailOpen !== null) return detailOpen;
+    return segments(r).length > 0 || !!(r && r.terrain);
+  }
+
+  function detailHtml(r) {
+    if (points(r).length < 2 || !detailOn(r)) return '';
+    const segs = segments(r);
+    const free = freePoints(r);
+    return '<div class="detbox">'
+      + (segs.length
+          ? '<ul class="near">' + segs.map(function (_, i) {
+              return segmentHtml(r, i);
+            }).join('') + '</ul>'
+          : '<div class="empty">아직 구간이 없다 — [+ 구간] 을 한 번 누르면 길 '
+            + '전체가 한 구간이 되고, 거기에 노면상태·암릉암반을 적는다. 밟는 것이 '
+            + '바뀌는 자리에서 구간을 하나 더 두면 그 점부터 다음 구간이다.</div>')
+      + (free.length
+          ? '<button class="addseg" data-addseg="' + free[0] + '">+ 구간</button>'
+          : '<div class="hint">점마다 구간이 하나씩이라 더 둘 자리가 없다</div>')
+      /* 구간을 하나씩 지우는 것으로는 감당이 안 되는 경우가 있다 — 점마다 구간이
+         하나씩 박힌 길이 그렇다(옛 [나누기] 가 점 목록에 있던 시절의 잔해다).
+         구간 하나짜리는 [지우기] 가 곧 이것이므로 두 번 묻지 않는다. */
+      + (segs.length > 1
+          ? '<button class="clearseg" data-clearseg="1">구간 전부 지우기</button>'
+          : '')
+      + terrainHtml(r)
+      + '</div>';
+  }
+
+  /* 구간 한 덩이 — 어디부터 어디까지이고, 거기서 밟는 것이 무엇인가. */
+  function segmentHtml(r, i) {
     const s = segments(r)[i];
     const to = segEnd(r, i);
     return '<li class="seghead">'
       + '<div class="hd"><b>구간 ' + (i + 1) + '</b>'
+      /* 첫 구간은 언제나 경로 첫 점에서 시작한다 — 앞이 비면 그 앞은 아무 구간도
+         아니다. 그래서 고를 것이 없고, 고르는 자리도 두지 않는다. */
+      + (i ? startPickHtml(r, i) : '')
       + '<span class="cap">' + (s.from + 1) + '~' + (to + 1) + '번 · '
       + fmtDist(Math.round(routeLength(points(r).slice(s.from, to + 1))))
       /* 경사는 저장할 때 표고 격자에서 잰 값이다(`core/elevation.py`). 격자 두 칸
@@ -1468,7 +1617,7 @@ function init() {
           ? ' · <span title="구간이 격자 두 칸(약 62m)보다 짧다">경사 —</span>'
           : ' · 경사 ' + (s.slope_deg > 0 ? '+' : '') + s.slope_deg + '°')
       + '</span>'
-      + (i ? '<button data-uncut="' + i + '">앞 구간에 합치기</button>' : '')
+      + '<button class="danger" data-segdel="' + i + '">지우기</button>'
       + '</div>'
       + '<span class="cap sgl">노면상태</span>'
       + chipsHtml('sf_' + i, DATA.trail.surface, DATA.trail.surfaceHelp,
@@ -1478,6 +1627,19 @@ function init() {
       + '<input type="text" data-snote="' + i + '" value="' + esc(s.note || '')
       + '" placeholder="이 구간의 특색 — 경사·쉴 곳·시야">'
       + '</li>';
+  }
+
+  /* 구간이 어느 점에서 시작하는지. 예전 [나누기] 가 하던 일이 이 자리로 왔다 —
+     자를 자리를 점 목록에서 고르는 대신, 구간이 자기 시작점을 들고 있는다. */
+  function startPickHtml(r, i) {
+    const at = segments(r)[i].from;
+    const pick = freePoints(r).concat([at]).sort(function (a, b) { return a - b; });
+    return '<select data-sfrom="' + i + '" title="이 구간이 시작하는 점">'
+      + pick.map(function (n) {
+          return '<option value="' + n + '"' + (n === at ? ' selected' : '') + '>'
+            + (n + 1) + '번부터</option>';
+        }).join('')
+      + '</select>';
   }
 
   /* 낱말 고르는 단추 한 줄. 무엇을 뜻하는지는 눌러 보고 알 것이 아니라서 원문 설명을
@@ -1493,20 +1655,6 @@ function init() {
         + (o[0] && colors ? ' style="border-color:' + colors[o[0]] + '55"' : '')
         + '>' + esc(o[1]) + '</button>';
     }).join('') + '</div>';
-  }
-
-  /* 길이에서 나오는 분은 **초안**이다. 저장되는 것은 사람이 확인해 적은 값이라
-     `도로 상태` 초안과 같은 점선 상자에 담고, 넣기만 하고 저장하지는 않는다.
-     계단 오르막은 이 눈금으로 못 재므로 초안과 실제가 크게 벌어진다 — 그래서
-     초안을 값 칸에 넣는 것도 사람이 누른다. */
-  function routeDraftHtml(r) {
-    const pts = points(r);
-    if (pts.length < 2) return '';
-    const mins = Math.max(1, Math.round(routeLength(pts) / DATA.walkMps / 60));
-    return '<div class="draft"><span>걸어서 약 <b>' + mins + '분</b> '
-      + '<span class="cap">· ' + DATA.walkMps + ' m/s 기준 · 계단·오르막은 훨씬 '
-      + '더 걸린다</span></span>'
-      + '<button data-usewalk="' + mins + '">이 길의 도보 시간으로</button></div>';
   }
 
   /* --- 오른쪽 [경로] 칸 전체 -------------------------------------------------- */
@@ -1525,7 +1673,6 @@ function init() {
         + '<span class="mt">'
         + (p.length ? p.length + '점 · ' + fmtDist(Math.round(routeLength(p)))
                     : '아직 안 찍었다')
-        + (x.minutes ? ' · ' + x.minutes + '분' : '')
         + (segments(x).length ? ' · 구간 ' + segments(x).length : '')
         + '</span></button>';
     }).join('')
@@ -1534,7 +1681,8 @@ function init() {
     if (!r) {
       return chooser + '<div class="empty" style="margin-top:8px">아직 그리지 '
         + '않았다 — [+ 다른 길] 로 길을 하나 만들고 지도를 우클릭한다. 첫 점은 '
-        + '주차 지점에 놓인다.</div>';
+        + '주차 자리에 놓인다' + (lots().length > 1 ? '(어느 자리인지 고른다)' : '')
+        + '.</div>';
     }
 
     return chooser
@@ -1546,9 +1694,18 @@ function init() {
       + (drawing
           ? '<button data-finish="1">관측 자리에서 끝내기</button>'
             + '<button data-stop="1">멈추기</button>'
-          : '<button data-draw="walk_routes">'
-            + (pts.length ? '이어 찍기' : '그리기') + '</button>')
-      + '<button data-delroute="' + active + '">이 길 지우기</button>'
+          : drawStartHtml(pts))
+      /* 노면을 적는 입구는 여기 하나다. 점 목록에는 두지 않는다. */
+      + (pts.length > 1
+          ? '<button data-detail="1"' + (detailOn(r) ? ' class="on"' : '')
+            + ' title="이 길의 구간·노면·암릉·지형">상세설정</button>'
+          : '')
+      + '<button class="danger" data-delroute="' + active + '">이 길 지우기</button>'
+      /* 길이 하나뿐이면 [이 길 지우기] 가 곧 전부 지우기라 두 번 묻지 않는다. */
+      + (list.length > 1
+          ? '<button class="danger" data-delall="1" title="이 관측지의 길 '
+            + list.length + '개를 모두">전부 지우기</button>'
+          : '')
       + '</div>'
       + (drawing
           ? '<div class="hint" style="margin-top:6px">지도를 <b>우클릭</b>한 순서가 '
@@ -1558,29 +1715,45 @@ function init() {
           : '')
       + (pts.length
           ? routeListHtml(r)
-          : '<div class="empty" style="margin-top:8px">[그리기] 를 누르고 지도를 '
-            + '우클릭한다. 첫 점은 주차 지점에 놓인다.</div>')
+          : '<div class="empty" style="margin-top:8px">'
+            + (lots().length > 1
+                ? '어느 주차 자리에서 오르는 길인지 위에서 고른다 — 그 자리가 첫 '
+                  + '점이 되고, 이어서 지도를 우클릭한다.'
+                : '[그리기] 를 누르고 지도를 우클릭한다. 첫 점은 주차 자리에 '
+                  + '놓인다.')
+            + '</div>')
       + (pts.length === 1
           ? '<div class="empty" style="margin-top:6px">점이 하나다 — 두 점부터 '
             + '경로다.</div>' : '')
       + (pts.length > 1 && !endsAtSite(pts)
           ? '<div class="empty" style="margin-top:6px">아직 <b>관측 자리</b>에서 '
             + '끝나지 않았다.</div>' : '')
-      + (pts.length > 1
-          ? '<div class="field" style="margin:8px 0 0"><label>이 길의 도보 시간(분)'
-            + '</label><input type="number" data-rmin="' + active + '" value="'
-            + esc(r.minutes === undefined ? '' : r.minutes) + '">'
-            + '<div class="hint">길마다 다른 값이라 여기에 적는다 — 아래 '
-            + '`도보 시간` 칸은 경로를 안 그린 곳에 쓴다</div></div>'
-          : '')
-      + terrainHtml(r)
-      + gradeHtml(r)
-      + routeDraftHtml(r);
+      + detailHtml(r)
+      /* 도보 시간은 내지 않는다. 길이 ÷ 걸음속도로 낸 분은 계단·오르막에서 실제와
+         크게 벌어지는데, 이 도구가 그리는 선은 대부분 오름 등반로다 — 틀린 수를
+         내놓느니 안 내놓는다. 힘든 정도는 아래 탐방로 등급이 말한다. */
+      + gradeHtml(r);
+  }
+
+  /* 찍기를 켜는 단추. 주차 자리가 둘 이상이고 아직 한 점도 안 찍었으면 **자리마다**
+     세운다 — 길은 정의상 주차 자리에서 시작하는데 그 자리가 여럿이면 어느 쪽인지는
+     코드가 알 수 없고, 짐작해서 놓은 첫 점은 나중에 아무도 틀린 줄 모른다.
+     이어 찍는 중이면 시작점은 이미 정해졌으므로 묻지 않는다. */
+  function drawStartHtml(pts) {
+    const list = lots();
+    if (pts.length || list.length < 2) {
+      return '<button data-draw="-1">' + (pts.length ? '이어 찍기' : '그리기')
+        + '</button>';
+    }
+    return list.map(function (p, i) {
+      return '<button data-draw="' + i + '" title="' + esc(p.name || '이름 없음')
+        + ' 에서 시작">' + esc(p.name || (i + 1) + '번 자리') + '에서</button>';
+    }).join('');
   }
 
   /* 지형은 **등급 배점표를 고르는 값**이다 — 같은 1km 가 둘레길에서 1점, 사면부에서
      3점이다. 코드가 짐작하지 않는다(오름이니 사면부겠지) — 안 고르면 등급을
-     내지 않는다. */
+     내지 않는다. 길 하나에 하나뿐인 값이라 [상세설정] 안에 있다. */
   function terrainHtml(r) {
     if (points(r).length < 2) return '';
     return '<div class="field" style="margin:8px 0 0"><label>지형</label>'
@@ -1601,7 +1774,10 @@ function init() {
     if (!worst.rock) why.push('암릉·암반');
     if (why.length) {
       return '<div class="empty" style="margin-top:8px">탐방로 등급 — 아직 '
-        + esc(why.join(' · ')) + ' 이(가) 없다</div>';
+        + esc(why.join(' · ')) + ' 이(가) 없다'
+        + (r.slope_deg === undefined && why.length === 1
+            ? '' : ' <span class="cap">· [상세설정] 에서 적는다</span>')
+        + '</div>';
     }
 
     const pct = Math.abs(r.climb_m) / r.over_m * 100;
@@ -1680,16 +1856,21 @@ function init() {
     } else if (col.type === 'bool') {
       body = segHtml(id, v);
     } else if (col.type === 'flags') {
-      /* 편의시설은 2단이다 — 원본이 '있다'만 적고 '없다'는 적지 않기 때문이다
-         (`{"toilet": true}`). 3단으로 물으면 '아니오'와 '미확인'이 파일에서
-         같은 것(키 없음)이 되어, 화면에만 있는 구분이 된다. */
+      /* 항목마다 3단이다 — 이 파일의 "없는 키가 곧 미확인"이 `amenities` 사전
+         안쪽에서도 그대로 서기 때문이다: 키 없음(미확인) · true(있다) ·
+         false(가 봤는데 없다). 한때 '있다'만 적었는데, 그러면 화장실을 확인하러
+         간 관측지와 아직 안 본 관측지가 파일에서 같아 보인다. */
       body = '<div class="flags" id="' + id + '">'
         + DATA.flagKeys.map(function (k) {
+            const f = v ? v[k] : undefined;
             return '<div class="one"><span class="nm">' + esc(k) + '</span>'
-              + segHtml(id + '_' + k, (v && v[k]) ? true : undefined,
-                        [['', '미확인'], ['yes', '있음']]) + '</div>';
+              + segHtml(id + '_' + k, typeof f === 'boolean' ? f : undefined,
+                        [['', '미확인'], ['yes', '있음'], ['no', '없음']])
+              + '</div>';
           }).join('')
         + '</div>';
+    } else if (col.type === 'parking') {
+      body = parkingFieldHtml(col, v);
     } else if (col.type === 'point') {
       /* 세 상태 — 미확인 · 없음 · 좌표. 상태마다 다음에 할 일이 하나뿐이라
          버튼도 하나씩만 세운다(3단 토글은 좌표를 만들어 내지 못한다). */
@@ -1736,14 +1917,48 @@ function init() {
       + '</div>';
   }
 
+  /* 주차 자리 칸. `point` 와 같은 세 상태(미확인 · 없음 · 좌표)인데 좌표가
+     **여럿**이다 — 오름 하나에 들머리가 갈리면 대는 자리도 갈린다. 그때 한쪽만
+     유료인 경우가 있어서 요금을 관측지에 한 값으로 적을 수가 없다. 그래서 요금은
+     자리마다 붙고, 그 자리에서만 3단(미확인·무료·유료)으로 묻는다. */
+  function parkingFieldHtml(col, v) {
+    if (v === false) {
+      return '<div class="point"><span class="val">확인함 · <b>댈 데 없음</b></span>'
+        + '<button data-unknown="' + col.key + '">미확인으로</button></div>';
+    }
+    const list = v || [];
+    if (!list.length) {
+      return '<div class="point"><span class="val cap">미확인</span>'
+        + '<button data-none="' + col.key + '">없음</button></div>';
+    }
+    const fees = [['', '미확인']].concat(DATA.parkingFee.map(function (f) {
+      return [f, f];
+    }));
+    return '<div class="parks" id="f_' + col.key + '">' + list.map(function (p, i) {
+      return '<div class="one"><span class="nm">' + esc(p.name || '이름 없음')
+        + ' <span class="cap">' + p.lat.toFixed(5) + ', ' + p.lon.toFixed(5)
+        + '</span></span>'
+        + pickHtml('f_' + col.key + '_fee_' + i, fees, p.fee || '')
+        + '<button data-parkdrop="' + i + '">빼기</button></div>';
+    }).join('') + '</div>'
+      + '<div class="hint">자리를 더 두려면 [주차 후보] 에서 [지정] 하거나 지도를 '
+      + '우클릭한다. 자리가 둘 이상이면 <b>경로도 어느 자리에서 시작하는지</b>를 '
+      + '고르게 된다</div>';
+  }
+
   /* 예·아니오는 3단이다 — 파일 규약이 "없는 키가 곧 미확인"이라, 아니오를 적는 것과
      아직 안 본 것을 같은 칸으로 두면 그 구분이 화면에서 사라진다. */
   function segHtml(id, v, opts) {
     opts = opts || [['', '미확인'], ['yes', '예'], ['no', '아니오']];
-    const now = v === true ? 'yes' : v === false ? 'no' : '';
+    return pickHtml(id, opts, v === true ? 'yes' : v === false ? 'no' : '');
+  }
+
+  /* 낱말을 그대로 값으로 쓰는 3단(주차 요금). 예·아니오와 모양은 같은데 값이
+     true·false 가 아니라서, 고른 것을 문자열로 받는 자리를 따로 둔다. */
+  function pickHtml(id, opts, now) {
     return '<div class="seg" id="' + id + '">' + opts.map(function (o) {
-      return '<button type="button" data-v="' + o[0] + '"'
-        + (o[0] === now ? ' class="on"' : '') + '>' + o[1] + '</button>';
+      return '<button type="button" data-v="' + esc(o[0]) + '"'
+        + (o[0] === now ? ' class="on"' : '') + '>' + esc(o[1]) + '</button>';
     }).join('') + '</div>';
   }
 
@@ -1760,8 +1975,21 @@ function init() {
         DATA.flagKeys.forEach(function (k) {
           bindSeg(el('f_' + col.key + '_' + k), function (v) {
             const now = Object.assign({}, value(col.key) || {});
-            if (v === 'yes') now[k] = true; else delete now[k];
+            /* '미확인'은 키를 지우는 것이다 — 이 파일에서 없는 키가 곧 미확인이라
+               false 로 두면 '가 봤는데 없다'가 되어 다른 말이 된다. */
+            if (v === '') delete now[k]; else now[k] = v === 'yes';
             setValue(col.key, Object.keys(now).length ? now : null);
+          });
+        });
+      } else if (col.type === 'parking') {
+        lots().forEach(function (_, i) {
+          bindSeg(el('f_' + col.key + '_fee_' + i), function (fee) {
+            setLots(lots().map(function (lot, j) {
+              if (j !== i) return lot;
+              const next = Object.assign({}, lot);
+              if (fee) next.fee = fee; else delete next.fee;
+              return next;
+            }));
           });
         });
       } else if (col.type === 'list') {
@@ -1784,8 +2012,15 @@ function init() {
         };
       });
     });
+    /* 주차 자리 하나를 뺀다. 목록이 비면 `setLots` 가 키를 지우므로 다시 미확인이
+       된다 — '확인했고 댈 데가 없다'는 [없음] 으로만 적힌다. */
+    document.querySelectorAll('[data-parkdrop]').forEach(function (btn) {
+      btn.onclick = function () { dropLot(Number(btn.dataset.parkdrop)); };
+    });
+    /* 값이 곧 시작할 주차 자리 번호다(-1 이면 코드가 고른다 — 자리가 하나뿐이거나
+       아예 없을 때). 찍는 중에는 이 단추 자리에 [끝내기]·[멈추기] 가 선다. */
     document.querySelectorAll('[data-draw]').forEach(function (btn) {
-      btn.onclick = toggleDraw;
+      btn.onclick = function () { startDraw(Number(btn.dataset.draw)); };
     });
     document.querySelectorAll('[data-goroute]').forEach(function (btn) {
       btn.onclick = scrollToRoute;
@@ -1803,11 +2038,48 @@ function init() {
     document.querySelectorAll('[data-drop]').forEach(function (btn) {
       btn.onclick = function () { dropPoint(Number(btn.dataset.drop)); };
     });
-    document.querySelectorAll('[data-cut]').forEach(function (btn) {
-      btn.onclick = function () { cut(Number(btn.dataset.cut)); renderForm(); };
+    /* [상세설정] — 편 것을 다시 접을 수도 있어야 한다. 경로 칸은 이미 길고, 다 적은
+       길의 구간표가 계속 펴져 있으면 아래 칸들이 화면 밖으로 밀린다. */
+    document.querySelectorAll('[data-detail]').forEach(function (btn) {
+      btn.onclick = function () {
+        detailOpen = !detailOn(activeRoute());
+        renderForm();
+      };
     });
-    document.querySelectorAll('[data-uncut]').forEach(function (btn) {
-      btn.onclick = function () { uncut(Number(btn.dataset.uncut)); renderForm(); };
+    /* 상세설정 안에서 한 조작은 상세설정을 **열린 채로 붙잡는다**. 자동 펼침은
+       '적어 둔 것이 있으면'이라, 마지막 구간을 지우는 순간 그 조건이 무너지면서
+       방금까지 손대고 있던 칸이 통째로 사라진다. */
+    document.querySelectorAll('[data-addseg]').forEach(function (btn) {
+      btn.onclick = function () {
+        addSegment(Number(btn.dataset.addseg));
+        detailOpen = true;
+        renderForm();
+      };
+    });
+    document.querySelectorAll('[data-segdel]').forEach(function (btn) {
+      btn.onclick = function () {
+        dropSegment(Number(btn.dataset.segdel));
+        detailOpen = true;
+        renderForm();
+      };
+    });
+    document.querySelectorAll('[data-clearseg]').forEach(function (btn) {
+      btn.onclick = function () {
+        const n = segments(activeRoute()).length;
+        if (!confirm('구간 ' + n + '개를 모두 지울까요?\\n'
+                     + '거기 적어 둔 노면상태·암릉암반·특색도 함께 사라집니다.')) {
+          return;
+        }
+        editRoute(active, { segments: [] });
+        detailOpen = true;
+        renderForm();
+      };
+    });
+    document.querySelectorAll('[data-sfrom]').forEach(function (node) {
+      node.onchange = function () {
+        moveSegment(Number(node.dataset.sfrom), Number(node.value));
+        renderForm();          /* 구간 경계는 지도 선 색이라 곧바로 다시 그린다 */
+      };
     });
     /* 길을 지우면 찍는 모드도 함께 끈다 — 점이 하나도 없는 채로 모드만 켜져 있으면
        지도를 눌러도 아무 일이 없어서 고장으로 보인다. */
@@ -1819,6 +2091,22 @@ function init() {
             && !confirm(routeName(list[i], i) + ' 을 지울까요?')) return;
         setRoutes(list.filter(function (_, j) { return j !== i; }));
         drawing = false;
+        detailOpen = null;
+        renderForm();
+      };
+    });
+    /* 길을 통째로 비운다. [이 길 지우기] 를 길 수만큼 누르게 하지 않는다 — 갈래가
+       셋이면 그것이 곧 세 번의 확인이고, 그 사이 한 번이라도 엉뚱한 길이 골라져
+       있으면 남기려던 것을 지운다. */
+    document.querySelectorAll('[data-delall]').forEach(function (btn) {
+      btn.onclick = function () {
+        const list = routes();
+        if (!confirm('이 관측지의 길 ' + list.length + '개를 모두 지울까요?\\n'
+                     + list.map(function (x, i) { return '· ' + routeName(x, i); })
+                       .join('\\n'))) return;
+        setRoutes([]);
+        drawing = false;
+        detailOpen = null;
         renderForm();
       };
     });
@@ -1826,19 +2114,13 @@ function init() {
       btn.onclick = function () {
         active = Number(btn.dataset.pickroute);
         drawing = false;
+        detailOpen = null;
         renderForm();
       };
     });
     document.querySelectorAll('[data-addroute]').forEach(function (btn) {
       btn.onclick = addRoute;
     });
-    document.querySelectorAll('[data-usewalk]').forEach(function (btn) {
-      btn.onclick = function () {
-        editRoute(active, { minutes: Number(btn.dataset.usewalk) });
-        renderForm();
-      };
-    });
-
     /* 글자를 치는 칸들은 다시 그리지 않는다 — 한 글자마다 다시 그리면 커서가
        칸 밖으로 튄다. 대신 위 목록의 이름표만 그 자리에서 바꿔 준다. */
     document.querySelectorAll('[data-rname]').forEach(function (node) {
@@ -1851,12 +2133,8 @@ function init() {
     });
     bindSeg(el('tr_' + active), function (v) {
       editRoute(active, { terrain: v });
+      detailOpen = true;       /* 지형도 상세설정 안에 있다 — 접히면 안 된다 */
       renderForm();            /* 배점표가 바뀌므로 등급을 다시 낸다 */
-    });
-    document.querySelectorAll('[data-rmin]').forEach(function (node) {
-      node.oninput = function () {
-        editRoute(Number(node.dataset.rmin), { minutes: node.value });
-      };
     });
     document.querySelectorAll('[data-snote]').forEach(function (node) {
       node.oninput = function () {
@@ -1980,36 +2258,6 @@ function init() {
 
   function fmtDist(m) { return m >= 1000 ? (m / 1000).toFixed(1) + 'km' : m + 'm'; }
 
-  /* 도로는 고를 것이 아니라 **읽고 판단할 것**이라 목록이 아니라 두 줄이다.
-     가장 가까운 길과 주행 가능한 길이 다르면 그 사실 자체가 답이다. */
-  /* 길에 대해 **잰 값만** 늘어놓는다 — 등급도, 등급에서 나온 판정도 없다.
-     폭·교행 여지는 원본에 거의 없으므로 없다고 적고, 그 자리는 위성·로드뷰가 맡는다. */
-  function roadHtml() {
-    if (!ctx) return '<div class="empty">재는 중…</div>';
-    const r = ctx.roads;
-    const legs = (r.legs || []).map(function (x) {
-      return '<li><span class="d">' + fmtDist(x.nearestM) + '</span>'
-        + '<span class="t"><b>' + esc(x.name || '이름 없는 길') + '</b>'
-        + '<span>' + esc(x.measured) + '</span></span></li>';
-    }).join('');
-    const pct = function (v) { return (100 * v).toFixed(1) + '%'; };
-
-    return '<div class="sub" style="margin:0 0 6px">도착 전 '
-      + (r.approachM / 1000) + 'km <span class="cap">— 주행 경로가 아니라 '
-      + '반경 안에 있는 길 목록이다</span></div>'
-      + (legs ? '<ul class="near">' + legs + '</ul>'
-              : '<div class="empty">반경 안에 도로가 없다</div>')
-      + (r.total > (r.legs || []).length
-          ? '<div class="empty" style="margin-top:6px">가까운 ' + r.legs.length
-            + '줄만 — 모두 ' + r.total + '줄</div>' : '')
-      + '<div class="empty" style="margin-top:8px">폭 ' + pct(r.coverage.width)
-      + ' · 차선 ' + pct(r.coverage.lanes) + ' · 노면 ' + pct(r.coverage.surface)
-      + ' 만 원본(OSM)에 있다. <b>앞에서 차가 오면 비켜설 수 있는지</b>는 데이터가 '
-      + '모른다 — 위성사진과 로드뷰로 보고 아래 칸에 적는다.</div>'
-      + '<div class="draft"><span>' + esc(r.summary) + '</span>'
-      + '<button id="useRoad">도로 상태 칸에 넣기</button></div>';
-  }
-
   function renderDetail() {
     const r = row();
     if (!r) {
@@ -2031,7 +2279,6 @@ function init() {
       + r.values.lat + ',' + r.values.lon + '">카카오맵에서 보기 →</a></div>'
       + '<section><h2>화장실 <span class="cap" id="tN"></span></h2>'
       + '<div id="toilets"></div></section>'
-      + '<section><h2>도로</h2><div id="roads"></div></section>'
       + '<section><h2>주차 후보</h2><div id="parking"></div></section>'
       /* 경로는 주차 지점에서 시작하므로 주차 바로 다음에 둔다. 찍는 일은 지도에서
          일어나지만 **되짚는 자리는 여기**다 — 몇 번째 점이 어디인지. */
@@ -2062,30 +2309,26 @@ function init() {
     el('toilets').innerHTML = toiletHtml();
     el('parking').innerHTML = parkingHtml();
     el('stores').innerHTML = storeHtml();
-    el('roads').innerHTML = roadHtml();
     el('tN').textContent = ctx
       ? '반경 ' + ctx.toilets.radiusM + 'm · ' + ctx.toilets.list.length + '곳' : '';
     el('sN').textContent = ctx
       ? '반경 ' + (ctx.stores.radiusM / 1000) + 'km · ' + ctx.stores.total + '곳' : '';
-    /* 접근 경로 초안을 `도로 상태` 칸에 옮긴다. 넣기만 하고 저장하지는 않는다 —
-       사람이 로드뷰를 보고 고쳐 쓴 뒤 [저장]을 누르는 흐름이라야 계산이 판단을
-       대신하지 않는다. */
-    const useRoad = el('useRoad');
-    if (useRoad && ctx) {
-      useRoad.onclick = function () {
-        setValue('road', ctx.roads.summary);
-        renderForm();
-      };
-    }
 
-    /* [지정] 은 셋 다 같은 일을 한다 — 후보 한 줄을 그 칸의 값으로 옮긴다. */
-    [['park', 'parking', 'parking'], ['toilet', 'toilet', 'toilets'],
-     ['store', 'store', 'stores']].forEach(function (spec) {
-      document.querySelectorAll('[data-' + spec[0] + ']').forEach(function (btn) {
-        btn.onclick = function () {
-          setPoint(spec[1], ctx[spec[2]].list[Number(btn.dataset[spec[0]])]);
-        };
+    /* [지정] 은 후보 한 줄을 그 칸의 값으로 옮긴다. 화장실·가게는 실제로 쓸 한 곳을
+       고르는 것이라 **갈아 끼우고**, 주차는 들머리가 갈리면 자리도 갈리므로
+       **더한다** — 그래서 여기만 다른 길로 보낸다. */
+    [['toilet', 'toilet', 'toilets'], ['store', 'store', 'stores']]
+      .forEach(function (spec) {
+        document.querySelectorAll('[data-' + spec[0] + ']').forEach(function (btn) {
+          btn.onclick = function () {
+            setPoint(spec[1], ctx[spec[2]].list[Number(btn.dataset[spec[0]])]);
+          };
+        });
       });
+    document.querySelectorAll('[data-park]').forEach(function (btn) {
+      btn.onclick = function () {
+        addLot(ctx.parking.list[Number(btn.dataset.park)]);
+      };
     });
   }
 
@@ -2202,6 +2445,7 @@ function init() {
     ctx = null;
     drawing = false;
     active = 0;
+    detailOpen = null;
     highlight();
     renderList();
     renderDetail();
@@ -2225,27 +2469,34 @@ function init() {
 
      첫 점만 코드가 놓는다. 도보 경로는 정의상 **주차 자리에서 시작**하는데 그
      좌표는 이미 지정돼 있으므로, 같은 자리를 눈대중으로 다시 찍게 하면 몇 m 씩
-     어긋난 시작점만 쌓인다. 주차 지점이 아직 없으면 그대로 첫 우클릭이 첫 점이다. */
+     어긋난 시작점만 쌓인다. 주차 지점이 아직 없으면 그대로 첫 우클릭이 첫 점이다.
+
+     주차 자리가 둘 이상이면 코드가 고르지 않는다 — 어느 들머리에서 오르는 길인지가
+     그 길의 정체이고, 짐작해서 놓은 첫 점은 나중에 아무도 틀린 줄 모른다. 그때는
+     [그리기] 자리에 자리마다 단추가 서고, 누른 자리가 첫 점이 된다. */
   function addRoute() {
     setRoutes(routes().concat([{ name: '', points: [] }]));
     active = routes().length - 1;
     drawing = false;
-    toggleDraw();
+    detailOpen = null;
+    startDraw(-1);
   }
 
-  function toggleDraw() {
-    if (!drawing) {
-      if (!routes().length) setRoutes([{ name: '', points: [] }]);
-      if (!points(activeRoute()).length) {
-        const pk = value('parking');
-        if (pk && pk.lat) editRoute(active, { points: [[pk.lat, pk.lon]] });
-      }
+  /* `at` 은 시작할 주차 자리 번호. -1 이면 코드가 고른다 — 자리가 하나뿐이면 그것,
+     아직 없으면 아무것도 놓지 않는다(첫 우클릭이 첫 점이다). */
+  function startDraw(at) {
+    if (drawing) { drawing = false; renderForm(); return; }
+    if (!routes().length) setRoutes([{ name: '', points: [] }]);
+    if (!points(activeRoute()).length) {
+      const list = lots();
+      const lot = at >= 0 ? list[at] : (list.length === 1 ? list[0] : null);
+      if (lot) editRoute(active, { points: [[lot.lat, lot.lon]] });
     }
-    drawing = !drawing;
+    drawing = true;
     renderForm();
     /* 켤 때 [경로] 칸을 화면 안으로 끌어온다. 우클릭 메뉴에서 켜면 오른쪽은 보던
        자리에 그대로 있어서, 점을 찍어도 목록이 화면 밖이면 확인할 수가 없다. */
-    if (drawing) scrollToRoute();
+    scrollToRoute();
   }
 
   function scrollToRoute() {
@@ -2313,7 +2564,8 @@ function init() {
                                  : '경로 이어 찍기')
           : '경로 그리기')
       + '</button>'
-      + '<button data-as="parking">주차 지점으로</button>'
+      + '<button data-as="parking">'
+      + (lots().length ? '주차 자리로 하나 더' : '주차 지점으로') + '</button>'
       + '<button data-as="toilet">화장실 위치로</button>'
       + '<button data-as="store">가게 위치로</button>'
       + '<button data-as="coords">관측 좌표로 옮기기</button>'
@@ -2332,8 +2584,9 @@ function init() {
   el('map').addEventListener('contextmenu', function (e) { e.preventDefault(); });
 
   /* 목록에 없는 자리도 지정할 수 있어야 한다 — 오름 초입 갓길, 원본에 없는 화장실.
-     칸이 늘어도 여기 손댈 것이 없게 `point` 칸이면 다 같은 길로 보낸다. */
-  const POINT_LABEL = { parking: '주차 지점', toilet: '화장실', store: '가게' };
+     칸이 늘어도 여기 손댈 것이 없게 `point` 칸이면 다 같은 길로 보낸다.
+     주차는 목록이라 여기 없다 — 갈아 끼우는 것이 아니라 더하기 때문이다. */
+  const POINT_LABEL = { toilet: '화장실', store: '가게' };
 
   function pickAs(what) {
     el('menu').style.display = 'none';
@@ -2343,8 +2596,14 @@ function init() {
        우클릭한 자리는 버리지 않고 그대로 경로에 넣는다(메뉴의 다른 항목들도
        모두 그 좌표를 쓴다). */
     if (what === 'route') {
-      if (!drawing) toggleDraw();
+      if (!drawing) startDraw(-1);
       addRoutePoint(new kakao.maps.LatLng(picking.lat, picking.lon));
+      return;
+    }
+    if (what === 'parking') {
+      const name = prompt('주차 자리 이름 (비워도 된다)', '');
+      if (name === null) return;
+      addLot({ name: name.trim(), lat: picking.lat, lon: picking.lon });
       return;
     }
     if (POINT_LABEL[what]) {
@@ -2546,7 +2805,7 @@ def _legend_html() -> str:
     )
     sources = "<br>".join(
         [darkness.SOURCE, nightlight.SOURCE, lamps.SOURCE,
-         parking.SOURCE, places.SOURCE, toilet.SOURCE, road.SOURCE]
+         parking.SOURCE, places.SOURCE, toilet.SOURCE]
     )
     return f'<h2>범례</h2>{body}<div class="foot">{sources}</div>'
 
@@ -2575,6 +2834,7 @@ def build_page(key: str, store: Spots) -> str:
         "columns": [vars(c) for c in columns],
         "choices": choices(spots, columns),
         "flagKeys": flag_keys(spots),
+        "parkingFee": list(PARKING_FEE),
         "addable": [[t, _TYPE_LABEL[t]] for t in ADDABLE],
         "colors": {
             "cap": _CAP_COLOR, "noGrid": _NO_GRID_COLOR, "toilet": _TOILET_COLOR,
@@ -2598,7 +2858,6 @@ def build_page(key: str, store: Spots) -> str:
         # 경로 길이는 화면이 찍을 때마다 다시 잰다. 같은 눈금·같은 근사를 쓰라고
         # 서버가 쓰는 값을 그대로 넘긴다.
         "kmPerDeg": lamps.KM_PER_DEG,
-        "walkMps": _WALK_MPS,
         "legendHtml": _legend_html(),
     }
     return (

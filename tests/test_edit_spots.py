@@ -4,8 +4,9 @@
 반쯤 이상한 값이 들어간 파일이 제일 나쁘고, 그건 다음에 열었을 때가 아니라 판정이
 그 관측지를 조용히 빼먹을 때 드러난다.
 
-경로만 본다. 나머지 형식(text·bool·point…)은 이 파일보다 오래됐고 쓰이는 곳도
-많아 이미 데이터로 검증돼 있다.
+경로와, 그와 같은 이유로 **여럿일 수 있는** 주차 자리를 본다. 나머지 형식
+(text·bool·point…)은 이 파일보다 오래됐고 쓰이는 곳도 많아 이미 데이터로 검증돼 있다.
+편의시설(`flags`)은 세 상태를 갖게 되면서 규약이 걸린 값이 되어 함께 본다.
 
 끝에 화면 코드 구문 검사가 하나 붙어 있다. 값 검증은 아니지만 같은 파일의 결함이고,
 그쪽은 틀려도 예외가 나지 않고 **검은 화면**으로만 드러나서 여기서 잡는 편이 빠르다.
@@ -26,6 +27,8 @@ from server import path
 from server.core import elevation
 
 _ROUTES = Column("walk_routes", "도보 경로", "routes")
+_PARKING = Column("parking", "주차 지점", "parking")
+_AMENITIES = Column("amenities", "편의시설", "flags")
 
 #: 제주 안의 두 점. 좌표 범위 검증(`_coord`)에 걸리지 않는 최소한의 선.
 _A = [33.4750, 126.8266]
@@ -78,15 +81,12 @@ def test_제주_밖_좌표를_막는다():
         coerce(_ROUTES, [{"points": [_A, [35.1, 129.0]]}])
 
 
-def test_도보_시간은_길마다_따로_붙는다():
-    # Given: 빠른 급경사길과 느린 완만한 길처럼 길마다 시간이 다를 때
-    # When: 분을 함께 보내면
-    # Then: 그 길에 정수로 붙는다 — 관측지 대표값(walk_minutes)과는 다른 값이다
-    assert coerce(_ROUTES, [_route(minutes="20")])[0]["minutes"] == 20
-    # 안 적었으면 키를 만들지 않는다
-    assert "minutes" not in coerce(_ROUTES, [_route(minutes="")])[0]
-    with pytest.raises(ValueError, match="1분보다"):
-        coerce(_ROUTES, [_route(minutes=0)])
+def test_도보_시간은_받지_않는다():
+    # Given: 옛 화면이 길마다 도보 시간을 적게 하던 시절의 값이 섞여 들어올 때
+    # When: 저장하면
+    # Then: 버린다 — 계단·오르막이 섞인 길의 분은 재도 눈대중이라 아예 두지 않는다.
+    #       힘든 정도는 경사·거리·노면·암릉으로 내는 탐방로 등급이 말한다
+    assert "minutes" not in coerce(_ROUTES, [_route(minutes="20")])[0]
 
 
 # --- 여러 갈래 ----------------------------------------------------------------
@@ -202,6 +202,79 @@ def test_지형은_배점표를_고르는_값이라_아무_말이나_못_적는�
     assert got[0]["terrain"] == "계곡·사면부"
     with pytest.raises(ValueError, match="모르는 지형"):
         coerce(_ROUTES, [_route(terrain="오름")])
+
+
+# --- 주차 자리 ----------------------------------------------------------------
+
+
+def test_안_봤으면_키를_지우고_봤는데_없으면_false_다():
+    # Given: 아직 안 본 관측지와, 가 봤는데 댈 데가 없던 관측지일 때
+    # When: 저장하면
+    # Then: 앞은 키가 없고 뒤는 false 다 — 둘을 같은 값으로 두면 남은 일이
+    #   파일에서 안 보인다
+    assert coerce(_PARKING, []) is None
+    assert coerce(_PARKING, None) is None
+    assert coerce(_PARKING, False) is False
+
+
+def test_들머리가_갈리면_자리도_갈린다():
+    # Given: 오름 하나에 남쪽 주차장과 북동쪽 갓길이 따로 있고 한쪽만 유료일 때
+    # When: 저장하면
+    # Then: 자리마다 요금이 따로 남는다 — 관측지에 한 값으로 적으면 어느 자리
+    #   말인지 알 수 없다
+    assert coerce(_PARKING, [
+        {"name": "남쪽 주차장", "lat": _A[0], "lon": _A[1], "fee": "유료"},
+        {"name": "북동쪽 갓길", "lat": _B[0], "lon": _B[1], "fee": "무료"},
+    ]) == [
+        {"name": "남쪽 주차장", "lat": _A[0], "lon": _A[1], "fee": "유료"},
+        {"name": "북동쪽 갓길", "lat": _B[0], "lon": _B[1], "fee": "무료"},
+    ]
+
+
+def test_요금을_아직_안_봤으면_키를_만들지_않는다():
+    # Given: 자리는 찍었는데 유료인지 무료인지는 아직 못 본 상태일 때
+    # When: 저장하면
+    # Then: fee 키가 없다 — 이 파일에서 없는 키가 곧 '아직 안 봤다'다
+    got = coerce(_PARKING, [{"name": "", "lat": _A[0], "lon": _A[1], "fee": ""}])
+    assert got == [{"name": "", "lat": _A[0], "lon": _A[1]}]
+
+
+def test_모르는_요금을_막는다():
+    # Given: 유료·무료 밖의 말이 왔을 때
+    # When: 저장하면
+    # Then: 막는다 — 액수는 `요금` 칸이 받고 여기는 돈을 받는가만 둔다
+    with pytest.raises(ValueError, match="모르는 요금"):
+        coerce(_PARKING, [{"lat": _A[0], "lon": _A[1], "fee": "3000원"}])
+
+
+def test_주차_자리도_제주_밖을_막는다():
+    with pytest.raises(ValueError, match="제주 밖"):
+        coerce(_PARKING, [{"lat": 35.1, "lon": 129.0}])
+
+
+# --- 편의시설 -----------------------------------------------------------------
+
+
+def test_편의시설은_세_상태다():
+    # Given: 화장실을 가 봤는데 없던 관측지일 때
+    # When: 저장하면
+    # Then: false 가 그대로 남는다 — 한때 true 만 남겼는데, 그러면 확인하러 간
+    #   관측지와 아직 안 본 관측지가 파일에서 같아 보인다
+    assert coerce(_AMENITIES, {"toilet": False}) == {"toilet": False}
+    assert coerce(_AMENITIES, {"toilet": True}) == {"toilet": True}
+    assert coerce(_AMENITIES, {}) is None
+
+
+def test_편의시설의_미확인은_키가_없는_것이다():
+    # Given: 화면이 '미확인'을 고른 항목을 아예 빼고 보냈을 때
+    # When: 저장하면
+    # Then: 그 키가 없다. 남은 항목만 적힌다
+    assert coerce(_AMENITIES, {"toilet": False, "bench": None}) == {"toilet": False}
+
+
+def test_편의시설에_예_아니오가_아닌_값을_막는다():
+    with pytest.raises(ValueError, match="예·아니오"):
+        coerce(_AMENITIES, {"toilet": "있음"})
 
 
 # --- 만들어진 페이지 ----------------------------------------------------------

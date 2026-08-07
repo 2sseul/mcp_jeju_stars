@@ -86,7 +86,10 @@ def absorb(spot: dict, row: dict) -> list[str]:
     """이미 있는 곳에 새로 안 사실만 채운다. 기존 값은 덮지 않는다."""
     gained = []
     if "parking_point" in row and "parking" not in spot:
-        spot["parking"] = row["parking_point"]
+        # `parking` 은 자리 목록이다(들머리가 갈리면 대는 자리도 갈린다). 전수 수집이
+        # 아는 것은 최근접 한 곳뿐이라 한 칸짜리 목록으로 넣는다 — 나머지는 로드뷰
+        # 검증에서 `edit_spots.py` 가 더한다.
+        spot["parking"] = [row["parking_point"]]
         gained.append("주차좌표")
     if row.get("toilet_on_site") and "amenities" not in spot:
         spot["amenities"] = {"toilet": True}
@@ -117,7 +120,7 @@ def to_spot(row: dict) -> dict:
         "discovery": "kakao_sweep",
     }
     if "parking_point" in row:
-        spot["parking"] = row["parking_point"]
+        spot["parking"] = [row["parking_point"]]
     if row.get("toilet_on_site"):
         spot["amenities"] = {"toilet": True}
     if row.get("campsite"):

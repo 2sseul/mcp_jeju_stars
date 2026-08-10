@@ -128,13 +128,7 @@ if __name__ == "__main__":
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
 
-    # 네트워크 없이 되는 단위 검증부터.
-    assert _clean(None) is None
-    assert _clean(float("nan")) is None
-    assert _clean(42) == 42.0
-    print("PASS _clean")
-
-    # 라이브 조회 데모(네트워크 필요).
+    # 라이브 조회 데모(네트워크 필요). 값 정규화 단위 검증은 tests/test_schema.py 에 있다.
     JEJU_LAT, JEJU_LON = 33.5097, 126.5219
     now = datetime.now(KST)
     tonight = now.replace(hour=20, minute=0, second=0, microsecond=0)

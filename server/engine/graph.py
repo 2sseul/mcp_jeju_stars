@@ -1,35 +1,28 @@
-"""P0 엔진 — astro → weather → judge → darkness 를 LangGraph StateGraph 로 잇는다.
+"""엔진 — astro → weather → judge → darkness 를 LangGraph StateGraph 로 잇는다.
 
-각 노드는 계획서의 provider/factor 역할을 한다. 축을 '하나씩' 추가하며 확장한다 —
-그때도 이 파일의 그래프 조립과 state 계약은 안 바뀐다(엣지·노드만 늘어남). P1 어둡기
-(광공해) 축을 darkness_node 로 붙였다. 별 개수 등은 이후 단계.
+축을 '하나씩' 추가하며 확장한다 — 그때도 이 파일의 그래프 조립과 state 계약은
+안 바뀐다(엣지·노드만 늘어남). 어둡기(광공해) 축이 darkness_node 로 그렇게 붙었다.
+별 개수 축은 이후 단계.
 
-계산 모듈(data/script/{astro,judge,open_meteo,darkness})은 아직 PR 검토 중이라 옮기지
-않고 import 만 한다. P1/P2 에서 server/providers·factors 로 정식 이관 예정.
+계산 모듈은 `server/core`(순수함수) · 네트워크는 `server/clients` 로 나뉜다.
+core 는 API·LLM 을 호출하지 않고, 이 파일이 둘을 조립한다.
 """
 
 from __future__ import annotations
 
-import sys
-from datetime import datetime
-from pathlib import Path
+from datetime import datetime, timedelta
 
 from langgraph.graph import END, START, StateGraph
 
+from server.clients import open_meteo
+from server.core import astro
+from server.core import darkness as _darkness
+from server.core import judge as _judge
+from server.core import lamps as _lamps
+from server.core import nightlight as _nightlight
+from server.core import tonight as _tonight
+
 from .state import EngineState
-
-# --- 계산 모듈 import 브리지 (임시) -------------------------------------------
-# data/script 를 패키지로 만들지 않고 경로만 추가해 그대로 재사용한다.
-_CALC = Path(__file__).resolve().parents[2] / "data" / "script"
-if str(_CALC) not in sys.path:
-    sys.path.insert(0, str(_CALC))
-
-import astro  # noqa: E402
-import darkness as _darkness  # noqa: E402
-import judge as _judge  # noqa: E402
-import open_meteo  # noqa: E402
-import tonight as _tonight  # noqa: E402
-
 
 # --- 노드 --------------------------------------------------------------------
 
@@ -95,11 +88,15 @@ def weather_node(state: EngineState) -> dict:
 
 
 def judge_node(state: EngineState) -> dict:
-    """상태·총운량·시정 → 관측 등급(운영 정책)."""
+    """상태·총운량·시정 → 관측 등급(운영 정책). 광공해 상한을 함께 받는다.
+
+    darkness_node 가 먼저 돌아야 상한이 채워진다(그래서 엣지가 darkness → judge 다).
+    """
     result = _judge.judge(
         state.get("state_code"),
         state.get("cloud"),
         state.get("visibility"),
+        state.get("darkness_cap"),
     )
     return {
         "verdict": result.verdict,
@@ -108,11 +105,15 @@ def judge_node(state: EngineState) -> dict:
     }
 
 
-def _darkness_numbers(d) -> dict | None:
-    """Darkness 판정 → numbers 조각(순간·밤 경로 공유). 결측이면 None."""
+def _darkness_numbers(site) -> dict | None:
+    """Site(어둡기 종합) → numbers 조각(순간·밤 경로 공유). SQM 결측이면 None.
+
+    세 신호를 평탄한 키로 편다 — 소비자(LLM)가 보는 키 모양을 한 겹으로 유지한다.
+    """
+    d = site.darkness
     if d is None:
         return None
-    return {
+    nums = {
         "sqm": d.sqm,
         "falchi_grade": d.falchi_grade,
         "falchi_label": d.falchi_label,
@@ -120,28 +121,43 @@ def _darkness_numbers(d) -> dict | None:
         "artificial_mcd": d.artificial_mcd,
         "light_pollution_ratio": d.ratio,
         "milky_way": d.milky_way,
+        "darkness_score": site.score,
+        "darkness_cap": site.cap,
+        "lamp_nearest_m": site.lamps.nearest_m,
+        "lamp_within_100m": site.lamps.near,
+        "lamp_within_500m": site.lamps.mid,
+        "lamp_within_1km": site.lamps.far,
     }
+    if site.nightlight is not None:
+        nums["viirs_near_max"] = site.nightlight.near_max
+        nums["viirs_wide_max"] = site.nightlight.wide_max
+    return nums
+
+
+#: 어둡기 축이 쓰는 세 데이터의 귀속. 세 신호를 다 쓰므로 셋을 함께 싣는다.
+_DARKNESS_SOURCES = [_darkness.SOURCE, _nightlight.SOURCE, _lamps.SOURCE]
 
 
 def darkness_node(state: EngineState) -> dict:
-    """광공해(어둡기) → 장소의 고정 속성(SQM·Falchi·Bortle). 정적이라 시각과 무관.
+    """광공해(어둡기) → 장소의 고정 속성. SQM·VIIRS·가로등 셋을 모아 점수·상한까지.
 
-    verdict 등급은 바꾸지 않는다(어둡기 판정 편입은 이후 단계) — 수치를 numbers 에
-    담고 사람이 읽는 한 줄을 reasons 에 더한다. '은하수까지'라는 판정 문구의 정정은
-    run() 이 milky_way 로 처리한다(judge 는 장소를 모르는 순수 함수로 유지).
+    정적 속성이라 시각과 무관하다. 여기서 낸 상한(cap)을 judge 가 받아 등급을
+    끌어내린다 — 그래서 이 노드가 judge 보다 **먼저** 돈다.
     """
-    d = _darkness.assess(state["lat"], state["lon"])
-    nums = _darkness_numbers(d)
+    site = _darkness.assess_site(state["lat"], state["lon"])
+    nums = _darkness_numbers(site)
     if nums is None:
+        # SQM(주 기준)이 없으면 점수를 내지 않는다. 응답 '모양'은 같게 유지한다.
         return {
             "numbers": {"darkness": None},
             "reasons": ["이 지점은 광공해 격자 밖이거나 데이터가 없어요(해상 등)"],
-            "attribution": [_darkness.SOURCE],
+            "attribution": _DARKNESS_SOURCES,
         }
     return {
+        "darkness_cap": site.cap,
         "numbers": nums,
-        "reasons": [_darkness.describe(d)],
-        "attribution": [_darkness.SOURCE],
+        "reasons": _darkness.describe_site(site),
+        "attribution": _DARKNESS_SOURCES,
     }
 
 
@@ -153,11 +169,12 @@ def _build():
     g.add_node("weather", weather_node)
     g.add_node("judge", judge_node)
     g.add_node("darkness", darkness_node)
+    # 어둡기가 judge 보다 앞이다 — judge 가 그 상한(cap)을 받아 등급을 정하기 때문.
     g.add_edge(START, "astro")
     g.add_edge("astro", "weather")
-    g.add_edge("weather", "judge")
-    g.add_edge("judge", "darkness")
-    g.add_edge("darkness", END)
+    g.add_edge("weather", "darkness")
+    g.add_edge("darkness", "judge")
+    g.add_edge("judge", END)
     return g.compile()
 
 
@@ -213,6 +230,7 @@ def run_tonight(lat: float, lon: float, when: datetime) -> dict:
         {"window": {"start": iso, "end": iso} | None,
          "summary": <tonight.summarize dict> | None,
          "darkness": <_darkness_numbers dict> | None,
+         "darkness_reasons": [str, ...],
          "milky_way_caveat": str | None,
          "attribution": [...]}
         완전한 밤이 없거나(백야 등) 조회 실패면 summary 는 None. 광공해(darkness)는
@@ -221,22 +239,22 @@ def run_tonight(lat: float, lon: float, when: datetime) -> dict:
     attribution = ["천체력: JPL DE421 via Skyfield"]
 
     # 광공해는 정적(장소 속성)이라 밤 구간·조회와 독립. 한 번 구해 모든 반환에 싣는다.
-    d = _darkness.assess(lat, lon)
-    darkness = _darkness_numbers(d)
-    if d is not None:
-        caveat = _darkness.milky_way_caveat(d)
-        darkness_reason = _darkness.describe(d)
-        attribution.append(_darkness.SOURCE)
+    site = _darkness.assess_site(lat, lon)
+    darkness = _darkness_numbers(site)
+    if site.darkness is not None:
+        caveat = _darkness.milky_way_caveat(site.darkness)
+        darkness_reasons = _darkness.describe_site(site)
+        attribution.extend(_DARKNESS_SOURCES)
     else:
         caveat = None
-        darkness_reason = "이 지점은 광공해 격자 밖이거나 데이터가 없어요(해상 등)"
+        darkness_reasons = ["이 지점은 광공해 격자 밖이거나 데이터가 없어요(해상 등)"]
 
     def _result(window, summary, extra_attr=None) -> dict:
         return {
             "window": window,
             "summary": summary,
             "darkness": darkness,
-            "darkness_reason": darkness_reason,
+            "darkness_reasons": darkness_reasons,
             "milky_way_caveat": caveat,
             "attribution": attribution + (extra_attr or []),
         }
@@ -247,8 +265,12 @@ def run_tonight(lat: float, lon: float, when: datetime) -> dict:
     start, end = window
 
     # 외부 I/O 는 실패해도 스키마를 깨지 않는다(순간 그래프의 weather_node 와 같은 규율).
+    # 밤 창의 시작·끝은 대개 정시가 아니다(예: 20:03~05:15). fetch_series 는 구간을
+    # 정시로 내림하므로 그대로 쓰면 ① 창 앞 정시(20:00)가 딸려 들어오고 ② 창 안의
+    # 마지막 정시(05:00)가 빠진다. 끝을 한 시간 넉넉히 받아 두고, 창 안에 실제로
+    # 들어오는 정시만 아래에서 걸러낸다(decisions.md §2.8).
     try:
-        series = open_meteo.fetch_series(lat, lon, start, end)
+        series = open_meteo.fetch_series(lat, lon, start, end + timedelta(hours=1))
         attribution.append("기상: Open-Meteo (open-meteo.com)")
     except Exception:  # noqa: BLE001 — 외부 I/O 경계, 스키마 보장이 우선
         return _result(_iso_window(start, end), None, ["기상: Open-Meteo (조회 실패)"])
@@ -256,8 +278,11 @@ def run_tonight(lat: float, lon: float, when: datetime) -> dict:
     hours = []
     for row in series:
         t = row["time"]
+        if t < start or t >= end:  # 밤 창 밖 정시는 집계에서 제외
+            continue
         state = astro.twilight_state(lat, lon, t)
-        result = _judge.judge(state, row["cloud_cover"], row["visibility"])
+        # 밤 집계의 매 정시도 순간 판정과 같은 광공해 상한을 받는다(같은 장소이므로).
+        result = _judge.judge(state, row["cloud_cover"], row["visibility"], site.cap)
         hours.append(
             _tonight.HourResult(t, result.verdict, result.possible, row["cloud_cover"])
         )

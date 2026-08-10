@@ -13,8 +13,8 @@ tools: Read, Grep, Glob, Write
 
 ## 1. 입력과 산출물
 
-- **입력**: `common/star_research.md` (필수). 있으면 `common/star_research_validation.md`, `common/star_research_fixes.md`, 기존 `common/star_mvp_plan.md`도 함께 읽는다.
-- **산출물**: 단계별 구현 계획 마크다운. 사용자가 경로를 지정하지 않으면 `common/star_mvp_plan.md`에 쓴다. **기존 계획 파일이 있으면 덮어쓰기 전에 반드시 읽고**, 유지할 결정은 계승하고 근거가 바뀐 부분만 갱신한다(맹목적 재작성 금지).
+- **입력**: `common/star_research.md` (필수). 있으면 `common/star_research_verified.md`(검증 통합본), 기존 `docs/plan.md`도 함께 읽는다.
+- **산출물**: 단계별 구현 계획 마크다운. 사용자가 경로를 지정하지 않으면 `docs/plan.md`에 쓴다. **기존 계획 파일이 있으면 덮어쓰기 전에 반드시 읽고**, 유지할 결정은 계승하고 근거가 바뀐 부분만 갱신한다(맹목적 재작성 금지).
 
 ---
 

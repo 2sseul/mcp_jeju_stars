@@ -14,6 +14,13 @@ clear sky 를 "운량 10% 미만 AND 투과율 변동 10% 미만" 으로 두 조
 가중합으로 단일 점수를 만들면 검증할 수 없는 계수가 생기므로 쓰지 않는다.
 (Kerber et al. 2014 — A&A 2022, 10.1051/0004-6361/202142493 에서 재인용)
 
+**광공해(어둡기 장소 속성)는 예외로 등급에 관여한다** — 단, 위 원칙을 지키려고
+가중합에 끼워 넣지 않고 **상한(cap)** 으로만 받는다(`darkness_cap` 인자). 구름·박명이
+정한 등급을 끌어내릴 수는 있어도 올리지는 못한다. 광공해 안쪽(SQM·VIIRS·가로등)의
+가중합은 `darkness.py` 소관이고, 이 모듈은 그 결과 등급 하나만 받는다. 셋은 같은
+물리량(인공 광원)을 다른 규모로 잰 값이라 합치는 것이 성립하지만, 구름·박명은 성격이
+다른 축이라 여전히 합치지 않는다.
+
 
 1. 어둡기 축
 --------------------------------------------------------------------------
@@ -184,6 +191,7 @@ def judge(
     state: int,
     cloud_cover: float | None,
     visibility_m: float | None,
+    darkness_cap: str | None = None,
 ) -> Judgement:
     """태양 고도 상태·총운량·시정으로 관측 등급을 판정한다.
 
@@ -192,6 +200,8 @@ def judge(
         cloud_cover: 총운량 비율(%, 0~100). 없으면 None. 지면 기준이라 고지대에서는
                      관측자 발밑의 운해도 포함된다(모듈 docstring 2절의 한계).
         visibility_m: 시정(m). 없으면 None.
+        darkness_cap: 광공해가 정한 등급 **상한**(darkness.cap_of 반환값). None 이면
+                     제한 없음. 등급을 끌어내리기만 하고 올리지는 않는다.
 
     Returns:
         Judgement(verdict, possible, reasons).
@@ -213,7 +223,13 @@ def judge(
     # 어둡기 축과 차폐 축 중 나쁜 쪽을 따른다.
     verdict = _BY_RANK[max(_RANK[sky_verdict], _RANK[cloud_grade])]
 
-    if verdict == IMPOSSIBLE:
+    # 광공해 상한도 같은 방식으로 나쁜 쪽만 취한다 — 끌어내리기만 하고 올리지 않는다.
+    # (구름이 '불가'인데 어두운 장소라고 '양호'로 올라가면 안 된다.)
+    capped = verdict
+    if darkness_cap in _RANK:
+        capped = _BY_RANK[max(_RANK[verdict], _RANK[darkness_cap])]
+
+    if capped == IMPOSSIBLE:
         return Judgement(
             IMPOSSIBLE,
             False,
@@ -235,87 +251,13 @@ def judge(
     else:
         reasons.append(f"공기 맑음 (수평시정 {_km(visibility_m)})")
 
-    return Judgement(verdict, True, reasons)
+    # 광공해가 실제로 등급을 끌어내렸을 때만 그 사실을 밝힌다 — 하늘·구름은 좋은데
+    # 등급이 낮은 이유가 장소에 있음을 알려야 '다른 곳으로'를 택할 수 있다.
+    if capped != verdict:
+        reasons.append(
+            f"하늘과 날씨는 '{verdict}'이지만 이 지점은 광공해가 있어 "
+            f"'{capped}'까지로 봅니다 — 더 어두운 곳으로 가면 나아져요"
+        )
 
+    return Judgement(capped, True, reasons)
 
-# --- 검증 (API 불필요) --------------------------------------------------------
-
-if __name__ == "__main__":
-    import sys
-
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8")
-
-    cases = [
-        # (이름, 상태, 총운량, 시정, 기대 등급)
-        # 어둡기 축 — 구름이 없을 때 태양 고도가 그대로 등급이 된다.
-        ("완전한밤+맑음", 0, 5.0, 20_000.0, OPTIMAL),
-        ("천문박명+맑음", 1, 5.0, 20_000.0, GOOD),
-        ("항해박명+맑음", 2, 5.0, 20_000.0, LIMITED),
-        ("시민박명(너무밝음)", 3, 0.0, 30_000.0, IMPOSSIBLE),
-        ("낮", 4, 0.0, 30_000.0, IMPOSSIBLE),
-        # 차폐 축 — 나쁜 쪽이 등급을 결정한다.
-        ("완전한밤+운량80", 0, 80.0, 20_000.0, IMPOSSIBLE),
-        ("완전한밤+운량45", 0, 45.0, 20_000.0, LIMITED),
-        ("완전한밤+운량28", 0, 28.0, 20_000.0, GOOD),
-        ("천문박명+운량45", 1, 45.0, 20_000.0, LIMITED),
-        # 결측 — 총운량이 없으면 알 수 없음.
-        ("완전한밤+운량데이터없음", 0, None, 20_000.0, UNKNOWN),
-        ("천문박명+운량데이터없음", 1, None, 20_000.0, UNKNOWN),
-        # 시정 = 참고 정보. 어떤 값이든 등급을 바꾸지 않는다.
-        ("완전한밤+안개", 0, 10.0, 400.0, OPTIMAL),
-        ("천문박명+안개", 1, 10.0, 400.0, GOOD),
-        ("항해박명+안개", 2, 10.0, 400.0, LIMITED),
-        ("완전한밤+연무", 0, 10.0, 5_000.0, OPTIMAL),
-        ("완전한밤+시정없음", 0, 10.0, None, OPTIMAL),
-        # 표기 경계 — 문구만 바뀌고 등급은 동일해야 한다.
-        ("시정 999m(안개 문구)", 0, 10.0, 999.0, OPTIMAL),
-        ("시정 1000m(연무 문구)", 0, 10.0, 1_000.0, OPTIMAL),
-        ("시정 9999m(연무 문구)", 0, 10.0, 9_999.0, OPTIMAL),
-        ("시정 10000m(맑음 문구)", 0, 10.0, 10_000.0, OPTIMAL),
-        # 사다리 경계 — 절벽이 아니라 단계적으로 내려간다.
-        ("운량 10%", 0, 10.0, 20_000.0, OPTIMAL),
-        ("운량 11%", 0, 11.0, 20_000.0, GOOD),
-        ("운량 30%", 0, 30.0, 20_000.0, GOOD),
-        ("운량 31%", 0, 31.0, 20_000.0, LIMITED),
-        ("운량 50%", 0, 50.0, 20_000.0, LIMITED),
-        ("운량 51%", 0, 51.0, 20_000.0, IMPOSSIBLE),
-        # 시정이 무너져도(안개 140m) 등급은 총운량만 따른다 — 시정은 문구 전용.
-        ("총운량 0% + 안개 140m", 0, 0.0, 140.0, OPTIMAL),
-    ]
-
-    failed = 0
-    for name, st, cc, vis, expected in cases:
-        r = judge(st, cc, vis)
-        ok = r.verdict == expected
-        failed += not ok
-        mark = {True: "가능", False: "불가", None: "미상"}[r.possible]
-        print(f"{'PASS' if ok else 'FAIL'} [{name}] -> {r.verdict}({mark})"
-              f"{'' if ok else f', 기대={expected}'} : {', '.join(r.reasons)}")
-
-    # 불변식 1: 시정은 등급을 바꾸지 않는다.
-    for st in (0, 1, 2):
-        base = judge(st, 0.0, 20_000.0).verdict
-        for vis in (0.0, 50.0, 999.0, 1_000.0, 9_999.0, None):
-            got = judge(st, 0.0, vis)
-            assert got.possible, f"시정 {vis} 가 불가를 만들었다"
-            assert got.verdict == base, f"시정 {vis} 가 등급을 {base}→{got.verdict} 로 바꿨다"
-
-    # 불변식 2: 총운량이 늘어나면 등급은 나빠지기만 한다(단조성).
-    for st in (0, 1, 2):
-        prev = -1
-        for pct in range(0, 101, 5):
-            v = judge(st, float(pct), 20_000.0).verdict
-            cur = _RANK[v]
-            assert cur >= prev, f"상태{st} 총운량 {pct}% 에서 등급이 좋아졌다"
-            prev = cur
-
-    # 불변식 3: 어둡기 축보다 좋아질 수 없다.
-    for st in (0, 1, 2):
-        ceiling = _RANK[_SKY[st][0]]
-        for cc in range(0, 101, 10):
-            v = judge(st, float(cc), 20_000.0).verdict
-            assert _RANK[v] >= ceiling, f"상태{st} 총운량{cc}% 가 어둡기 상한을 넘었다"
-
-    print(f"\n{len(cases) - failed}/{len(cases)} 통과")
-    sys.exit(1 if failed else 0)

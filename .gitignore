@@ -27,3 +27,7 @@ outputs/
 # 원본 tif 도 거기서 만든 npz 도 커밋하지 않는다 — 저장소가 나르는 것은
 # `scripts/build_elevation_grid.py` 뿐이고, 받은 사람이 한 번 돌리면 된다.
 data/elevation/
+
+# 토지대장 원본(375MB). GitHub 100MB 제한을 넘고 코드가 읽지 않는다 —
+# 저장소가 나르지 않고 로컬에만 둔다.
+data/land/

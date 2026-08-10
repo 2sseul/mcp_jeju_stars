@@ -38,13 +38,25 @@ DEM 자신의 오차보다 한참 아래라 의미가 없고, int16 이면 파�
 원본 타일
 --------------------------------------------------------------------------
 제주는 1도 x 1도 타일 **한 장**에 다 든다(N33E126 이 위도 33~34 · 경도 126~127 을
-덮고, 제주는 33.19~33.56 · 126.15~126.97). 4.8MB.
+덮고, 제주는 33.19~33.56 · 126.15~126.97). 6.7MB.
 
     원본  https://data.bris.ac.uk/data/dataset/s5hqmjcdj8yo2ibzi9b4ew3sn
-    미러  huggingface.co/datasets/links-ads/fabdem-v12 (타일 낱개로 받을 수 있다)
+    미러  huggingface.co/buckets/links-ads/fabdem (타일 낱개로 받을 수 있다)
+    목록  huggingface.co/datasets/links-ads/fabdem-v12 (STAC 카탈로그만)
 
 원본 저장소는 10도 x 10도 zip 으로만 주므로 타일 하나를 받으려고 수 GB 를 내려받게
 된다. 그래서 미러에서 낱개로 받는다.
+
+미러가 2025-09 에 tif 를 `datasets/links-ads/fabdem-v12` 에서 `buckets/links-ads/fabdem`
+로 옮겼다(데이터셋 쪽에는 STAC 메타데이터만 남았다). 다시 옮겨져 404 가 나면 STAC
+아이템의 `assets.DEM.href` 가 정답이다:
+
+    huggingface.co/datasets/links-ads/fabdem-v12/resolve/main
+        /stac_catalog/N33E126_FABDEM_V1-2/N33E126_FABDEM_V1-2.json
+
+화소값은 그대로고 컨테이너만 COG 로 다시 쓴 것이라(내부 512x512 타일 · DEFLATE
+predictor 2 · 오버뷰 2/4/8) `tifffile` 로 읽을 때 `imagecodecs` 가 필요하고,
+전체 해상도는 `pages[0]` 이다(뒤 페이지는 오버뷰).
 
 실행:
     uv run --with tifffile --with imagecodecs python -m scripts.build_elevation_grid
@@ -62,7 +74,7 @@ from server import path
 #: 제주가 드는 1도 x 1도 타일.
 TILE = "N33E126_FABDEM_V1-2"
 URL = (
-    "https://huggingface.co/datasets/links-ads/fabdem-v12/resolve/main"
+    "https://huggingface.co/buckets/links-ads/fabdem/resolve"
     f"/tiles/N30E120-N40E130_FABDEM_V1-2/{TILE}.tif"
 )
 
@@ -87,7 +99,7 @@ SOURCE = (
 
 def _fetch(dest) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
-    print(f"타일 내려받는 중 (약 5MB) — {URL}")
+    print(f"타일 내려받는 중 (약 7MB) — {URL}")
     urllib.request.urlretrieve(URL, dest)
 
 

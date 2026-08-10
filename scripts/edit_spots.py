@@ -12,7 +12,8 @@
 한 화면에서 하는 일
 --------------------------------------------------------------------------
     광공해   `core.darkness.assess_site` 세 신호를 그대로 — 리포트·판정과 같은 숫자
-    화장실   `core.toilet` 반경 200m. 없으면 가장 가까운 곳까지의 거리를 말한다
+    화장실   `core.toilet` 반경 200m. 없으면 가장 가까운 곳까지의 거리를 말한다.
+             쓸 만한 곳이 여럿이면 **여럿 지정한다**(아래)
     주차     `core.parking`(공영) + `core.places`(카카오) 1km 안 후보 — 눌러서 지정.
              들머리가 여럿이면 여럿 지정하고, 요금은 **자리마다** 적는다
     도보     주차 지점 → 관측 자리 경로를 **지도에서 직접 찍는다**(아래)
@@ -79,6 +80,19 @@
 노면이 관측지가 아니라 **구간에 붙는** 이유는, 한 길에서 그것이 바뀌기 때문이다 —
 야자매트로 오르다 데크계단이 나오고 능선은 맨 흙길이다. 관측지에 한 값으로 적으면
 그 길에서 제일 나쁜 자리 하나만 남고 어디서 그런지는 사라진다.
+
+한 자리로 적을 수 없는 것들 — 주차 · 화장실
+--------------------------------------------------------------------------
+주차 지점(`parking`)과 화장실(`toilet`)은 **목록**이다. 이유는 서로 다르다.
+
+주차는 오름 하나에 들머리가 갈리기 때문이고(다랑쉬오름의 남쪽 주차장 / 북동쪽
+갓길), 그래서 요금도 자리마다 붙는다. 화장실은 **밤에 열려 있는 곳이 어디일지
+모르기 때문**이다 — 주차장 옆 한 곳과 들머리 위 한 곳이 다 있는 자리에서 한 곳만
+남기면, 가 보고 잠겨 있을 때 나머지가 파일에 없다. 어느 쪽을 쓸지는 그날 밤에
+정할 일이라 여기서는 **본 것을 다 적는다**.
+
+둘 다 `point` 의 세 상태(미확인 · 없음 · 자리)를 그대로 두고 자리만 여럿이 된
+것이라, `false` 는 여전히 "가 봤는데 없다"이고 빈 목록이 아니다.
 
 없는 키가 곧 '미확인'이다
 --------------------------------------------------------------------------
@@ -234,7 +248,8 @@ class Column:
         number         숫자                bool    3단(미확인·예·아니오)
         list           문자열 목록(줄 단위) flags   {이름: 3단} 묶음(편의시설)
         point          {name, lat, lon}    coords  관측지 자신의 lat·lon
-        parking        주차 자리 여럿 — 자리마다 요금(위 `point` 의 세 상태 그대로)
+        points         자리 여럿 — `point` 의 세 상태 그대로에 좌표만 여럿(화장실)
+        parking        주차 자리 여럿 — `points` 에 자리마다 요금이 더 붙는다
         routes         도보 경로 묶음        — 지도에서 찍는 선(아래)
     """
 
@@ -275,9 +290,9 @@ _BUILTIN: tuple[Column, ...] = (
            "길이 갈리면 경로를 여러 개 둔다"),
     Column("walk_type", "도보 유형", "choice", "주차 지점에서 관측 자리까지의 오르내림",
            options=("평지", "등반", "차량")),
-    Column("toilet", "화장실 위치", "point",
-           "실제로 쓸 한 곳. 목록에 없으면 지도 우클릭으로 찍고, "
-           "가 봤는데 없으면 [없음]"),
+    Column("toilet", "화장실 위치", "points",
+           "쓸 만한 곳을 다 적는다 — 밤에 어느 쪽이 열려 있을지는 여기서 알 수 없다. "
+           "목록에 없으면 지도 우클릭으로 찍고, 가 봤는데 없으면 [없음]"),
     Column("store", "가게 위치", "point",
            "밤에 들를 가게. 목록에 없으면 지도 우클릭으로 찍고, 없으면 [없음]"),
     Column("amenities", "편의시설", "flags",
@@ -410,15 +425,16 @@ def coerce(column: Column, value):
             flags[name] = flag
         return flags or None
 
-    if column.type == "parking":
+    if column.type in ("points", "parking"):
         # `point` 의 세 상태에 **여럿**이 더해진 것 — 키 없음(미확인) ·
-        # false(확인했고 댈 데가 없다) · 자리 목록.
+        # false(확인했고 없다) · 자리 목록. 빈 목록은 값이 아니라 미확인이다.
         if value is False:
             return False
-        lots = list(value or [])
-        if not lots:
+        items = list(value or [])
+        if not items:
             return None
-        return [_parking(lot, f"{column.label} {i}") for i, lot in enumerate(lots, 1)]
+        one = _parking if column.type == "parking" else _place
+        return [one(item, f"{column.label} {i}") for i, item in enumerate(items, 1)]
 
     if column.type == "point":
         # 세 상태다 — 키 없음(미확인) · false(확인했고 없다) · 좌표(여기 있다).
@@ -427,8 +443,7 @@ def coerce(column: Column, value):
             return False
         if not value:
             return None
-        lat, lon = _coord(value.get("lat"), value.get("lon"), column.label)
-        return {"name": _text(value.get("name")), "lat": lat, "lon": lon}
+        return _place(value, column.label)
 
     if column.type == "coords":
         lat, lon = _coord(
@@ -453,6 +468,17 @@ def coerce(column: Column, value):
     raise ValueError(f"{column.label}: 모르는 형식 {column.type}")
 
 
+def _place(value, label: str) -> dict:
+    """자리 하나 — 이름과 좌표. `point` · `points` · `parking` 이 함께 쓴다.
+
+    이름이 비는 것은 막지 않는다. 지도에서 찍은 갓길·간이화장실은 부를 이름이
+    없는 경우가 있고, 그때 필요한 것은 좌표다.
+    """
+    value = value or {}
+    lat, lon = _coord(value.get("lat"), value.get("lon"), label)
+    return {"name": _text(value.get("name")), "lat": lat, "lon": lon}
+
+
 def _parking(value, label: str) -> dict:
     """주차 자리 하나 — 어디이고, 돈을 받는가.
 
@@ -460,11 +486,12 @@ def _parking(value, label: str) -> dict:
     남쪽 주차장과 북동쪽 갓길로 갈린다). 그 둘은 같은 자리의 이표기가 아니라
     **고를 수 있는 다른 들머리**이고, 요금도 따로 붙는다 — 한쪽만 유료인 경우가
     있어서 관측지에 요금 한 값을 적으면 어느 자리 말인지 알 수 없다.
+
+    화장실(`points`)이 요금 없이 같은 모양인 것은, 여럿인 이유가 달라서다 —
+    거기서는 **밤에 어느 곳이 열려 있을지 모르는 것**이 이유다(모듈 설명 참고).
     """
-    value = value or {}
-    lat, lon = _coord(value.get("lat"), value.get("lon"), label)
-    lot = {"name": _text(value.get("name")), "lat": lat, "lon": lon}
-    fee = _text(value.get("fee"))
+    lot = _place(value, label)
+    fee = _text((value or {}).get("fee"))
     if fee:
         if fee not in PARKING_FEE:
             raise ValueError(
@@ -1032,18 +1059,23 @@ _HTML = """<meta charset="utf-8">
   .flags .one { display: flex; align-items: center; gap: 8px; font-size: 12px; }
   .flags .one .nm { flex: 1 1 auto; }
   .flags .one .seg { flex: 0 0 auto; width: 132px; }
-  /* 주차 자리 목록. 자리마다 요금 3단이 붙으므로 편의시설과 같은 줄 모양이지만,
-     이름이 길어질 수 있어(카카오 검색 이름) 넘치면 자른다. */
+  /* 여러 자리를 담는 칸(주차·화장실). 주차는 자리마다 요금 3단이 붙어 편의시설과
+     같은 줄 모양이고, 화장실은 그 자리가 비어 이름과 [빼기] 만 선다. 이름이
+     길어질 수 있어(카카오 검색 이름) 넘치면 자른다. */
   .parks { display: grid; gap: 7px; }
   .parks .one { display: flex; align-items: center; gap: 6px; font-size: 12px; }
   .parks .one .nm { flex: 1 1 auto; min-width: 0; overflow: hidden;
                     text-overflow: ellipsis; white-space: nowrap; }
   .parks .one .seg { flex: 0 0 auto; width: 126px; }
-  .parks .one button { font: inherit; font-size: 11px; padding: 2px 7px;
-                       cursor: pointer; background: transparent; color: var(--ink-2);
-                       flex: 0 0 auto; border: 1px solid var(--hairline);
-                       border-radius: 5px; }
-  .parks .one button:hover { color: var(--danger); border-color: var(--danger); }
+  /* `>` 로 [빼기] 만 잡는다 — 자식까지 잡으면 요금 3단 단추도 함께 걸려서,
+     `.seg button.on` 과 같은 무게(클래스 2·요소 1)인데 뒤에 서므로 **고른 요금이
+     파랗게 서지 않는다**. 지정은 되는데 화면이 그대로라 안 된 것처럼 보인다.
+     빨간 hover(=지우는 단추 표시)까지 요금 단추에 붙는 것도 같은 이유였다. */
+  .parks .one > button { font: inherit; font-size: 11px; padding: 2px 7px;
+                         cursor: pointer; background: transparent;
+                         color: var(--ink-2); flex: 0 0 auto;
+                         border: 1px solid var(--hairline); border-radius: 5px; }
+  .parks .one > button:hover { color: var(--danger); border-color: var(--danger); }
 
   .acts { display: flex; gap: 6px; margin-top: 10px; }
   .acts button { flex: 1; font: inherit; font-size: 12px; font-weight: 600;
@@ -1268,7 +1300,7 @@ function init() {
     ctx.parking.list.forEach(function (p) {
       pin(p.lat, p.lon, DATA.colors.parking, 10,
         p.name + ' · ' + p.distanceM + 'm',
-        tap(function () { addLot(p); }));
+        tap(function () { addPlace('parking', p); }));
     });
     ctx.stores.list.forEach(function (s) {
       pin(s.lat, s.lon, DATA.colors.store, 9,
@@ -1278,20 +1310,25 @@ function init() {
     ctx.toilets.list.forEach(function (t) {
       pin(t.lat, t.lon, DATA.colors.toilet, 10,
         t.name + ' · ' + t.distanceM + 'm · ' + (t.hours || '개방시간 미상'),
-        tap(function () { setPoint('toilet', t); }));
+        tap(function () { addPlace('toilet', t); }));
     });
     /* 지정해 둔 자리는 후보 위에 겹쳐 크게 찍는다 — 무엇을 이미 골랐는지가
-       목록을 다시 읽지 않아도 지도에서 바로 보여야 한다. 주차는 여럿일 수 있고,
-       요금은 자리마다 다르므로 꼬리표에 함께 적는다. */
+       목록을 다시 읽지 않아도 지도에서 바로 보여야 한다. 주차·화장실은 여럿일 수
+       있어 몇 번째인지를 함께 적고, 주차는 요금이 자리마다 다르므로 그것도 적는다. */
     lots().forEach(function (p, i) {
       pin(p.lat, p.lon, DATA.colors.pick, 12,
         '지정 주차 ' + (i + 1) + ': ' + (p.name || '이름 없음')
         + ' · ' + (p.fee || '요금 미확인'));
     });
-    ['toilet', 'store'].forEach(function (key) {
-      const p = value(key);
-      if (p) pin(p.lat, p.lon, DATA.colors.pick, 12, '지정: ' + (p.name || key));
+    places('toilet').forEach(function (p, i) {
+      pin(p.lat, p.lon, DATA.colors.pick, 12,
+        '지정 화장실 ' + (i + 1) + ': ' + (p.name || '이름 없음'));
     });
+    const store = value('store');
+    if (store) {
+      pin(store.lat, store.lon, DATA.colors.pick, 12,
+        '지정 가게: ' + (store.name || '이름 없음'));
+    }
     /* 도보 경로는 이 화면에서 유일한 선이다. 길이 여럿이면 전부 그리되 지금 손대는
        길만 굵고 진하게 둔다 — 나머지는 "여기 다른 길이 있다"만 말하면 된다.
        구간을 나눠 뒀으면 구간마다 난이도 색으로 끊어 그린다. 경계 점은 양쪽 선이
@@ -1371,37 +1408,41 @@ function init() {
 
   function dirty() { return Object.keys(draft).length > 0; }
 
-  /* --- 주차 자리 --------------------------------------------------------------
-     길이 여럿일 수 있는 것과 같은 이유로 자리도 여럿일 수 있다 — 오름 하나에
-     들머리가 갈리면 대는 자리도 갈리고, 그때 한쪽만 유료인 경우가 있다.
-     `false` 는 "확인했고 댈 데가 없다"라서 목록이 아니다(그때는 빈 목록으로 본다). */
-  function lots() {
-    const v = value('parking');
+  /* --- 여러 자리를 담는 칸(주차 · 화장실) ---------------------------------------
+     길이 여럿일 수 있는 것과 같은 이유로 자리도 여럿일 수 있다 — 주차는 오름
+     하나에 들머리가 갈려서(그때 한쪽만 유료인 경우가 있다), 화장실은 밤에 어느
+     곳이 열려 있을지 몰라서다. 이유는 달라도 화면이 하는 일은 같아서 한 벌로 둔다.
+     `false` 는 "확인했고 없다"라서 목록이 아니다(그때는 빈 목록으로 본다). */
+  function places(key) {
+    const v = value(key);
     return Array.isArray(v) ? v : [];
   }
 
-  function setLots(list) {
-    setValue('parking', list.length ? list : null);
+  function setPlaces(key, list) {
+    setValue(key, list.length ? list : null);
   }
 
   /* 후보를 누르면 **더한다**(갈아 끼우지 않는다). 이미 같은 자리가 있으면 아무 일도
      하지 않는다 — 같은 자리가 후보 목록과 지도 양쪽에 있어서 두 번 누르기 쉽고,
-     그러면 요금 3단이 둘로 늘어 어느 쪽이 값인지 흐려진다.
+     그러면 한 자리가 둘로 늘어 주차는 요금 3단이 어느 쪽이 값인지 흐려진다.
      요금은 여기서 묻지 않는다 — 지도를 보고 아는 것이 아니라 출처를 봐야 아는
      것이라 [기입] 칸에서 적는다. */
-  function addLot(p) {
-    const list = lots();
+  function addPlace(key, p) {
+    const list = places(key);
     const same = list.some(function (x) {
       return metersBetween([x.lat, x.lon], [p.lat, p.lon]) < 1;
     });
-    if (!same) setLots(list.concat([{ name: p.name, lat: p.lat, lon: p.lon }]));
+    if (!same) setPlaces(key, list.concat([{ name: p.name, lat: p.lat, lon: p.lon }]));
     renderForm();
   }
 
-  function dropLot(i) {
-    setLots(lots().filter(function (_, j) { return j !== i; }));
+  function dropPlace(key, i) {
+    setPlaces(key, places(key).filter(function (_, j) { return j !== i; }));
     renderForm();
   }
+
+  /* 주차 자리는 경로가 시작하는 자리이기도 해서 아래 경로 코드가 자주 부른다. */
+  function lots() { return places('parking'); }
 
   /* --- 도보 경로 ------------------------------------------------------------
      찍을 때마다 다시 재는 값이라 서버에 묻지 않는다. 거리 식은
@@ -1869,8 +1910,8 @@ function init() {
               + '</div>';
           }).join('')
         + '</div>';
-    } else if (col.type === 'parking') {
-      body = parkingFieldHtml(col, v);
+    } else if (col.type === 'parking' || col.type === 'points') {
+      body = placesFieldHtml(col, v);
     } else if (col.type === 'point') {
       /* 세 상태 — 미확인 · 없음 · 좌표. 상태마다 다음에 할 일이 하나뿐이라
          버튼도 하나씩만 세운다(3단 토글은 좌표를 만들어 내지 못한다). */
@@ -1917,13 +1958,18 @@ function init() {
       + '</div>';
   }
 
-  /* 주차 자리 칸. `point` 와 같은 세 상태(미확인 · 없음 · 좌표)인데 좌표가
-     **여럿**이다 — 오름 하나에 들머리가 갈리면 대는 자리도 갈린다. 그때 한쪽만
-     유료인 경우가 있어서 요금을 관측지에 한 값으로 적을 수가 없다. 그래서 요금은
-     자리마다 붙고, 그 자리에서만 3단(미확인·무료·유료)으로 묻는다. */
-  function parkingFieldHtml(col, v) {
+  /* 자리 여럿을 담는 칸(`points`·`parking`). `point` 와 같은 세 상태(미확인 ·
+     없음 · 좌표)인데 좌표가 **여럿**이다 — 주차는 들머리가 갈려서, 화장실은 밤에
+     어느 곳이 열려 있을지 몰라서 여럿이 된다.
+
+     요금은 주차에만 붙는다. 한쪽 들머리만 유료인 경우가 있어 관측지에 한 값으로
+     적을 수가 없어서인데, 화장실에는 그런 자리마다 갈리는 값이 없다 — 개방시간은
+     원본(`core.toilet`)이 들고 있지 사람이 여기 옮겨 적을 것이 아니다. */
+  function placesFieldHtml(col, v) {
+    const fee = col.type === 'parking';
     if (v === false) {
-      return '<div class="point"><span class="val">확인함 · <b>댈 데 없음</b></span>'
+      return '<div class="point"><span class="val">확인함 · <b>'
+        + (fee ? '댈 데 없음' : '없음') + '</b></span>'
         + '<button data-unknown="' + col.key + '">미확인으로</button></div>';
     }
     const list = v || [];
@@ -1938,12 +1984,15 @@ function init() {
       return '<div class="one"><span class="nm">' + esc(p.name || '이름 없음')
         + ' <span class="cap">' + p.lat.toFixed(5) + ', ' + p.lon.toFixed(5)
         + '</span></span>'
-        + pickHtml('f_' + col.key + '_fee_' + i, fees, p.fee || '')
-        + '<button data-parkdrop="' + i + '">빼기</button></div>';
+        + (fee ? pickHtml('f_' + col.key + '_fee_' + i, fees, p.fee || '') : '')
+        + '<button data-placedrop="' + col.key + ':' + i + '">빼기</button></div>';
     }).join('') + '</div>'
-      + '<div class="hint">자리를 더 두려면 [주차 후보] 에서 [지정] 하거나 지도를 '
-      + '우클릭한다. 자리가 둘 이상이면 <b>경로도 어느 자리에서 시작하는지</b>를 '
-      + '고르게 된다</div>';
+      + '<div class="hint">'
+      + (fee
+          ? '자리를 더 두려면 [주차 후보] 에서 [지정] 하거나 지도를 우클릭한다. '
+            + '자리가 둘 이상이면 <b>경로도 어느 자리에서 시작하는지</b>를 고르게 된다'
+          : '더 두려면 위 주변 목록에서 [지정] 하거나 지도를 우클릭한다')
+      + '</div>';
   }
 
   /* 예·아니오는 3단이다 — 파일 규약이 "없는 키가 곧 미확인"이라, 아니오를 적는 것과
@@ -1982,9 +2031,9 @@ function init() {
           });
         });
       } else if (col.type === 'parking') {
-        lots().forEach(function (_, i) {
+        places(col.key).forEach(function (_, i) {
           bindSeg(el('f_' + col.key + '_fee_' + i), function (fee) {
-            setLots(lots().map(function (lot, j) {
+            setPlaces(col.key, places(col.key).map(function (lot, j) {
               if (j !== i) return lot;
               const next = Object.assign({}, lot);
               if (fee) next.fee = fee; else delete next.fee;
@@ -2012,10 +2061,12 @@ function init() {
         };
       });
     });
-    /* 주차 자리 하나를 뺀다. 목록이 비면 `setLots` 가 키를 지우므로 다시 미확인이
-       된다 — '확인했고 댈 데가 없다'는 [없음] 으로만 적힌다. */
-    document.querySelectorAll('[data-parkdrop]').forEach(function (btn) {
-      btn.onclick = function () { dropLot(Number(btn.dataset.parkdrop)); };
+    /* 목록에서 자리 하나를 뺀다(`<칸 키>:<번호>` — 경로 점의 [빼기](`data-drop`)와
+       이름이 겹치면 한쪽 처리기가 둘 다 잡는다). 목록이 비면 `setPlaces` 가 키를
+       지우므로 다시 미확인이 된다 — '확인했고 없다'는 [없음] 으로만 적힌다. */
+    document.querySelectorAll('[data-placedrop]').forEach(function (btn) {
+      const at = btn.dataset.placedrop.split(':');
+      btn.onclick = function () { dropPlace(at[0], Number(at[1])); };
     });
     /* 값이 곧 시작할 주차 자리 번호다(-1 이면 코드가 고른다 — 자리가 하나뿐이거나
        아예 없을 때). 찍는 중에는 이 단추 자리에 [끝내기]·[멈추기] 가 선다. */
@@ -2314,22 +2365,21 @@ function init() {
     el('sN').textContent = ctx
       ? '반경 ' + (ctx.stores.radiusM / 1000) + 'km · ' + ctx.stores.total + '곳' : '';
 
-    /* [지정] 은 후보 한 줄을 그 칸의 값으로 옮긴다. 화장실·가게는 실제로 쓸 한 곳을
-       고르는 것이라 **갈아 끼우고**, 주차는 들머리가 갈리면 자리도 갈리므로
-       **더한다** — 그래서 여기만 다른 길로 보낸다. */
-    [['toilet', 'toilet', 'toilets'], ['store', 'store', 'stores']]
+    /* [지정] 은 후보 한 줄을 그 칸의 값으로 옮긴다. 가게는 관측 전에 들르는 한
+       곳이라 **갈아 끼우고**, 주차·화장실은 여럿일 수 있어 **더한다**. */
+    document.querySelectorAll('[data-store]').forEach(function (btn) {
+      btn.onclick = function () {
+        setPoint('store', ctx.stores.list[Number(btn.dataset.store)]);
+      };
+    });
+    [['park', 'parking', 'parking'], ['toilet', 'toilet', 'toilets']]
       .forEach(function (spec) {
         document.querySelectorAll('[data-' + spec[0] + ']').forEach(function (btn) {
           btn.onclick = function () {
-            setPoint(spec[1], ctx[spec[2]].list[Number(btn.dataset[spec[0]])]);
+            addPlace(spec[1], ctx[spec[2]].list[Number(btn.dataset[spec[0]])]);
           };
         });
       });
-    document.querySelectorAll('[data-park]').forEach(function (btn) {
-      btn.onclick = function () {
-        addLot(ctx.parking.list[Number(btn.dataset.park)]);
-      };
-    });
   }
 
   function renderForm() {
@@ -2566,7 +2616,8 @@ function init() {
       + '</button>'
       + '<button data-as="parking">'
       + (lots().length ? '주차 자리로 하나 더' : '주차 지점으로') + '</button>'
-      + '<button data-as="toilet">화장실 위치로</button>'
+      + '<button data-as="toilet">'
+      + (places('toilet').length ? '화장실 하나 더' : '화장실 위치로') + '</button>'
       + '<button data-as="store">가게 위치로</button>'
       + '<button data-as="coords">관측 좌표로 옮기기</button>'
       + '<button data-as="measure">이 자리 광공해 보기</button>';
@@ -2584,9 +2635,10 @@ function init() {
   el('map').addEventListener('contextmenu', function (e) { e.preventDefault(); });
 
   /* 목록에 없는 자리도 지정할 수 있어야 한다 — 오름 초입 갓길, 원본에 없는 화장실.
-     칸이 늘어도 여기 손댈 것이 없게 `point` 칸이면 다 같은 길로 보낸다.
-     주차는 목록이라 여기 없다 — 갈아 끼우는 것이 아니라 더하기 때문이다. */
-  const POINT_LABEL = { toilet: '화장실', store: '가게' };
+     칸이 늘어도 여기 손댈 것이 없게 형식마다 한 길로 보낸다. 갈리는 것은 **갈아
+     끼우는가 더하는가** 하나뿐이다(`point` 는 앞, 여러 자리를 담는 칸은 뒤). */
+  const POINT_LABEL = { store: '가게' };
+  const PLACE_LABEL = { parking: '주차 자리', toilet: '화장실' };
 
   function pickAs(what) {
     el('menu').style.display = 'none';
@@ -2600,10 +2652,10 @@ function init() {
       addRoutePoint(new kakao.maps.LatLng(picking.lat, picking.lon));
       return;
     }
-    if (what === 'parking') {
-      const name = prompt('주차 자리 이름 (비워도 된다)', '');
+    if (PLACE_LABEL[what]) {
+      const name = prompt(PLACE_LABEL[what] + ' 이름 (비워도 된다)', '');
       if (name === null) return;
-      addLot({ name: name.trim(), lat: picking.lat, lon: picking.lon });
+      addPlace(what, { name: name.trim(), lat: picking.lat, lon: picking.lon });
       return;
     }
     if (POINT_LABEL[what]) {

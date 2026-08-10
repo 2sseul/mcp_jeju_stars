@@ -4,7 +4,7 @@
 반쯤 이상한 값이 들어간 파일이 제일 나쁘고, 그건 다음에 열었을 때가 아니라 판정이
 그 관측지를 조용히 빼먹을 때 드러난다.
 
-경로와, 그와 같은 이유로 **여럿일 수 있는** 주차 자리를 본다. 나머지 형식
+경로와, 그와 같은 이유로 **여럿일 수 있는** 주차 자리·화장실을 본다. 나머지 형식
 (text·bool·point…)은 이 파일보다 오래됐고 쓰이는 곳도 많아 이미 데이터로 검증돼 있다.
 편의시설(`flags`)은 세 상태를 갖게 되면서 규약이 걸린 값이 되어 함께 본다.
 
@@ -28,6 +28,7 @@ from server.core import elevation
 
 _ROUTES = Column("walk_routes", "도보 경로", "routes")
 _PARKING = Column("parking", "주차 지점", "parking")
+_TOILET = Column("toilet", "화장실 위치", "points")
 _AMENITIES = Column("amenities", "편의시설", "flags")
 
 #: 제주 안의 두 점. 좌표 범위 검증(`_coord`)에 걸리지 않는 최소한의 선.
@@ -250,6 +251,47 @@ def test_모르는_요금을_막는다():
 def test_주차_자리도_제주_밖을_막는다():
     with pytest.raises(ValueError, match="제주 밖"):
         coerce(_PARKING, [{"lat": 35.1, "lon": 129.0}])
+
+
+# --- 화장실 -------------------------------------------------------------------
+
+
+def test_화장실도_세_상태를_그대로_둔다():
+    # Given: 아직 안 본 관측지와, 가 봤는데 없던 관측지일 때
+    # When: 저장하면
+    # Then: 앞은 키가 없고 뒤는 false 다 — 여럿이 됐다고 빈 목록이 '없다'가 되지
+    #   않는다. 빈 목록은 아직 아무것도 안 적은 것이라 미확인이다
+    assert coerce(_TOILET, []) is None
+    assert coerce(_TOILET, None) is None
+    assert coerce(_TOILET, False) is False
+
+
+def test_쓸_만한_화장실을_다_적는다():
+    # Given: 주차장 옆과 들머리 위에 하나씩 있을 때
+    # When: 저장하면
+    # Then: 둘 다 남는다 — 밤에 어느 쪽이 열려 있는지는 여기서 알 수 없어서,
+    #   한 곳만 남기면 가 보고 잠겨 있을 때 나머지가 파일에 없다
+    assert coerce(_TOILET, [
+        {"name": "주차장 화장실", "lat": _A[0], "lon": _A[1]},
+        {"name": "들머리 화장실", "lat": _B[0], "lon": _B[1]},
+    ]) == [
+        {"name": "주차장 화장실", "lat": _A[0], "lon": _A[1]},
+        {"name": "들머리 화장실", "lat": _B[0], "lon": _B[1]},
+    ]
+
+
+def test_화장실에는_요금이_붙지_않는다():
+    # Given: 화면이 주차 자리처럼 요금을 실어 보냈을 때
+    # When: 저장하면
+    # Then: 버린다 — 자리마다 갈리는 값이 있는 것은 주차뿐이고, 개방시간·비상벨은
+    #   공중화장실 원본(`core.toilet`)이 들고 있지 여기 옮겨 적을 것이 아니다
+    got = coerce(_TOILET, [{"name": "", "lat": _A[0], "lon": _A[1], "fee": "유료"}])
+    assert got == [{"name": "", "lat": _A[0], "lon": _A[1]}]
+
+
+def test_화장실도_제주_밖을_막는다():
+    with pytest.raises(ValueError, match="제주 밖"):
+        coerce(_TOILET, [{"lat": 35.1, "lon": 129.0}])
 
 
 # --- 편의시설 -----------------------------------------------------------------

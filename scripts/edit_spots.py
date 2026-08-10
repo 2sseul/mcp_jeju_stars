@@ -135,10 +135,8 @@ from scripts import env
 from scripts.review_parking import Server, site_fields
 from server import path
 from server.core import (
-    darkness,
     elevation,
     lamps,
-    nightlight,
     parking,
     places,
     toilet,
@@ -1121,9 +1119,6 @@ _HTML = """<meta charset="utf-8">
                  color: var(--ink-2); }
   .legend .sw { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto;
                 border: 1px solid rgba(0,0,0,0.55); }
-  .legend .foot { margin-top: 8px; padding-top: 8px;
-                  border-top: 1px solid var(--hairline); color: var(--ink-muted);
-                  font-size: 10.5px; line-height: 1.5; }
   a { color: var(--link); }
   .fail { position: absolute; inset: 0; display: grid; place-items: center;
           color: var(--ink-2); font-size: 13px; text-align: center; padding: 24px; }
@@ -2834,7 +2829,7 @@ function init() {
 
 
 def _legend_html() -> str:
-    """지도 위 색이 무슨 뜻인지와 데이터 귀속. 화면에서 바로 읽히게 둔다."""
+    """지도 위 색이 무슨 뜻인지. 화면에서 바로 읽히게 둔다."""
     rows = [
         (color, f"어둡기 상한 {cap}") for cap, color in _CAP_COLOR.items()
     ] + [
@@ -2855,11 +2850,7 @@ def _legend_html() -> str:
         f"<span>{label}</span></div>"
         for color, label in rows
     )
-    sources = "<br>".join(
-        [darkness.SOURCE, nightlight.SOURCE, lamps.SOURCE,
-         parking.SOURCE, places.SOURCE, toilet.SOURCE]
-    )
-    return f'<h2>범례</h2>{body}<div class="foot">{sources}</div>'
+    return f"<h2>범례</h2>{body}"
 
 
 def build_page(key: str, store: Spots) -> str:

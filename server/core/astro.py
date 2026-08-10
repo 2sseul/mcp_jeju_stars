@@ -36,6 +36,11 @@ KST = ZoneInfo("Asia/Seoul")
 # 이것은 태양 고도라는 천문학적 사실일 뿐, "관측 가능"이라는 정책이 아니다.
 _NIGHT = 0
 
+# '박명 포함 밤'의 상한 상태값. 상태 0~2(완전한 밤·천문박명·항해박명 = 태양 < −6°)를
+# 하나의 밤으로 본다. 상태 3(시민박명)·4(낮)는 제외. 밤 단위 집계(tonight)의 시간
+# 창으로 쓰며, 이 역시 태양 고도라는 사실일 뿐 관측 가능 판정이 아니다.
+_NIGHTISH_MAX = 2
+
 # 천체력을 모듈 파일 기준 절대경로(data/ephem)에 고정한다.
 # 실행 위치(cwd)와 무관하게 항상 같은 파일을 쓰므로 중복 다운로드가 없다.
 _EPHEM_DIR = Path(__file__).resolve().parent.parent / "ephem"
@@ -145,6 +150,45 @@ def dark_window(
     return None
 
 
+def night_window(
+    lat: float, lon: float, when: datetime
+) -> tuple[datetime, datetime] | None:
+    """when 이 속한(또는 이후 도래하는) '박명 포함 밤' 구간 (시작, 종료)을 반환한다.
+
+    태양이 −6° 아래인 구간(완전한 밤+천문박명+항해박명, 상태 0/1/2)을 **하나로 병합**한
+    넓은 밤이다. 시민박명(−6~0°)·낮은 제외한다. '오늘 밤 볼 수 있나'를 시간별로 집계할 때
+    시간 창으로 쓴다 — dark_window(상태 0만)보다 넓어, 여름처럼 완전한 밤이 짧은 철에도
+    이른 저녁 박명의 밝은 별 관측 시간을 포함한다.
+
+    dark_window 와 마찬가지로 이것은 **천문학적 사실**(태양 고도)이지 관측 가능 판정이
+    아니다. when 이 이미 밤이면 과거 진입 시각을 자르지 않고 그대로 준다. when 이 밤이
+    아니면 이후 처음 도래하는 밤을 반환한다. 검색 창(48h) 내 없으면 None.
+    """
+    when = _require_aware(when)
+    fn = _twilight_fn(lat, lon)
+
+    # 현재 밤에 이미 들어와 있을 수 있으므로 과거로 24h, 미래로 48h 훑는다.
+    segs = _segments(fn, when - timedelta(hours=24), when + timedelta(hours=48))
+
+    # 상태 ≤ 2 인 연속 구간을 극대 런(run)으로 병합한다. 각 seg i 는
+    # [segs[i][0], segs[i+1][0]) 동안 그 상태이므로, 이웃한 nightish seg 들을 이어붙인다.
+    i, n = 0, len(segs)
+    while i < n:
+        if segs[i][1] > _NIGHTISH_MAX:
+            i += 1
+            continue
+        j = i
+        while j + 1 < n and segs[j + 1][1] <= _NIGHTISH_MAX:
+            j += 1
+        # 런의 종료는 런 다음(=상태 > 2)의 시작 시각. 그 경계가 창을 벗어나면 건너뛴다.
+        if j + 1 < n:
+            run = (segs[i][0], segs[j + 1][0])
+            if run[1] > when:  # when 이 속한 밤이거나 이후 첫 밤
+                return run
+        i = j + 1
+    return None
+
+
 # --- 검증 ---------------------------------------------------------------------
 
 if __name__ == "__main__":
@@ -248,3 +292,19 @@ if __name__ == "__main__":
     _probe("새벽 박명", morning, nxt)
 
     print("  → 모든 경계 검증 통과")
+
+    # --- night_window: 박명 포함 밤은 완전한 밤을 포함하는 더 넓은 구간 ----------
+    print("-" * 52)
+    print("night_window 검증 (박명 포함 ⊇ 완전한 밤):")
+    nw = night_window(JEJU_LAT, JEJU_LON, ref)
+    assert nw is not None, "여름 제주에는 박명 포함 밤이 존재해야 한다"
+    n_start, n_end = nw
+    print(f"  박명 포함 밤: {n_start:%m-%d %H:%M} ~ {n_end:%m-%d %H:%M}")
+    print(f"  완전한 밤  : {b_start:%m-%d %H:%M} ~ {b_end:%m-%d %H:%M}")
+    # 완전한 밤(상태 0)은 박명 포함 밤(상태 0/1/2) 안에 완전히 들어가야 한다.
+    assert n_start <= b_start + timedelta(seconds=1), "박명 포함 밤이 더 일찍 시작해야 한다"
+    assert n_end >= b_end - timedelta(seconds=1), "박명 포함 밤이 더 늦게 끝나야 한다"
+    # 창 안의 모든 시각은 태양이 −6° 아래(상태 ≤ 2)여야 한다.
+    probe = n_start + (n_end - n_start) / 2
+    assert twilight_state(JEJU_LAT, JEJU_LON, probe) <= 2, "박명 포함 밤 한가운데는 상태 ≤ 2"
+    print("  → night_window 검증 통과")

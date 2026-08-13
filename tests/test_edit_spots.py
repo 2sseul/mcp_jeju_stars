@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.edit_spots import Column, Spots, build_page, coerce
+from scripts.edit_spots import Column, Spots, apply, build_page, coerce
 from server import path
 from server.core import elevation
 
@@ -30,6 +30,8 @@ _ROUTES = Column("walk_routes", "도보 경로", "routes")
 _PARKING = Column("parking", "주차 지점", "parking")
 _TOILET = Column("toilet", "화장실 위치", "points")
 _AMENITIES = Column("amenities", "편의시설", "flags")
+_COORDS = Column("coords", "관측 좌표", "coords")
+_ELEVATION = Column("elevation_m", "해발높이(m)", "measured")
 
 #: 제주 안의 두 점. 좌표 범위 검증(`_coord`)에 걸리지 않는 최소한의 선.
 _A = [33.4750, 126.8266]
@@ -358,6 +360,29 @@ def test_경사는_사람이_적는_값이_아니다():
     got = coerce(_ROUTES, [_route(slope_deg=99, climb_m=999, over_m=1)])[0]
     assert got["slope_deg"] != 99
     assert got["over_m"] == round(elevation.length_m([_A, _B]), 1)
+
+
+def test_좌표를_옮기면_해발높이가_따라온다():
+    # Given: 다른 자리의 해발높이를 들고 있는 관측지에서
+    spot = {"name_ko": "옮기는 곳", "lat": _A[0], "lon": _A[1],
+            "elevation_m": 808, "slope_deg": 17.4}
+    # When: 좌표만 옮겨 저장하면
+    apply(spot, [_COORDS], {"coords": {"lat": _B[0], "lon": _B[1]}})
+    # Then: 두 칸이 그 자리 값으로 따라 바뀐다. 예전에는 배치를 따로 부르지 않으면
+    #   옛 자리 값이 그대로 남았고, 실제로 27곳이 그렇게 어긋나 있었다
+    assert spot["elevation_m"] == round(elevation.at(*_B))
+    assert spot["slope_deg"] == elevation.slope_at(*_B)
+
+
+def test_해발높이는_사람이_적는_값이_아니다():
+    # Given: 화면이 해발높이를 지어내 보냈을 때
+    spot = {"name_ko": "손댄 곳", "lat": _A[0], "lon": _A[1]}
+    # When: 저장하면
+    # Then: 저장 **자체가** 막힌다. 경로의 잰 값(위)은 조용히 다시 재면 되지만,
+    #   이쪽은 사람이 친 숫자를 받아 둘 자리가 아예 없다 — 좌표만으로 정해지는
+    #   값이라 둘이 갈리면 어느 쪽이 맞는지 알 수가 없다
+    with pytest.raises(ValueError):
+        apply(spot, [_ELEVATION], {"elevation_m": 999})
 
 
 def test_격자_두_칸보다_짧으면_경사를_안_낸다():

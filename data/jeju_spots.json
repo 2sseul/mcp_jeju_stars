@@ -48,8 +48,8 @@
           "fee": "무료"
         }
       ],
-      "elevation_m": 185,
-      "slope_deg": 9.0,
+      "elevation_m": 242,
+      "slope_deg": 2.7,
       "campsite": false,
       "rest_year": false,
       "pets": "반려견 동반 가능",
@@ -332,8 +332,8 @@
       "type": "오름",
       "why": "'오름의 여왕'. \n표고 382m 정상 360도 파노라마, 주변 광원 적어 동부 다크스카이 촬영지로 인기.\n한라산과 성산 일출봉까지 조망 가능. \n정상에 올라가면 깊이 115m의 거대한 분화구 관람 가능",
       "notes": "야간 산행은 급경사 주의",
-      "elevation_m": 336,
-      "slope_deg": 23.8,
+      "elevation_m": 373,
+      "slope_deg": 5.4,
       "parking": [
         {
           "name": "다랑쉬오름 주차장",
@@ -1210,8 +1210,8 @@
       "type": "오름",
       "why": "넓은 원형 분화구와 트인 시야. \n송당 일대 어두운 하늘로 접근성 좋은 관측지",
       "notes": "좌표 교정(2026-08-05): 33.4356, 126.7291 → 33.448828, 126.777202. 카카오맵 장소검색과 '제주특별자치도 제주시 구좌읍 송당리 2263' 주소 지오코딩이 30m 안에서 일치(scripts/check_spot_coords.py). 이전 신뢰도 medium.",
-      "elevation_m": 231,
-      "slope_deg": 7.9,
+      "elevation_m": 291,
+      "slope_deg": 4.4,
       "parking": [
         {
           "name": "아부오름 주차장",
@@ -1389,7 +1389,7 @@
       "type": "해안/섬",
       "why": "우도 동쪽 끝 비양도의 망대. 사방이 바다로 트인 저지대라 해안 수평선까지 보이고, 섬이라 본섬 불빛과 떨어져 있다. 입도해 캠핑으로 묵어야 볼 수 있다.",
       "notes": "가로등이 있지만 관측지",
-      "elevation_m": 2,
+      "elevation_m": 5,
       "slope_deg": 1.7,
       "night_access": "상시 개방",
       "parking": [
@@ -1528,8 +1528,8 @@
       "type": "주차장",
       "why": "교래리 중산간 개활 초지, 사방이 트여 계절 별자리 조망 용이. 접근 도로 양호",
       "notes": "유료 관람지로 산굼부리는 야간 개방을 하지 않아 별 관측은 주차장에서 진행",
-      "elevation_m": 408,
-      "slope_deg": 1.9,
+      "elevation_m": 405,
+      "slope_deg": 0.9,
       "parking": [
         {
           "name": "산굼부리 대형주차장",
@@ -1608,7 +1608,7 @@
         "https://korean.visitkorea.or.kr/detail/rem_detail.do?cotid=054247db-9860-480e-83ea-899b19fb8b53",
         "http://place.map.kakao.com/19975290"
       ],
-      "elevation_m": 623,
+      "elevation_m": 624,
       "slope_deg": 2.3,
       "parking": [
         {
@@ -1700,8 +1700,8 @@
         "https://korean.visitkorea.or.kr/detail/rem_detail.do?cotid=054247db-9860-480e-83ea-899b19fb8b53",
         "http://place.map.kakao.com/19975290"
       ],
-      "elevation_m": 623,
-      "slope_deg": 2.3,
+      "elevation_m": 629,
+      "slope_deg": 1.8,
       "parking": [
         {
           "name": "축산진흥원목마장 주차장",
@@ -1837,8 +1837,8 @@
           "fee": "무료"
         }
       ],
-      "elevation_m": 1104,
-      "slope_deg": 4.9,
+      "elevation_m": 1103,
+      "slope_deg": 8.4,
       "toilet": [
         {
           "name": "1100고지 화장실",
@@ -1940,8 +1940,8 @@
         "http://place.map.kakao.com/503529219",
         "http://place.map.kakao.com/27583339"
       ],
-      "elevation_m": 392,
-      "slope_deg": 7.9,
+      "elevation_m": 393,
+      "slope_deg": 4.3,
       "parking": [
         {
           "name": "제주별빛누리공원 1주차장",
@@ -2174,8 +2174,8 @@
         "https://www.visitjeju.net/kr/detail/view?contentsid=CNTS_200000000013886",
         "http://place.map.kakao.com/1749886626"
       ],
-      "elevation_m": 483,
-      "slope_deg": 14.3,
+      "elevation_m": 504,
+      "slope_deg": 7.9,
       "parking": [
         {
           "name": "새별오름 주차장",
@@ -2396,8 +2396,8 @@
         "https://www.kkday.com/ko/blog/20051/jeju_orum_spots_5",
         "http://place.map.kakao.com/2142378352"
       ],
-      "elevation_m": 386,
-      "slope_deg": 4.0,
+      "elevation_m": 397,
+      "slope_deg": 11.3,
       "parking": [
         {
           "name": "금오름주차장",
@@ -2686,8 +2686,8 @@
       "sources": [
         "http://place.map.kakao.com/13725890"
       ],
-      "elevation_m": 164,
-      "slope_deg": 24.7,
+      "elevation_m": 232,
+      "slope_deg": 10.7,
       "toilet": [
         {
           "name": "저지오름 화장실",
@@ -3498,8 +3498,8 @@
         "https://ohou.se/advices/9485",
         "https://korean.visitkorea.or.kr/detail/rem_detail.do?cotid=054247db-9860-480e-83ea-899b19fb8b53"
       ],
-      "elevation_m": 359,
-      "slope_deg": 1.6,
+      "elevation_m": 346,
+      "slope_deg": 1.0,
       "parking": [
         {
           "name": "성이시돌목장 주차장",
@@ -3749,8 +3749,8 @@
       "type": "오름",
       "why": "가시리 중산간 '오름의 여왕', 세 개 굼부리와 억새·개활. 동남부 어두운 하늘로 관측·촬영 인기",
       "notes": "좌표 위키백과 교차확인(33.3608, 126.7808) 좌표 교정(2026-08-05): 33.3608, 126.7808 → 33.387851, 126.75392. 카카오맵 장소검색과 '제주특별자치도 서귀포시 표선면 가시리 산 63' 주소 지오코딩이 30m 안에서 일치(scripts/check_spot_coords.py). 이전 신뢰도 high.",
-      "elevation_m": 306,
-      "slope_deg": 6.5,
+      "elevation_m": 333,
+      "slope_deg": 14.0,
       "parking": [
         {
           "name": "따라비오름 주차장",
@@ -4502,8 +4502,8 @@
       "type": "오름/습지",
       "why": "남원 수망리 람사르 습지 오름, 주변 목장·중산간으로 어둡고 조용. 능선 개활지에서 관측",
       "notes": "정상 습지·숲 구간 시야 제한, 야간 산행 안전 주의",
-      "elevation_m": 495,
-      "slope_deg": 18.7,
+      "elevation_m": 470,
+      "slope_deg": 8.4,
       "toilet": [
         {
           "name": "물영아리오름 화장실",
@@ -5145,8 +5145,8 @@
         "https://v.daum.net/v/jzqcJzxf3e",
         "https://culture.seogwipo.go.kr/astronomy/index.htm"
       ],
-      "elevation_m": 403,
-      "slope_deg": 8.3,
+      "elevation_m": 398,
+      "slope_deg": 7.1,
       "parking": [
         {
           "name": "천문과학문화관 주차장",
@@ -5232,8 +5232,8 @@
         "https://v.daum.net/v/jzqcJzxf3e",
         "http://place.map.kakao.com/26094848"
       ],
-      "elevation_m": 6,
-      "slope_deg": 0.7,
+      "elevation_m": 12,
+      "slope_deg": 0.4,
       "parking": [
         {
           "name": "알뜨르비행장 공터주차장",
@@ -5324,8 +5324,8 @@
       "type": "오름",
       "why": "종달리 해안 오름. 정상에서 성산 방면까지 사방이 트인다",
       "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.316 실측 — 종달리 마을 조명 영향",
-      "elevation_m": 98,
-      "slope_deg": 23.3,
+      "elevation_m": 149,
+      "slope_deg": 5.8,
       "parking": [
         {
           "name": "지미봉 주차장",
@@ -5796,8 +5796,8 @@
       "type": "숲",
       "why": "동부 대표 관광지이면서 주변 조명이 적다. 여러 매체가 별 관측지로 함께 꼽는다",
       "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.308 실측. 숲이라 시야는 별도 확인 필요",
-      "elevation_m": 131,
-      "slope_deg": 3.1,
+      "elevation_m": 124,
+      "slope_deg": 2.7,
       "parking": [
         {
           "name": "비자림 주차장",
@@ -5916,8 +5916,8 @@
         "https://www.visitjeju.net/kr/detail/view?contentsid=CNTS_200000000013886",
         "https://blog.naver.com/diasyh/223071840014"
       ],
-      "elevation_m": 12,
-      "slope_deg": 5.0,
+      "elevation_m": 6,
+      "slope_deg": 6.4,
       "parking": [
         {
           "name": "주차장",
@@ -6693,8 +6693,8 @@
       "coord_confidence": "high",
       "region": "동",
       "type": "포구",
-      "elevation_m": 3,
-      "slope_deg": 1.9,
+      "elevation_m": 0,
+      "slope_deg": 0.0,
       "parking": [
         {
           "name": "신천리 포구 주차지점",
@@ -6846,8 +6846,8 @@
       "type": "평지",
       "why": "가시리 초지 한복판. 이번 검산에서 육상 후보 중 가장 어두웠다",
       "notes": "어둡기 종합 0.114 실측. 1100고지(0.132)보다 어둡다",
-      "elevation_m": 309,
-      "slope_deg": 3.1,
+      "elevation_m": 298,
+      "slope_deg": 3.3,
       "parking": [
         {
           "name": "가시리 풍력발전단지 주차장",
@@ -6924,8 +6924,8 @@
         "https://v.daum.net/v/jzqcJzxf3e",
         "https://www.visitjeju.net/kr/detail/view?contentsid=CONT_000000000500378"
       ],
-      "elevation_m": 79,
-      "slope_deg": 8.2,
+      "elevation_m": 38,
+      "slope_deg": 12.8,
       "parking": [
         {
           "name": "송악산 공영주차장",
@@ -7478,8 +7478,8 @@
         "https://v.daum.net/v/jzqcJzxf3e",
         "https://www.visitjeju.net/kr/detail/view?contentsid=CONT_000000000500378"
       ],
-      "elevation_m": 79,
-      "slope_deg": 8.2,
+      "elevation_m": 37,
+      "slope_deg": 17.9,
       "parking": [
         {
           "name": "송악산 공영주차장",
@@ -8005,8 +8005,8 @@
         "https://v.daum.net/v/jzqcJzxf3e",
         "https://www.visitjeju.net/kr/detail/view?contentsid=CONT_000000000500378"
       ],
-      "elevation_m": 79,
-      "slope_deg": 8.2,
+      "elevation_m": 40,
+      "slope_deg": 23.3,
       "parking": [
         {
           "name": "송악산 공영주차장",
@@ -8245,8 +8245,8 @@
       "sources": [
         "http://place.map.kakao.com/13723890"
       ],
-      "elevation_m": 14,
-      "slope_deg": 4.7,
+      "elevation_m": 8,
+      "slope_deg": 5.0,
       "toilet": [
         {
           "name": "용머리해안 화장실",
@@ -8426,8 +8426,8 @@
       "type": "오름",
       "why": "교래 권역 오름. 산굼부리·돌문화공원과 같은 축선이면서 조명에서 더 물러나 있다",
       "notes": "카카오맵 장소검색 일치. 어둡기 종합 0.306 실측",
-      "elevation_m": 538,
-      "slope_deg": 6.7,
+      "elevation_m": 542,
+      "slope_deg": 9.2,
       "parking": [
         {
           "name": "바농오름 주차장",
@@ -8883,8 +8883,8 @@
         "http://place.map.kakao.com/25051219",
         "http://place.map.kakao.com/17578366"
       ],
-      "elevation_m": 577,
-      "slope_deg": 4.5,
+      "elevation_m": 574,
+      "slope_deg": 5.3,
       "parking": [
         {
           "name": "한라생태숲 주차장",
@@ -9191,8 +9191,8 @@
           "fee": "무료"
         }
       ],
-      "elevation_m": 440,
-      "slope_deg": 3.6,
+      "elevation_m": 436,
+      "slope_deg": 2.2,
       "cautions": [
         "공원 내부는 야간 개방하지 않으므로 출입할 수 없습니다.",
         "매표소 앞 공간은 가로등이 없어 주변 광공해가 비교적 적어 별 관측이 가능합니다.",
@@ -9626,8 +9626,8 @@
         "http://place.map.kakao.com/958753707",
         "http://place.map.kakao.com/26923144"
       ],
-      "elevation_m": 808,
-      "slope_deg": 17.4,
+      "elevation_m": 559,
+      "slope_deg": 3.7,
       "walk_routes": [
         {
           "points": [
@@ -9680,8 +9680,8 @@
       "access": "노을해안로 바로 옆(36m). 평지라 걸어 오를 구간이 없다",
       "walk_type": "평지",
       "sources": [],
-      "elevation_m": 31,
-      "slope_deg": 26.3
+      "elevation_m": 18,
+      "slope_deg": 3.7
     },
     {
       "name_ko": "자구내포구",
@@ -9693,8 +9693,8 @@
       "type": "해안",
       "why": "차귀도 조망 포구. 여러 매체가 차귀도를 별 관측지로 꼽는다",
       "notes": "카카오맵 장소검색 일치(차귀도포구). 어둡기 종합 0.442 실측. 여름철 어화 주의",
-      "elevation_m": 0,
-      "slope_deg": 1.3
+      "elevation_m": 5,
+      "slope_deg": 6.0
     },
     {
       "name_ko": "신창풍차해안도로",
@@ -9734,8 +9734,8 @@
         "https://www.visitjeju.net/kr/detail/view?contentsid=CNTS_200000000013886",
         "http://place.map.kakao.com/20512978"
       ],
-      "elevation_m": 702,
-      "slope_deg": 13.5,
+      "elevation_m": 655,
+      "slope_deg": 15.7,
       "parking": [
         {
           "name": "거린사슴전망대주차장",
@@ -9810,8 +9810,8 @@
         "https://www.ohmynews.com/NWS_Web/View/at_pg.aspx?CNTN_CD=A0002773837",
         "http://place.map.kakao.com/939156933"
       ],
-      "elevation_m": 318,
-      "slope_deg": 10.1,
+      "elevation_m": 316,
+      "slope_deg": 5.7,
       "parking": [
         {
           "name": "군산오름 주차장",
@@ -9836,8 +9836,8 @@
       "sources": [
         "https://triple.guide/articles/27accdc5-bbed-4160-87c0-6f97a6710eb2"
       ],
-      "elevation_m": 231,
-      "slope_deg": 1.4
+      "elevation_m": 230,
+      "slope_deg": 1.5
     },
     {
       "name_ko": "비자림로",
@@ -9853,8 +9853,8 @@
         "삼나무가 양쪽을 막아 하늘 시야가 좁다",
         "주행 차량이 있는 도로 — 정차 지점 확인 필요"
       ],
-      "elevation_m": 313,
-      "slope_deg": 0.3
+      "elevation_m": 311,
+      "slope_deg": 0.9
     },
     {
       "name_ko": "소금막해변",
@@ -9873,7 +9873,7 @@
         "https://triple.guide/articles/27accdc5-bbed-4160-87c0-6f97a6710eb2"
       ],
       "elevation_m": 0,
-      "slope_deg": 3.4
+      "slope_deg": 3.0
     },
     {
       "name_ko": "법환포구",
@@ -9891,8 +9891,8 @@
       "sources": [
         "https://ohou.se/advices/9485"
       ],
-      "elevation_m": 10,
-      "slope_deg": 3.1
+      "elevation_m": 3,
+      "slope_deg": 4.0
     },
     {
       "name_ko": "고근산",
@@ -9904,8 +9904,8 @@
       "type": "오름",
       "why": "서귀포 신시가지 북측 오름. 시내에서 가장 가까운 오름 전망대다",
       "notes": "카카오맵 일치(서귀포시 서호동 1286-1). 어둡기 종합 0.459 실측 — 신시가지 조명 영향",
-      "elevation_m": 371,
-      "slope_deg": 16.8,
+      "elevation_m": 385,
+      "slope_deg": 4.7,
       "parking": [
         {
           "name": "고근산 주차장",
@@ -9935,8 +9935,8 @@
         "http://place.map.kakao.com/1710048072",
         "http://place.map.kakao.com/504391581"
       ],
-      "elevation_m": 791,
-      "slope_deg": 23.8,
+      "elevation_m": 823,
+      "slope_deg": 4.8,
       "parking": [
         {
           "name": "성판악 공영주차장 전기차충전소",
@@ -9960,8 +9960,8 @@
         "http://place.map.kakao.com/7901044",
         "http://place.map.kakao.com/79642288"
       ],
-      "elevation_m": 751,
-      "slope_deg": 2.6,
+      "elevation_m": 755,
+      "slope_deg": 3.7,
       "parking": [
         {
           "name": "법정악 주차장",
@@ -9984,8 +9984,8 @@
         "http://place.map.kakao.com/18488951",
         "http://place.map.kakao.com/11041974"
       ],
-      "elevation_m": 77,
-      "slope_deg": 8.8
+      "elevation_m": 85,
+      "slope_deg": 11.4
     },
     {
       "name_ko": "일출랜드 수변공원",
@@ -10000,8 +10000,8 @@
       "sources": [
         "http://place.map.kakao.com/17573659"
       ],
-      "elevation_m": 88,
-      "slope_deg": 2.2
+      "elevation_m": 84,
+      "slope_deg": 2.0
     },
     {
       "name_ko": "고사포진지",
@@ -10027,8 +10027,8 @@
         "http://place.map.kakao.com/13725608",
         "http://place.map.kakao.com/25284265"
       ],
-      "elevation_m": 27,
-      "slope_deg": 5.5
+      "elevation_m": 26,
+      "slope_deg": 4.6
     },
     {
       "name_ko": "모구리야영장",
@@ -10054,8 +10054,8 @@
       "sources": [
         "http://place.map.kakao.com/10331832"
       ],
-      "elevation_m": 160,
-      "slope_deg": 4.2
+      "elevation_m": 159,
+      "slope_deg": 3.7
     },
     {
       "name_ko": "섭지오름",
@@ -10070,8 +10070,8 @@
       "sources": [
         "http://place.map.kakao.com/1565295947"
       ],
-      "elevation_m": 14,
-      "slope_deg": 3.6
+      "elevation_m": 18,
+      "slope_deg": 1.7
     },
     {
       "name_ko": "휴애리자연생활공원",
@@ -10094,8 +10094,8 @@
         "http://place.map.kakao.com/27581976",
         "http://place.map.kakao.com/17556899"
       ],
-      "elevation_m": 235,
-      "slope_deg": 3.0
+      "elevation_m": 232,
+      "slope_deg": 1.9
     },
     {
       "name_ko": "수산체육공원",
@@ -10117,8 +10117,8 @@
       "sources": [
         "http://place.map.kakao.com/14935499"
       ],
-      "elevation_m": 102,
-      "slope_deg": 1.4
+      "elevation_m": 101,
+      "slope_deg": 1.3
     },
     {
       "name_ko": "종달리 고망난돌 쉼터",
@@ -10133,8 +10133,8 @@
       "sources": [
         "http://place.map.kakao.com/20433579"
       ],
-      "elevation_m": 0,
-      "slope_deg": 3.2
+      "elevation_m": 10,
+      "slope_deg": 3.7
     },
     {
       "name_ko": "두강봉",
@@ -10149,8 +10149,8 @@
       "sources": [
         "http://place.map.kakao.com/26455799"
       ],
-      "elevation_m": 59,
-      "slope_deg": 4.3
+      "elevation_m": 68,
+      "slope_deg": 3.2
     },
     {
       "name_ko": "밝은오름",
@@ -10167,7 +10167,7 @@
         "http://place.map.kakao.com/125635765"
       ],
       "elevation_m": 342,
-      "slope_deg": 5.6,
+      "slope_deg": 3.9,
       "parking": [
         {
           "name": "노형동 무료 주차장",
@@ -10189,8 +10189,8 @@
       "sources": [
         "http://place.map.kakao.com/10337128"
       ],
-      "elevation_m": 150,
-      "slope_deg": 13.6
+      "elevation_m": 164,
+      "slope_deg": 5.4
     },
     {
       "name_ko": "저지곶자왈",
@@ -10206,8 +10206,8 @@
         "http://place.map.kakao.com/243953803",
         "http://place.map.kakao.com/8293848"
       ],
-      "elevation_m": 139,
-      "slope_deg": 1.6
+      "elevation_m": 137,
+      "slope_deg": 0.9
     },
     {
       "name_ko": "제주4.3평화공원",
@@ -10229,8 +10229,8 @@
         "http://place.map.kakao.com/27588363",
         "http://place.map.kakao.com/27588364"
       ],
-      "elevation_m": 459,
-      "slope_deg": 3.4,
+      "elevation_m": 457,
+      "slope_deg": 4.6,
       "parking": [
         {
           "name": "제주한라경찰수련원 주차장1",
@@ -10258,8 +10258,8 @@
         "http://place.map.kakao.com/17582215",
         "http://place.map.kakao.com/23445950"
       ],
-      "elevation_m": 406,
-      "slope_deg": 3.2,
+      "elevation_m": 405,
+      "slope_deg": 3.8,
       "parking": [
         {
           "name": "렛츠런파크제주 주차장1",
@@ -10301,8 +10301,8 @@
         "http://place.map.kakao.com/20594586",
         "http://place.map.kakao.com/20580721"
       ],
-      "elevation_m": 332,
-      "slope_deg": 6.2,
+      "elevation_m": 322,
+      "slope_deg": 2.9,
       "parking": [
         {
           "name": "상효원식물원 주차장",
@@ -10331,8 +10331,8 @@
       "sources": [
         "http://place.map.kakao.com/25229887"
       ],
-      "elevation_m": 103,
-      "slope_deg": 9.0
+      "elevation_m": 114,
+      "slope_deg": 10.6
     },
     {
       "name_ko": "잃어버린 마을 하늬골",
@@ -10347,8 +10347,8 @@
       "sources": [
         "http://place.map.kakao.com/1199397808"
       ],
-      "elevation_m": 118,
-      "slope_deg": 1.6
+      "elevation_m": 117,
+      "slope_deg": 3.6
     },
     {
       "name_ko": "동알오름",
@@ -10364,8 +10364,8 @@
         "http://place.map.kakao.com/7849255",
         "http://place.map.kakao.com/1713888526"
       ],
-      "elevation_m": 34,
-      "slope_deg": 5.0
+      "elevation_m": 45,
+      "slope_deg": 3.5
     },
     {
       "name_ko": "거리못",
@@ -10380,8 +10380,8 @@
       "sources": [
         "http://place.map.kakao.com/8168831"
       ],
-      "elevation_m": 200,
-      "slope_deg": 2.5
+      "elevation_m": 201,
+      "slope_deg": 3.2
     },
     {
       "name_ko": "백리악",
@@ -10396,8 +10396,8 @@
       "sources": [
         "http://place.map.kakao.com/228825285"
       ],
-      "elevation_m": 133,
-      "slope_deg": 11.1
+      "elevation_m": 142,
+      "slope_deg": 7.6
     },
     {
       "name_ko": "파평 윤씨공원",
@@ -10412,8 +10412,8 @@
       "sources": [
         "http://place.map.kakao.com/13723553"
       ],
-      "elevation_m": 13,
-      "slope_deg": 1.6
+      "elevation_m": 9,
+      "slope_deg": 0.3
     },
     {
       "name_ko": "돔배오름",
@@ -10428,8 +10428,8 @@
       "sources": [
         "http://place.map.kakao.com/7834108"
       ],
-      "elevation_m": 457,
-      "slope_deg": 2.4
+      "elevation_m": 455,
+      "slope_deg": 8.9
     },
     {
       "name_ko": "항파두리 항몽유적지",
@@ -10451,8 +10451,8 @@
       "sources": [
         "http://place.map.kakao.com/8641860"
       ],
-      "elevation_m": 172,
-      "slope_deg": 2.2
+      "elevation_m": 167,
+      "slope_deg": 0.8
     },
     {
       "name_ko": "득생곶등대",
@@ -10467,8 +10467,8 @@
       "sources": [
         "http://place.map.kakao.com/27601929"
       ],
-      "elevation_m": 0,
-      "slope_deg": 0.6
+      "elevation_m": 1,
+      "slope_deg": 0.8
     },
     {
       "name_ko": "갈마못",
@@ -10483,8 +10483,8 @@
       "sources": [
         "http://place.map.kakao.com/12969030"
       ],
-      "elevation_m": 75,
-      "slope_deg": 1.4
+      "elevation_m": 73,
+      "slope_deg": 1.2
     },
     {
       "name_ko": "하도해변",
@@ -10504,7 +10504,7 @@
         "http://place.map.kakao.com/11700411"
       ],
       "elevation_m": 0,
-      "slope_deg": 2.6
+      "slope_deg": 2.0
     },
     {
       "name_ko": "중문색달해수욕장",
@@ -10529,8 +10529,8 @@
       "sources": [
         "http://place.map.kakao.com/8069764"
       ],
-      "elevation_m": 34,
-      "slope_deg": 13.9
+      "elevation_m": 0,
+      "slope_deg": 11.3
     },
     {
       "name_ko": "용암해수제1공원",
@@ -10545,8 +10545,8 @@
       "sources": [
         "http://place.map.kakao.com/193269322"
       ],
-      "elevation_m": 33,
-      "slope_deg": 2.3
+      "elevation_m": 34,
+      "slope_deg": 2.1
     },
     {
       "name_ko": "춘지등대",
@@ -10597,8 +10597,8 @@
       "sources": [
         "http://place.map.kakao.com/10941032"
       ],
-      "elevation_m": 12,
-      "slope_deg": 1.0
+      "elevation_m": 10,
+      "slope_deg": 1.8
     },
     {
       "name_ko": "동일리포구",
@@ -10629,8 +10629,8 @@
       "sources": [
         "http://place.map.kakao.com/1402723839"
       ],
-      "elevation_m": 3,
-      "slope_deg": 0.7
+      "elevation_m": 2,
+      "slope_deg": 0.8
     },
     {
       "name_ko": "세화포구",
@@ -10661,8 +10661,8 @@
       "sources": [
         "http://place.map.kakao.com/27539430"
       ],
-      "elevation_m": 119,
-      "slope_deg": 3.8
+      "elevation_m": 117,
+      "slope_deg": 2.4
     },
     {
       "name_ko": "황우치해변",
@@ -10677,8 +10677,8 @@
       "sources": [
         "http://place.map.kakao.com/17806435"
       ],
-      "elevation_m": 13,
-      "slope_deg": 6.0
+      "elevation_m": 0,
+      "slope_deg": 5.9
     },
     {
       "name_ko": "인정오름",
@@ -10694,8 +10694,8 @@
         "http://place.map.kakao.com/8551890",
         "http://place.map.kakao.com/800929558"
       ],
-      "elevation_m": 216,
-      "slope_deg": 5.0,
+      "elevation_m": 222,
+      "slope_deg": 2.0,
       "parking": [
         {
           "name": "서귀포시장애인사회복지관 주차장",
@@ -10717,8 +10717,8 @@
       "sources": [
         "http://place.map.kakao.com/25537283"
       ],
-      "elevation_m": 3,
-      "slope_deg": 2.8
+      "elevation_m": 8,
+      "slope_deg": 2.4
     },
     {
       "name_ko": "미와미못",
@@ -10733,8 +10733,8 @@
       "sources": [
         "http://place.map.kakao.com/7889783"
       ],
-      "elevation_m": 69,
-      "slope_deg": 1.0
+      "elevation_m": 67,
+      "slope_deg": 2.1
     },
     {
       "name_ko": "수산저수지",
@@ -10750,7 +10750,7 @@
         "http://place.map.kakao.com/7962202"
       ],
       "elevation_m": 50,
-      "slope_deg": 4.7
+      "slope_deg": 0.4
     },
     {
       "name_ko": "어리목입구주차장",
@@ -10765,8 +10765,8 @@
       "sources": [
         "http://place.map.kakao.com/1724910507"
       ],
-      "elevation_m": 927,
-      "slope_deg": 7.8
+      "elevation_m": 916,
+      "slope_deg": 4.8
     },
     {
       "name_ko": "어리목휴게소",
@@ -10784,8 +10784,8 @@
         "http://place.map.kakao.com/20588448",
         "http://place.map.kakao.com/75269236"
       ],
-      "elevation_m": 975,
-      "slope_deg": 9.8,
+      "elevation_m": 966,
+      "slope_deg": 4.0,
       "parking": [
         {
           "name": "어리목 공영주차장 전기차충전소",
@@ -10807,8 +10807,8 @@
       "sources": [
         "http://place.map.kakao.com/11153555"
       ],
-      "elevation_m": 524,
-      "slope_deg": 9.5
+      "elevation_m": 535,
+      "slope_deg": 5.5
     },
     {
       "name_ko": "제주공천포전지훈련센터",
@@ -10823,8 +10823,8 @@
       "sources": [
         "http://place.map.kakao.com/19431295"
       ],
-      "elevation_m": 54,
-      "slope_deg": 2.9
+      "elevation_m": 53,
+      "slope_deg": 1.7
     },
     {
       "name_ko": "영실입구 주차장",
@@ -10839,8 +10839,8 @@
       "sources": [
         "http://place.map.kakao.com/20519375"
       ],
-      "elevation_m": 1223,
-      "slope_deg": 5.2
+      "elevation_m": 1214,
+      "slope_deg": 7.7
     },
     {
       "name_ko": "영실 공영주차장 전기차충전소",
@@ -10863,8 +10863,8 @@
           "lon": 126.4804042
         }
       ],
-      "elevation_m": 1027,
-      "slope_deg": 6.3
+      "elevation_m": 1016,
+      "slope_deg": 2.7
     },
     {
       "name_ko": "주차장(서귀포시 남원읍 하례리)",
@@ -10879,8 +10879,8 @@
       "sources": [
         "http://place.map.kakao.com/20580659"
       ],
-      "elevation_m": 458,
-      "slope_deg": 8.3
+      "elevation_m": 446,
+      "slope_deg": 8.2
     },
     {
       "name_ko": "거슨세미오름 주차장",
@@ -10895,8 +10895,8 @@
       "sources": [
         "http://place.map.kakao.com/786275823"
       ],
-      "elevation_m": 263,
-      "slope_deg": 0.9
+      "elevation_m": 259,
+      "slope_deg": 0.1
     },
     {
       "name_ko": "스누피가든 주차장",
@@ -10911,8 +10911,8 @@
       "sources": [
         "http://place.map.kakao.com/1649418016"
       ],
-      "elevation_m": 257,
-      "slope_deg": 3.0,
+      "elevation_m": 256,
+      "slope_deg": 1.8,
       "parking": [
         {
           "name": "스누피가든 주차장",
@@ -10980,8 +10980,8 @@
         "http://place.map.kakao.com/1065054399",
         "http://place.map.kakao.com/17570738"
       ],
-      "elevation_m": 272,
-      "slope_deg": 2.3
+      "elevation_m": 273,
+      "slope_deg": 1.7
     },
     {
       "name_ko": "부소오름주차장",
@@ -10996,8 +10996,8 @@
       "sources": [
         "http://place.map.kakao.com/528133288"
       ],
-      "elevation_m": 370,
-      "slope_deg": 3.1
+      "elevation_m": 366,
+      "slope_deg": 1.0
     },
     {
       "name_ko": "바리메주차장",
@@ -11012,8 +11012,8 @@
       "sources": [
         "http://place.map.kakao.com/1671405298"
       ],
-      "elevation_m": 626,
-      "slope_deg": 20.5
+      "elevation_m": 597,
+      "slope_deg": 10.6
     },
     {
       "name_ko": "마보기오름주차장",
@@ -11036,8 +11036,8 @@
           "lon": 126.3855131
         }
       ],
-      "elevation_m": 468,
-      "slope_deg": 6.7
+      "elevation_m": 456,
+      "slope_deg": 4.8
     },
     {
       "name_ko": "메밀밭주차장",
@@ -11052,8 +11052,8 @@
       "sources": [
         "http://place.map.kakao.com/524112283"
       ],
-      "elevation_m": 496,
-      "slope_deg": 5.5
+      "elevation_m": 493,
+      "slope_deg": 5.7
     },
     {
       "name_ko": "아르떼뮤지엄 제주 주차장",
@@ -11068,8 +11068,8 @@
       "sources": [
         "http://place.map.kakao.com/1936486320"
       ],
-      "elevation_m": 246,
-      "slope_deg": 5.0
+      "elevation_m": 253,
+      "slope_deg": 2.8
     },
     {
       "name_ko": "국립제주호국원 주차장",
@@ -11092,8 +11092,8 @@
           "lon": 126.4943529
         }
       ],
-      "elevation_m": 641,
-      "slope_deg": 4.6
+      "elevation_m": 634,
+      "slope_deg": 5.3
     },
     {
       "name_ko": "삼위일체대성당 주차장",
@@ -11118,8 +11118,8 @@
           "lon": 126.3283017
         }
       ],
-      "elevation_m": 341,
-      "slope_deg": 3.4
+      "elevation_m": 340,
+      "slope_deg": 0.9
     },
     {
       "name_ko": "물영아리주차장 전기차충전소",
@@ -11134,8 +11134,8 @@
       "sources": [
         "http://place.map.kakao.com/1537839980"
       ],
-      "elevation_m": 338,
-      "slope_deg": 2.8
+      "elevation_m": 336,
+      "slope_deg": 2.3
     },
     {
       "name_ko": "정석항공관 대형주차장",
@@ -11150,8 +11150,8 @@
       "sources": [
         "http://place.map.kakao.com/456229536"
       ],
-      "elevation_m": 327,
-      "slope_deg": 1.8
+      "elevation_m": 325,
+      "slope_deg": 3.0
     },
     {
       "name_ko": "남송이오름 주차장",
@@ -11166,8 +11166,8 @@
       "sources": [
         "http://place.map.kakao.com/125832946"
       ],
-      "elevation_m": 220,
-      "slope_deg": 6.3
+      "elevation_m": 216,
+      "slope_deg": 11.2
     },
     {
       "name_ko": "에코랜드테마파크 주차장",
@@ -11183,7 +11183,7 @@
         "http://place.map.kakao.com/1304562839"
       ],
       "elevation_m": 427,
-      "slope_deg": 1.9
+      "slope_deg": 3.3
     },
     {
       "name_ko": "김만일기념관 주차장",
@@ -11198,8 +11198,8 @@
       "sources": [
         "http://place.map.kakao.com/1965522915"
       ],
-      "elevation_m": 230,
-      "slope_deg": 5.8
+      "elevation_m": 218,
+      "slope_deg": 4.1
     },
     {
       "name_ko": "헬로키티아일랜드 주차장",
@@ -11214,8 +11214,8 @@
       "sources": [
         "http://place.map.kakao.com/1507367454"
       ],
-      "elevation_m": 231,
-      "slope_deg": 4.1
+      "elevation_m": 228,
+      "slope_deg": 3.4
     },
     {
       "name_ko": "안세미오름 주차장",
@@ -11230,8 +11230,8 @@
       "sources": [
         "http://place.map.kakao.com/1176739238"
       ],
-      "elevation_m": 336,
-      "slope_deg": 7.9
+      "elevation_m": 331,
+      "slope_deg": 11.8
     },
     {
       "name_ko": "도깨비공원 주차장",
@@ -11246,8 +11246,8 @@
       "sources": [
         "http://place.map.kakao.com/17561645"
       ],
-      "elevation_m": 331,
-      "slope_deg": 5.0
+      "elevation_m": 323,
+      "slope_deg": 3.4
     },
     {
       "name_ko": "거문오름주차장",
@@ -11270,8 +11270,8 @@
           "lon": 126.7119442
         }
       ],
-      "elevation_m": 339,
-      "slope_deg": 2.6
+      "elevation_m": 340,
+      "slope_deg": 2.3
     },
     {
       "name_ko": "동광육거리주차장",
@@ -11295,8 +11295,8 @@
           "lon": 126.3415809
         }
       ],
-      "elevation_m": 317,
-      "slope_deg": 2.7
+      "elevation_m": 312,
+      "slope_deg": 3.7
     },
     {
       "name_ko": "선녀와나무꾼 테마공원 주차장",
@@ -11311,8 +11311,8 @@
       "sources": [
         "http://place.map.kakao.com/17951912"
       ],
-      "elevation_m": 244,
-      "slope_deg": 2.4
+      "elevation_m": 249,
+      "slope_deg": 3.8
     },
     {
       "name_ko": "와흘메밀마을 주차장",
@@ -11328,7 +11328,7 @@
         "http://place.map.kakao.com/2016774028"
       ],
       "elevation_m": 251,
-      "slope_deg": 4.2
+      "slope_deg": 2.7
     },
     {
       "name_ko": "카멜리아힐 주차장",
@@ -11345,7 +11345,7 @@
         "http://place.map.kakao.com/1055436043"
       ],
       "elevation_m": 267,
-      "slope_deg": 4.6
+      "slope_deg": 3.7
     },
     {
       "name_ko": "세계자동차&피아노박물관 주차장",
@@ -11368,8 +11368,8 @@
           "lon": 126.3556491
         }
       ],
-      "elevation_m": 219,
-      "slope_deg": 4.4
+      "elevation_m": 208,
+      "slope_deg": 6.6
     },
     {
       "name_ko": "관음사 공영주차장 전기차충전소",
@@ -11392,8 +11392,8 @@
           "lon": 126.5498357
         }
       ],
-      "elevation_m": 574,
-      "slope_deg": 1.9
+      "elevation_m": 575,
+      "slope_deg": 3.8
     },
     {
       "name_ko": "당오름 주차장",
@@ -11408,8 +11408,8 @@
       "sources": [
         "http://place.map.kakao.com/317372954"
       ],
-      "elevation_m": 200,
-      "slope_deg": 2.3
+      "elevation_m": 199,
+      "slope_deg": 5.9
     },
     {
       "name_ko": "솔오름주차장",
@@ -11424,8 +11424,8 @@
       "sources": [
         "http://place.map.kakao.com/2076430951"
       ],
-      "elevation_m": 369,
-      "slope_deg": 6.0
+      "elevation_m": 359,
+      "slope_deg": 6.4
     },
     {
       "name_ko": "이승악탐방휴게소 주차장",
@@ -11440,8 +11440,8 @@
       "sources": [
         "http://place.map.kakao.com/890274520"
       ],
-      "elevation_m": 290,
-      "slope_deg": 4.1
+      "elevation_m": 285,
+      "slope_deg": 3.7
     },
     {
       "name_ko": "관음사 주차장",
@@ -11456,8 +11456,8 @@
       "sources": [
         "http://place.map.kakao.com/17570598"
       ],
-      "elevation_m": 564,
-      "slope_deg": 5.0
+      "elevation_m": 568,
+      "slope_deg": 10.1
     },
     {
       "name_ko": "제주미니미니랜드 주차장2",
@@ -11482,8 +11482,8 @@
           "lon": 126.6761351
         }
       ],
-      "elevation_m": 421,
-      "slope_deg": 1.6
+      "elevation_m": 419,
+      "slope_deg": 1.2
     },
     {
       "name_ko": "영주고등학교 주차장",
@@ -11506,8 +11506,8 @@
           "lon": 126.5747348
         }
       ],
-      "elevation_m": 327,
-      "slope_deg": 3.4
+      "elevation_m": 330,
+      "slope_deg": 3.7
     }
   ]
 }

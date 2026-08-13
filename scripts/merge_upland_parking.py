@@ -17,8 +17,8 @@
 "시가지가 아니고 차로 닿는 자리"라는 뜻이라, 어둡기가 애매한 곳도 남겨 두고 사람이
 판단하게 한다. 어둡기 점수는 `notes` 에 실측값으로 적어 그 판단의 재료로 준다.
 
-해발높이는 저장소에 DEM 이 없어 Open-Meteo 로 받는다(`fetch_elevation.py` 와 같은
-출처). 1,912곳 분은 `outputs/` 에 캐시하므로 두 번째 실행부터는 부르지 않는다.
+해발높이는 표고 격자(`core.elevation`)에서 읽는다 — 관측지의 `elevation_m` 과 같은
+격자다. 1,912곳을 읽는 데도 네트워크가 필요 없다.
 
 같은 곳이면 합친다
 --------------------------------------------------------------------------
@@ -31,35 +31,22 @@
 
     uv run python -m scripts.merge_upland_parking          # 해발 200m 이상
     uv run python -m scripts.merge_upland_parking 300      # 경계 조정
-    → 이어서 uv run python -m scripts.fetch_elevation      # elevation_m·slope_deg
+    → 이어서 uv run python -m scripts.measure_elevation    # elevation_m·slope_deg
 """
 
 from __future__ import annotations
 
 import json
 import sys
-import time
 
-from scripts.fetch_elevation import fetch
 from scripts.merge_swept_spots import SAME_PLACE_KM, absorb, region_of, type_of
 from server import path
-from server.core import darkness, places
+from server.core import darkness, elevation, places
 
 #: 중산간 경계(m). 제주특별자치도가 관리보전지역·중산간 정책에서 쓰는 해발 200m 다.
 #: 위쪽 경계는 두지 않는다 — 600m 를 넘는 자리(관음사·1100고지 권역)도 차로 닿으면
 #: 후보이고, 야간 통제 여부는 사람이 판단할 몫이다.
 UPLAND_M = 200.0
-
-#: 한 요청에 담을 좌표 수. Open-Meteo Elevation 의 상한이다.
-_PER_REQUEST = 100
-
-#: 분당 요청 제한(429)에 걸렸을 때 기다리는 시간(초).
-_RETRY_WAIT = 62.0
-_RETRIES = 6
-
-#: 해발높이 캐시. 원본 CSV 를 다시 긁기 전에는 값이 변하지 않고, 언제든 다시
-#: 받을 수 있으므로 `data/` 가 아니라 산출물로 둔다.
-ELEVATION_CACHE = path.OUTPUTS / "parking_elevation.json"
 
 _KM_PER_DEG = 111.19492664455873
 _COS_LAT = 0.836
@@ -121,30 +108,11 @@ def name_of(row: dict) -> str:
 
 
 def elevations(lots: list[places.Place]) -> dict[str, float]:
-    """주차장 id → 해발높이(m). 캐시에 없는 것만 받아 채운다."""
-    ELEVATION_CACHE.parent.mkdir(exist_ok=True)
-    cache: dict[str, float] = (
-        json.loads(ELEVATION_CACHE.read_text(encoding="utf-8"))
-        if ELEVATION_CACHE.exists() else {}
-    )
-    todo = [lot for lot in lots if lot.id not in cache]
-    if todo:
-        print(f"  해발높이 받는 중 {len(todo):,}곳 (캐시 {len(cache):,})")
-    for start in range(0, len(todo), _PER_REQUEST):
-        chunk = todo[start:start + _PER_REQUEST]
-        for attempt in range(_RETRIES):
-            try:
-                heights = fetch([(lot.lat, lot.lon) for lot in chunk])
-                break
-            except SystemExit as exc:
-                if "429" not in str(exc) or attempt == _RETRIES - 1:
-                    raise
-                print(f"    분당 제한 — {_RETRY_WAIT:.0f}초 대기", flush=True)
-                time.sleep(_RETRY_WAIT)
-        cache.update({lot.id: h for lot, h in zip(chunk, heights)})
-        ELEVATION_CACHE.write_text(json.dumps(cache), encoding="utf-8")
-        print(f"    {min(start + _PER_REQUEST, len(todo)):,}/{len(todo):,}", flush=True)
-    return cache
+    """주차장 id → 해발높이(m). 격자 밖(해상·제주 밖 좌표)은 아예 담지 않는다 —
+    모르는 것을 0m 로 두면 '해수면'이 되어 중산간 경계에서 조용히 걸러진다.
+    """
+    heights = {lot.id: elevation.at(lot.lat, lot.lon) for lot in lots}
+    return {lot: height for lot, height in heights.items() if height is not None}
 
 
 def to_row(lot: places.Place, elevation: float) -> dict | None:
@@ -188,8 +156,9 @@ def main() -> None:
     print(f"카카오맵 주차장 {len(lots):,}곳 · 중산간 경계 해발 {limit:.0f}m")
 
     height = elevations(lots)
-    upland = [lot for lot in lots if height[lot.id] >= limit]
-    print(f"  해발 {limit:.0f}m 이상 {len(upland):,}곳")
+    upland = [lot for lot in lots if lot.id in height and height[lot.id] >= limit]
+    print(f"  해발 {limit:.0f}m 이상 {len(upland):,}곳 "
+          f"(표고 격자 밖 {len(lots) - len(height):,}곳은 뺐다)")
 
     rows = [row for row in (to_row(lot, height[lot.id]) for lot in upland) if row]
     rows.sort(key=lambda r: r["score"])
@@ -243,8 +212,8 @@ def main() -> None:
     parked = sum(s.get("discovery") == "kakao_parking" for s in spots)
     print(f"\n총 {len(spots)}곳 · 자동발굴 {swept + parked}"
           f"(장소 {swept} + 주차장 {parked}) · 큐레이션 {len(spots) - swept - parked}")
-    print("다음: uv run python -m scripts.fetch_elevation "
-          "(새 항목의 elevation_m·slope_deg 를 채운다)")
+    print("다음: uv run python -m scripts.measure_elevation "
+          "(새 항목의 elevation_m·slope_deg 를 잰다)")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,8 @@
 """표고 조회 — 정적 격자에서 읽는 순수 함수 (네트워크 없음).
 
 `scripts/build_elevation_grid.py` 가 잘라 둔 FABDEM(1초각 ~30m) 격자를 연다.
-도보 경로가 얼마나 오르는지를 여기서 답한다.
+도보 경로가 얼마나 오르는지, 그리고 관측지 한 점이 어떤 지형에 서 있는지를
+여기서 답한다.
 
 **맨땅(DTM)이다.** Copernicus GLO-30·SRTM 같은 DSM 은 수관·건물 높이가 섞여 있어
 숲길 오름에서 사람이 나무를 밟고 걷는 것으로 계산된다 — 제주 육지의 67%가 1m 이상,
@@ -56,6 +57,13 @@ CELL_M: float = _SCALE * lamps.KM_PER_DEG * 1000.0
 #: 이웃 칸일 수 있고, 그러면 잰 것이 지형이 아니라 그 칸 경계 하나다.
 MIN_M: float = 2 * CELL_M
 
+#: 관측지 한 점의 경사를 재는 규모(m). 격자 한 칸(30m)이 아니다 — 묻는 것이
+#: "삼각대를 세우고 차를 댈 이 자리가 비탈인가"라 사람이 서서 둘러보는 크기에서
+#: 답해야 하고, 한 칸으로 재면 밭두렁 하나가 경사가 된다. 90m 는 이 값을 처음
+#: 낸 격자(Copernicus GLO-90)의 칸 크기에서 왔고, 격자를 바꾸면서도 그대로 뒀다 —
+#: 눈금이 바뀌면 이미 적어 둔 값들과 비교가 안 된다(`decisions.md` §2.20).
+SITE_M: float = 90.0
+
 
 def at(lat: float, lon: float) -> float | None:
     """그 좌표의 표고(m). 격자 밖이거나 결측이면 None.
@@ -69,6 +77,31 @@ def at(lat: float, lon: float) -> float | None:
         return None
     value = int(_GRID[row, col])
     return None if value == _NODATA else value / 10.0
+
+
+def slope_at(lat: float, lon: float) -> float | None:
+    """그 점 주변 `SITE_M` 격자의 경사(도). 이웃을 하나라도 모르면 None.
+
+    동/서·남/북 이웃 넷을 받아 중앙차분한다.
+
+        tan(경사) = √( ((E-W)/2d)² + ((N-S)/2d)² )
+
+    `slope_deg` 와 답하는 것이 다르다 — 저쪽은 **걸어간 선**의 평균 기울기이고,
+    이쪽은 **선 없이 한 점**이 놓인 지형의 기울기다. 그래서 저쪽은 방향이 있어
+    음수가 되지만(내리막), 이쪽은 방향이 없어 늘 0 이상이다.
+
+    이웃도 최근접 화소를 그대로 읽는다 — 90m 상자로 평균을 내 봐도 이 목록에서
+    중앙값 0.1°·최대 5.3° 밖에 달라지지 않아, 읽는 방식을 둘로 두지 않는다.
+    """
+    dlat = SITE_M / (lamps.KM_PER_DEG * 1000.0)
+    dlon = dlat / math.cos(math.radians(lat))
+    west, east = at(lat, lon - dlon), at(lat, lon + dlon)
+    south, north = at(lat - dlat, lon), at(lat + dlat, lon)
+    if west is None or east is None or south is None or north is None:
+        return None
+    dz_dx = (east - west) / (2 * SITE_M)
+    dz_dy = (north - south) / (2 * SITE_M)
+    return round(math.degrees(math.atan(math.hypot(dz_dx, dz_dy))), 1)
 
 
 def metres_between(a: tuple[float, float], b: tuple[float, float]) -> float:

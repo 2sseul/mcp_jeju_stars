@@ -132,6 +132,7 @@ from urllib.parse import parse_qs, urlparse
 import numpy as np
 
 from scripts import env
+from scripts.measure_elevation import ELEVATION_KEY, SLOPE_KEY, measure_site
 from scripts.review_parking import Server, site_fields
 from server import path
 from server.core import (
@@ -249,6 +250,10 @@ class Column:
         points         자리 여럿 — `point` 의 세 상태 그대로에 좌표만 여럿(화장실)
         parking        주차 자리 여럿 — `points` 에 자리마다 요금이 더 붙는다
         routes         도보 경로 묶음        — 지도에서 찍는 선(아래)
+        measured       코드가 잰 값 — 보여 주기만 한다(해발높이·경사도)
+
+    `measured` 만 입력칸이 없다. 좌표만 있으면 정해지는 값이라 저장할 때 표고
+    격자에서 재고(`measure_site`), 사람이 보낸 값은 `_READONLY` 가 되돌린다.
     """
 
     key: str
@@ -273,10 +278,10 @@ _BUILTIN: tuple[Column, ...] = (
     Column("type", "유형", "choice"),
     Column("why", "선정 이유", "textarea", "추천 문구에 그대로 나갈 한 문장"),
     Column("notes", "비고", "textarea", "좌표 근거·정성적 광공해 서술 등"),
-    Column("elevation_m", "해발높이(m)", "number",
-           "이 좌표 지점의 값 — 오름 공표 표고가 아니다. "
-           "scripts/fetch_elevation.py 가 채운다"),
-    Column("slope_deg", "경사도(°)", "number",
+    Column(ELEVATION_KEY, "해발높이(m)", "measured",
+           "이 좌표 지점의 값 — 오름 공표 표고가 아니다. 저장할 때 표고 격자에서 "
+           "잰다(core/elevation.py)"),
+    Column(SLOPE_KEY, "경사도(°)", "measured",
            "주변 90m 격자의 경사. 삼각대·주차 자리가 비탈인지"),
     Column("access", "접근", "text", "차로 어디까지 들어가나"),
     Column("parking", "주차 지점", "parking",
@@ -315,8 +320,10 @@ ADDABLE = ("text", "textarea", "number", "choice", "bool", "list")
 #: 나중에 파이썬에서 `spot["key"]` 로 꺼낼 때 눈에 걸리는 것이 없다.
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]{1,29}$")
 
-#: 편집하지 않는 키 — 자동 발굴 표식은 사람이 지우거나 붙일 것이 아니다.
-_READONLY = ("discovery",)
+#: 편집하지 않는 키 — 자동 발굴 표식은 사람이 지우거나 붙일 것이 아니다. 해발높이·
+#: 경사도는 좌표만 있으면 정해지는 값이라 저장할 때 코드가 잰다(`measure_site`) —
+#: 사람이 친 숫자를 받아 두면 좌표를 옮겼을 때 어느 쪽이 맞는지 알 수 없다.
+_READONLY = ("discovery", ELEVATION_KEY, SLOPE_KEY)
 
 #: 좌표 허용 범위. 파일 자신이 적어 둔 제주 경계(`meta.jeju_bounds`)에 여유를 준 값 —
 #: `core.lamps`·`core.parking`·`core.toilet` 과 같은 경계다.
@@ -659,7 +666,12 @@ def _coord(lat, lon, label: str) -> tuple[float, float]:
 
 
 def apply(spot: dict, columns: list[Column], values: dict) -> None:
-    """받은 값들을 관측지 하나에 반영한다. 빈 값은 **키를 지운다**."""
+    """받은 값들을 관측지 하나에 반영한다. 빈 값은 **키를 지운다**.
+
+    끝에 해발높이·경사도를 **다시 잰다**. 좌표를 옮긴 저장에서만 부르지 않는 것은
+    한 번이라도 빠뜨리면 값이 옛 자리에 남기 때문이다 — 실제로 그렇게 어긋난 곳이
+    27곳 있었다(`decisions.md` §2.20). 격자 한 번 읽는 값이라 늘 잰다.
+    """
     by_key = {c.key: c for c in columns}
     for key, raw in values.items():
         column = by_key.get(key)
@@ -675,6 +687,8 @@ def apply(spot: dict, columns: list[Column], values: dict) -> None:
             spot.pop(key, None)
         else:
             spot[key] = value
+
+    measure_site(spot)
 
 
 # --- 주변 --------------------------------------------------------------------
@@ -1927,6 +1941,12 @@ function init() {
         + v.lon.toFixed(6) + '</span>'
         + '<button data-copy="' + v.lat.toFixed(6) + ', ' + v.lon.toFixed(6)
         + '">복사</button></div>';
+    } else if (col.type === 'measured') {
+      /* 코드가 표고 격자에서 잰 값이라 입력칸을 두지 않는다 — 좌표를 옮기고 저장하면
+         그 자리에서 다시 재어 바뀐다. 못 잰 것은 못 쟀다고 적는다(격자 밖). */
+      body = '<div class="point"><span class="val' + (v == null ? ' cap' : '') + '">'
+        + (v == null ? '못 잼 — 표고 격자 밖' : esc(String(v)))
+        + '</span></div>';
     } else if (col.type === 'routes') {
       /* 찍는 것도 되짚는 것도 위 [경로] 칸에서 한다. 여기서는 지금 값이 무엇인지만
          말한다 — 같은 목록을 두 군데 그리면 어느 쪽이 값인지 흐려진다. */

@@ -58,8 +58,14 @@
 구간이 되고, 밟는 것이 바뀌는 자리에서 하나 더 두면 그 점부터 다음 구간이다.
 
 구간은 **자르는 자리**로만 잡는다 — `from` 은 그 구간이 시작하는 점 번호이고 끝은
-다음 구간이 시작하기 직전이다. 구간마다 시작·끝을 따로 적게 하면 틈과 겹침이
-생기고, 점을 하나 빼는 순간 둘이 어긋난다. 지도는 구간마다 노면 색으로 끊어 그린다.
+다음 구간이 시작하는 점이다. **경계 점은 앞뒤 구간이 함께 쓴다**: 18점짜리 길을
+6번에서 자르면 앞이 `1~6번`, 뒤가 `6~18번` 이다(밟는 것이 바뀌는 그 점까지가 앞
+구간이고, 그 점부터가 뒤 구간이다). 경계를 한 칸 당겨 `1~5번` 으로 끊으면 5번과
+6번 사이 한 걸음이 어느 구간에도 없어, 구간 길이의 합이 길 길이에 못 미친다.
+
+구간마다 시작·끝을 따로 적게 하지는 않는다 — 그러면 틈과 겹침이 생기고, 점을 하나
+빼는 순간 둘이 어긋난다. 끝을 옮기고 싶으면 **다음 구간의 시작을 옮긴다**(그 둘은
+같은 점이다). 지도는 구간마다 노면 색으로 끊어 그린다.
 
 점 목록은 **찍은 것을 되짚는 자리**로만 둔다(좌표와 앞 점에서의 거리, 그리고 잘못
 찍은 점을 빼는 [빼기]). 한때 그 목록의 [나누기] 가 노면을 적는 유일한 입구였는데,
@@ -583,12 +589,9 @@ def _measure(route: dict) -> None:
         route["over_m"] = round(elevation.length_m(points), 1)
 
     # 구간마다의 경사. 짧은 구간은 못 재고, 못 잰 것은 비워 둔다 — 어디가 가파른지가
-    # 여기서 보여야 사람이 구간을 어디서 끊을지 정할 수 있다.
-    segments = route.get("segments") or []
-    for i, segment in enumerate(segments):
-        start = segment["from"]
-        end = segments[i + 1]["from"] if i + 1 < len(segments) else len(points) - 1
-        piece = points[start:end + 1]
+    # 여기서 보여야 사람이 구간을 어디까지로 잡을지 정할 수 있다.
+    for segment in route.get("segments") or []:
+        piece = points[segment["from"]:segment["to"] + 1]
         segment.pop("slope_deg", None)
         segment.pop("over_m", None)
         got = elevation.slope_deg(piece)
@@ -603,34 +606,54 @@ _SAID = frozenset(("surface", "rock", "note"))
 
 
 def _segments(value, count: int, label: str) -> list[dict]:
-    """경로를 자른 구간들. 구간은 **자르는 자리**로만 잡는다.
+    """경로에서 잘라 적은 구간들. 구간은 **N번부터 M번까지**의 범위다.
 
-    `from` 은 그 구간이 시작하는 점 번호(0부터)다. 끝은 다음 구간이 시작하기 직전,
-    마지막 구간은 경로 끝이다 — 구간마다 시작·끝을 따로 적게 하면 틈과 겹침이
-    생기고, 점을 하나 빼는 순간 둘이 어긋난다.
+    `from`·`to` 는 그 구간의 첫 점과 끝 점 번호(0부터)이고 끝 점을 포함한다.
 
-    노면도 설명도 없는 구간은 버린다. 자른 자리만 남으면 그건 아무것도 말하지
-    않는 구분이라, 파일에도 화면에도 남길 것이 없다.
+    한때 `from` 만 두고 끝은 다음 구간의 시작으로 삼았다 — 길 전체를 빈틈없이 덮는
+    타일이었다. 그러면 **밟는 것이 바뀌지 않는 자리에도 구간을 만들어야** 하고, 실제로
+    길 45개에 구간이 821개까지 불었다(길 하나에 18개). 지금은 적은 자리만 남긴다:
+    사이가 비면 그 사이는 아직 안 본 것이고, 이 파일의 "없는 키가 곧 미확인"이 구간
+    목록에서도 그대로 서는 것이다(`decisions.md` §2.21).
+
+    붙은 두 구간은 경계 점을 **함께 쓴다**(1~6번 · 6~18번). 한 칸 당겨 1~5번 으로
+    끊으면 5번과 6번 사이 한 걸음이 어느 구간에도 없어, 구간 길이의 합이 길 길이에
+    못 미치고 지도 선과도 어긋난다. 그래서 겹침은 경계 점 하나까지만 받는다.
+
+    노면도 설명도 없는 구간은 버린다. 범위만 남으면 그건 아무것도 말하지 않는
+    구분이라, 파일에도 화면에도 남길 것이 없다.
     """
     segments = list(value or [])
     if not segments:
         return []
 
     out = []
-    previous = -1
+    previous = 0
     for i, raw in enumerate(segments, 1):
         raw = raw or {}
         try:
-            start = int(raw.get("from"))
+            start, end = int(raw.get("from")), int(raw.get("to"))
         except (TypeError, ValueError) as exc:
-            raise ValueError(f"{label}: {i}번째 구간의 시작 점이 없습니다") from exc
-        if not 0 <= start < count:
             raise ValueError(
-                f"{label}: {i}번째 구간이 없는 점({start + 1}번)에서 시작합니다"
+                f"{label}: {i}번째 구간의 시작·끝 점이 없습니다"
+            ) from exc
+        if not 0 <= start < count or not 0 <= end < count:
+            raise ValueError(
+                f"{label}: {i}번째 구간이 없는 점을 가리킵니다 "
+                f"({start + 1}~{end + 1}번 · 이 길은 {count}점)"
             )
-        if start <= previous:
-            raise ValueError(f"{label}: 구간이 찍은 순서대로 있지 않습니다")
-        previous = start
+        if end <= start:
+            raise ValueError(
+                f"{label}: {i}번째 구간이 시작({start + 1}번)에서 끝납니다 — "
+                "한 걸음도 덮지 않는 구간은 아무것도 말하지 않습니다"
+            )
+        if start < previous:
+            raise ValueError(
+                f"{label}: 구간이 찍은 순서대로 있지 않거나 서로 겹칩니다 "
+                f"({i}번째가 {start + 1}번에서 시작하는데 앞 구간이 "
+                f"{previous + 1}번까지입니다)"
+            )
+        previous = end
 
         surface = _text(raw.get("surface"))
         if surface and surface not in trail.SURFACE:
@@ -642,7 +665,7 @@ def _segments(value, count: int, label: str) -> list[dict]:
             raise ValueError(
                 f"{label}: 모르는 암릉·암반 '{rock}' — {' · '.join(trail.ROCK)}"
             )
-        segment = {"from": start}
+        segment = {"from": start, "to": end}
         if surface:
             segment["surface"] = surface
         if rock:
@@ -652,8 +675,7 @@ def _segments(value, count: int, label: str) -> list[dict]:
             segment["note"] = note
         out.append(segment)
 
-    if out[0]["from"] != 0:
-        raise ValueError(f"{label}: 첫 구간은 경로 첫 점에서 시작해야 합니다")
+    # 첫 구간이 길 첫 점에서 시작할 필요는 없다 — 앞쪽을 아직 안 본 길이 있다.
     # 아무것도 안 적힌 구간만 남았으면 자른 적이 없는 것과 같다.
     if not any(_SAID & s.keys() for s in out):
         return []
@@ -1023,8 +1045,8 @@ _HTML = """<meta charset="utf-8">
                         cursor: pointer; background: transparent; color: var(--ink-2);
                         border: 1px solid var(--hairline); border-radius: 5px; }
   .seghead .hd button.danger { color: var(--danger); border-color: var(--danger); }
-  /* 구간이 어느 점에서 시작하는지를 고르는 자리. 줄 안에 끼는 것이라 아래 입력칸과
-     달리 글자만큼만 차지한다. */
+  /* 구간이 몇 번부터 몇 번까지인지를 고르는 두 자리. 줄 안에 끼는 것이라 아래
+     입력칸과 달리 글자만큼만 차지한다. */
   .seghead .hd select { flex: 0 0 auto; font: inherit; font-size: 10.5px;
                         padding: 1px 4px; background: rgba(255,255,255,0.06);
                         color: var(--ink); border: 1px solid var(--hairline);
@@ -1358,12 +1380,10 @@ function init() {
       const pts = points(r);
       const on = ri === active;
       const segs = segments(r);
-      const spans = segs.length
-        ? segs.map(function (s, i) {
-            return [s.from, i + 1 < segs.length ? segs[i + 1].from : pts.length - 1,
-                    segColor(s)];
-          })
-        : [[0, pts.length - 1, DATA.colors.route]];
+      /* 길 전체를 기본색으로 한 번 긋고 그 위에 구간을 얹는다 — 구간 사이가 비어
+         있어도 길이 끊겨 보이지 않는다. 밑에 남는 기본색이 곧 '아직 안 본 걸음'이다. */
+      const spans = [[0, pts.length - 1, DATA.colors.route]].concat(
+        segs.map(function (s) { return [s.from, s.to, segColor(s)]; }));
       if (pts.length > 1) {
         spans.forEach(function (span) {
           const line = new kakao.maps.Polyline({
@@ -1383,17 +1403,18 @@ function init() {
       /* 양 끝은 크게 찍는다 — 그 둘만 코드가 놓는 점이고, 경로가 관측 자리에서
          끝났는지가 지도에서도 보여야 한다. */
       const last = endsAtSite(pts) ? pts.length - 1 : -1;
-      const head = {};
-      segs.forEach(function (s, i) { head[s.from] = i; });
+      const head = {}, tail = {};
+      segs.forEach(function (s, i) { head[s.from] = i; tail[s.to] = i; });
       pts.forEach(function (p, i) {
         const end = i === 0 || i === last;
-        const at = head[i];
+        const at = head[i] === undefined ? tail[i] : head[i];
         pin(p[0], p[1],
           at === undefined ? DATA.colors.route : segColor(segs[at]),
           end || at !== undefined ? 9 : 7,
           (i + 1) + '/' + pts.length
           + (i === 0 ? ' · 시작' : (i === last ? ' · 끝' : ''))
-          + (at === undefined ? '' : ' · 구간 ' + (at + 1) + ' 시작'));
+          + (tail[i] === undefined ? '' : ' · 구간 ' + (tail[i] + 1) + ' 끝')
+          + (head[i] === undefined ? '' : ' · 구간 ' + (head[i] + 1) + ' 시작'));
       });
     });
     radius = new kakao.maps.Circle({
@@ -1526,17 +1547,16 @@ function init() {
   }
 
   /* --- 구간 -------------------------------------------------------------------
-     구간은 **자르는 자리**로만 잡는다. `from` 은 그 구간이 시작하는 점 번호이고,
-     끝은 다음 구간이 시작하기 직전이다 — 구간마다 시작·끝을 따로 적게 하면 틈과
-     겹침이 생기고, 점을 하나 빼는 순간 둘이 어긋난다.
+     구간은 **N번부터 M번까지**의 범위다(`from`·`to`, 끝 점 포함). 적은 자리만
+     남기므로 사이가 비어도 된다 — 빈 자리는 아직 안 본 곳이고, 이 파일의 "없는
+     키가 곧 미확인"이 구간 목록에서도 그대로 선다.
 
-     선을 그릴 때만 경계 점을 양쪽이 함께 쓴다(안 그러면 구간 사이가 끊겨 보인다). */
+     경계 점은 붙은 두 구간이 **함께 쓴다** — 6번에서 갈리는 18점짜리 길은 `1~6번`
+     과 `6~18번` 이다. 한 칸 당겨 `1~5번` 으로 끊으면 5번과 6번 사이 한 걸음이 어느
+     구간에도 없어 구간 길이의 합이 길 길이에 못 미치고, 지도 선(경계 점을 함께
+     쓴다)과 저장된 구간 경사(`_measure` 도 그렇다)와도 어긋난다. 그래서 고르는
+     자리도 경계 점 하나까지만 허용한다(`segBounds`). */
   function segments(r) { return (r && r.segments) || []; }
-
-  function segEnd(r, i) {
-    const segs = segments(r);
-    return i + 1 < segs.length ? segs[i + 1].from - 1 : points(r).length - 1;
-  }
 
   /* 노면을 아직 안 적은 구간은 경로 기본색으로 둔다 — 색이 없는 것과 '정비'는
      다른 말이다. */
@@ -1544,42 +1564,50 @@ function init() {
     return (s && s.surface && DATA.colors.surface[s.surface]) || DATA.colors.route;
   }
 
-  /* 구간 머리로 아직 안 쓰인 점들. [+ 구간] 과 시작점 고르기가 이 목록에서 고른다 —
-     한 점에 구간 둘이 걸리면 앞엣것은 길이 0 이 되어 아무것도 말하지 않는다.
-     구간이 하나도 없으면 첫 구간뿐이고, 첫 구간은 언제나 경로 첫 점에서 시작한다. */
-  function freePoints(r) {
-    if (!segments(r).length) return [0];
-    const used = {};
-    segments(r).forEach(function (s) { used[s.from] = true; });
-    const out = [];
-    for (let i = 1; i < points(r).length; i++) if (!used[i]) out.push(i);
-    return out;
+  /* 이 구간이 움직일 수 있는 바깥 한계 [앞, 뒤]. 앞 구간의 끝·뒤 구간의 시작까지는
+     갈 수 있다(경계 점은 함께 쓴다). 그 너머로 가면 겹치므로 서버가 되돌린다. */
+  function segBounds(r, i) {
+    const segs = segments(r);
+    return [i ? segs[i - 1].to : 0,
+            i + 1 < segs.length ? segs[i + 1].from : points(r).length - 1];
+  }
+
+  /* 새 구간을 놓을 빈자리 [처음, 끝]. 구간이 없으면 길 전체이고, 있으면 아직 안
+     덮인 첫 틈이다. 점 둘이 있어야 한 걸음이라 틈이 없으면 null 을 답한다. */
+  function firstGap(r) {
+    const last = points(r).length - 1;
+    const segs = segments(r);
+    let at = 0;
+    for (let i = 0; i < segs.length; i++) {
+      if (segs[i].from > at) return [at, segs[i].from];
+      at = Math.max(at, segs[i].to);
+    }
+    return last > at ? [at, last] : null;
   }
 
   function byFrom(a, b) { return a.from - b.from; }
 
-  function addSegment(from) {
+  function addSegment(gap) {
     editRoute(active, {
-      segments: segments(activeRoute()).concat([{ from: from }]).sort(byFrom)
+      segments: segments(activeRoute())
+        .concat([{ from: gap[0], to: gap[1] }]).sort(byFrom)
     });
   }
 
-  /* 시작점을 옮기면 순서가 바뀔 수 있다 — 서버는 찍은 순서대로가 아닌 구간을 받지
+  /* 시작을 옮기면 순서가 바뀔 수 있다 — 서버는 찍은 순서대로가 아닌 구간을 받지
      않으므로 여기서 다시 세운다. */
-  function moveSegment(i, from) {
+  function moveSegment(i, patch) {
     editRoute(active, {
       segments: segments(activeRoute()).map(function (s, j) {
-        return j === i ? Object.assign({}, s, { from: from }) : s;
+        return j === i ? Object.assign({}, s, patch) : s;
       }).sort(byFrom)
     });
   }
 
-  /* 구간을 지우면 그 자리는 앞 구간이 물려받는다. 첫 구간을 지웠으면 다음 구간이
-     경로 첫 점으로 내려온다 — 첫 점에서 시작하지 않는 구간표를 서버가 받지 않기
-     때문이고, 그게 사실이기도 하다(앞이 비면 그 앞은 아무 구간도 아니다). */
+  /* 구간을 지우면 그 자리는 **빈자리가 된다** — 앞뒤가 물려받지 않는다. 적은 것을
+     지웠으니 그 걸음은 다시 '아직 안 봤다'이지, 옆 구간과 같아진 것이 아니다. */
   function dropSegment(i) {
     const segs = segments(activeRoute()).filter(function (_, j) { return j !== i; });
-    if (segs.length) segs[0] = Object.assign({}, segs[0], { from: 0 });
     /* 남은 것이 아무것도 말하지 않으면 자른 적 없는 것과 같다. 서버의 `_SAID` 와
        같은 목록이다 — 둘이 갈리면 화면에서 지운 구간이 저장에서 되살아나거나,
        화면에만 있던 값이 저장에서 조용히 사라진다. */
@@ -1604,18 +1632,22 @@ function init() {
     const pts = points(r);
     if (!pts.length) return '';
     const segs = segments(r);
-    const head = {};
-    segs.forEach(function (s, i) { head[s.from] = i; });
+    const head = {}, tail = {};
+    segs.forEach(function (s, i) { head[s.from] = i; tail[s.to] = i; });
     const done = endsAtSite(pts);
 
     return '<ul class="near">' + pts.map(function (p, i) {
       const tag = i === 0 ? ' <span class="cap">· 시작</span>'
         : (done && i === pts.length - 1 ? ' <span class="cap">· 끝</span>' : '');
-      /* 구간 경계는 여기서 **말만 한다**. 자르고 적는 일은 [상세설정] 이 맡는다 —
+      /* 구간 경계는 여기서 **말만 한다**. 잡고 적는 일은 [상세설정] 이 맡는다 —
          한 줄이 좌표 확인과 구간 편집의 입구를 겸하면, 노면을 적으려고 점을
-         자른다는 것이 무슨 일인지 화면만 보고는 알 수가 없다. */
-      const at = head[i] === undefined ? ''
-        : ' <span class="cap">· 구간 ' + (head[i] + 1) + ' 시작</span>';
+         나눈다는 것이 무슨 일인지 화면만 보고는 알 수가 없다.
+         한 점이 앞 구간의 끝이면서 뒤 구간의 시작일 수 있다(경계 점은 함께 쓴다). */
+      const mark = [];
+      if (tail[i] !== undefined) mark.push('구간 ' + (tail[i] + 1) + ' 끝');
+      if (head[i] !== undefined) mark.push('구간 ' + (head[i] + 1) + ' 시작');
+      const at = mark.length
+        ? ' <span class="cap">· ' + mark.join(' · ') + '</span>' : '';
       return '<li><span class="d">'
         + (i ? '+' + fmtDist(Math.round(metersBetween(pts[i - 1], p))) : '시작')
         + '</span><span class="t"><b>' + (i + 1) + '번</b>' + tag + at
@@ -1639,7 +1671,7 @@ function init() {
   function detailHtml(r) {
     if (points(r).length < 2 || !detailOn(r)) return '';
     const segs = segments(r);
-    const free = freePoints(r);
+    const gap = firstGap(r);
     return '<div class="detbox">'
       + (segs.length
           ? '<ul class="near">' + segs.map(function (_, i) {
@@ -1647,10 +1679,14 @@ function init() {
             }).join('') + '</ul>'
           : '<div class="empty">아직 구간이 없다 — [+ 구간] 을 한 번 누르면 길 '
             + '전체가 한 구간이 되고, 거기에 노면상태·암릉암반을 적는다. 밟는 것이 '
-            + '바뀌는 자리에서 구간을 하나 더 두면 그 점부터 다음 구간이다.</div>')
-      + (free.length
-          ? '<button class="addseg" data-addseg="' + free[0] + '">+ 구간</button>'
-          : '<div class="hint">점마다 구간이 하나씩이라 더 둘 자리가 없다</div>')
+            + '바뀌는 자리에서 <b>몇 번부터 몇 번까지</b>로 잡으면 되고, 안 잡은 '
+            + '자리는 아직 안 본 것으로 남는다 — 길 전체를 덮지 않아도 된다.</div>')
+      + (gap
+          ? '<button class="addseg" data-addseg="' + gap[0] + ':' + gap[1] + '">'
+            + '+ 구간 <span class="cap">(' + (gap[0] + 1) + '~' + (gap[1] + 1)
+            + '번)</span></button>'
+          : '<div class="hint">빈 자리가 없다 — 길 전체가 이미 구간으로 덮여 있다. '
+            + '더 나누려면 구간 하나의 끝을 당겨 자리를 낸다</div>')
       /* 구간을 하나씩 지우는 것으로는 감당이 안 되는 경우가 있다 — 점마다 구간이
          하나씩 박힌 길이 그렇다(옛 [나누기] 가 점 목록에 있던 시절의 잔해다).
          구간 하나짜리는 [지우기] 가 곧 이것이므로 두 번 묻지 않는다. */
@@ -1664,14 +1700,11 @@ function init() {
   /* 구간 한 덩이 — 어디부터 어디까지이고, 거기서 밟는 것이 무엇인가. */
   function segmentHtml(r, i) {
     const s = segments(r)[i];
-    const to = segEnd(r, i);
     return '<li class="seghead">'
       + '<div class="hd"><b>구간 ' + (i + 1) + '</b>'
-      /* 첫 구간은 언제나 경로 첫 점에서 시작한다 — 앞이 비면 그 앞은 아무 구간도
-         아니다. 그래서 고를 것이 없고, 고르는 자리도 두지 않는다. */
-      + (i ? startPickHtml(r, i) : '')
-      + '<span class="cap">' + (s.from + 1) + '~' + (to + 1) + '번 · '
-      + fmtDist(Math.round(routeLength(points(r).slice(s.from, to + 1))))
+      + pointPickHtml(r, i, 'from') + pointPickHtml(r, i, 'to')
+      + '<span class="cap">'
+      + fmtDist(Math.round(routeLength(points(r).slice(s.from, s.to + 1))))
       /* 경사는 저장할 때 표고 격자에서 잰 값이다(`core/elevation.py`). 격자 두 칸
          보다 짧은 구간은 못 재고, 못 잰 것은 못 쟀다고 적는다 — 0° 로 두면
          '평평하다'로 읽힌다. */
@@ -1691,17 +1724,22 @@ function init() {
       + '</li>';
   }
 
-  /* 구간이 어느 점에서 시작하는지. 예전 [나누기] 가 하던 일이 이 자리로 왔다 —
-     자를 자리를 점 목록에서 고르는 대신, 구간이 자기 시작점을 들고 있는다. */
-  function startPickHtml(r, i) {
-    const at = segments(r)[i].from;
-    const pick = freePoints(r).concat([at]).sort(function (a, b) { return a - b; });
-    return '<select data-sfrom="' + i + '" title="이 구간이 시작하는 점">'
-      + pick.map(function (n) {
-          return '<option value="' + n + '"' + (n === at ? ' selected' : '') + '>'
-            + (n + 1) + '번부터</option>';
-        }).join('')
-      + '</select>';
+  /* 구간이 어디부터 어디까지인지. 두 자리에서 각각 고른다 — 고를 수 있는 것은
+     옆 구간과 겹치지 않는 점뿐이고(`segBounds`), 시작은 끝보다 앞이어야 한다.
+     한 걸음도 안 덮는 구간은 아무것도 말하지 않으므로 같은 점은 고를 수 없다. */
+  function pointPickHtml(r, i, end) {
+    const s = segments(r)[i];
+    const bound = segBounds(r, i);
+    const lo = end === 'from' ? bound[0] : s.from + 1;
+    const hi = end === 'from' ? s.to - 1 : bound[1];
+    const out = [];
+    for (let n = lo; n <= hi; n++) {
+      out.push('<option value="' + n + '"' + (n === s[end] ? ' selected' : '') + '>'
+        + (n + 1) + '번' + (end === 'from' ? '부터' : '까지') + '</option>');
+    }
+    return '<select data-s' + end + '="' + i + '" title="'
+      + (end === 'from' ? '이 구간이 시작하는 점' : '이 구간이 끝나는 점') + '">'
+      + out.join('') + '</select>';
   }
 
   /* 낱말 고르는 단추 한 줄. 무엇을 뜻하는지는 눌러 보고 알 것이 아니라서 원문 설명을
@@ -1871,8 +1909,8 @@ function init() {
       + '</div></div></div>';
   }
 
-  /* 등급은 길 하나에 하나다. 구간마다 내려면 구간마다의 경사가 있어야 하는데 90m
-     DEM 으로는 못 잰다. 그래서 노면·암릉은 **가장 나쁜 구간**으로 대표한다 —
+  /* 등급은 길 하나에 하나다. 구간마다 내려면 구간마다의 경사가 있어야 하는데 격자
+     두 칸보다 짧은 구간은 못 잰다. 그래서 노면·암릉은 **가장 나쁜 구간**으로 대표한다 —
      편한 데를 말해 놓고 힘든 데서 막히는 것이 반대보다 나쁘다. */
   function worstSegment(r) {
     const out = { surface: '', rock: '' };
@@ -2129,7 +2167,7 @@ function init() {
        방금까지 손대고 있던 칸이 통째로 사라진다. */
     document.querySelectorAll('[data-addseg]').forEach(function (btn) {
       btn.onclick = function () {
-        addSegment(Number(btn.dataset.addseg));
+        addSegment(btn.dataset.addseg.split(':').map(Number));
         detailOpen = true;
         renderForm();
       };
@@ -2153,11 +2191,15 @@ function init() {
         renderForm();
       };
     });
-    document.querySelectorAll('[data-sfrom]').forEach(function (node) {
-      node.onchange = function () {
-        moveSegment(Number(node.dataset.sfrom), Number(node.value));
-        renderForm();          /* 구간 경계는 지도 선 색이라 곧바로 다시 그린다 */
-      };
+    ['from', 'to'].forEach(function (end) {
+      document.querySelectorAll('[data-s' + end + ']').forEach(function (node) {
+        node.onchange = function () {
+          const patch = {};
+          patch[end] = Number(node.value);
+          moveSegment(Number(node.dataset['s' + end]), patch);
+          renderForm();        /* 구간 경계는 지도 선 색이라 곧바로 다시 그린다 */
+        };
+      });
     });
     /* 길을 지우면 찍는 모드도 함께 끈다 — 점이 하나도 없는 채로 모드만 켜져 있으면
        지도를 눌러도 아무 일이 없어서 고장으로 보인다. */
@@ -2605,22 +2647,20 @@ function init() {
     renderForm();
   }
 
-  /* 점을 빼면 구간 경계도 함께 밀린다 — 인덱스만 남겨 두면 다음에 열었을 때 구간이
-     한 점씩 어긋난 채로 그려진다. 경계가 겹치게 되면 뒤엣것이 이긴다(방금 뺀 점에서
-     시작하던 구간이 앞 구간에 흡수되는 것이 아니라 그 자리를 물려받는다). */
+  /* 점을 빼면 구간의 양 끝도 함께 밀린다 — 인덱스만 남겨 두면 다음에 열었을 때
+     구간이 한 점씩 어긋난 채로 그려진다. 한 점으로 오그라든 구간은 버린다: 한
+     걸음도 안 덮으므로 아무것도 말하지 않고, 서버도 그런 구간을 받지 않는다. */
   function dropPoint(i) {
     const r = activeRoute();
     const pts = points(r).slice();
     pts.splice(i, 1);
+    const last = pts.length - 1;
     const segs = [];
     segments(r).forEach(function (s) {
-      const from = s.from > i ? s.from - 1 : s.from;
-      if (from > pts.length - 1) return;         /* 경로 끝이 잘려 나갔다 */
-      const moved = Object.assign({}, s, { from: from });
-      if (segs.length && segs[segs.length - 1].from === from) segs.pop();
-      segs.push(moved);
+      const from = Math.min(s.from > i ? s.from - 1 : s.from, last);
+      const to = Math.min(s.to > i ? s.to - 1 : s.to, last);
+      if (to > from) segs.push(Object.assign({}, s, { from: from, to: to }));
     });
-    if (segs.length) segs[0] = Object.assign({}, segs[0], { from: 0 });
     editRoute(active, { points: pts, segments: segs });
     renderForm();
   }

@@ -118,51 +118,79 @@ def test_같은_이름_둘을_막는다():
 # --- 구간 --------------------------------------------------------------------
 
 
-def test_구간은_자르는_자리로만_남는다():
+def test_구간은_몇_번부터_몇_번까지로_남는다():
     # Given: 계단 구간과 능선길로 나눠 노면을 적었을 때
     # When: 저장하면
-    # Then: 시작 점 번호와 적은 것만 남는다 — 끝은 다음 구간이 정하므로 적지 않는다
-    routes = coerce(_ROUTES, [_route(segments=[
-        {"from": 0, "surface": "포장", "rock": "목재계단",
+    # Then: 양 끝 점 번호와 적은 것이 남는다. 경계 점(2번)은 앞뒤가 함께 쓴다 —
+    #   한 칸 당겨 끊으면 그 한 걸음이 어느 구간에도 없다
+    routes = coerce(_ROUTES, [{"points": [_A, _B, _A], "segments": [
+        {"from": 0, "to": 1, "surface": "포장", "rock": "목재계단",
          "note": "경사 30~35도 데크계단"},
-        {"from": 1, "surface": "거의 흙", "note": "완만한 능선 흙길"},
-    ])])
+        {"from": 1, "to": 2, "surface": "거의 흙", "note": "완만한 능선 흙길"},
+    ]}])
     assert _tagged(routes[0])["segments"] == [
-        {"from": 0, "surface": "포장", "rock": "목재계단",
+        {"from": 0, "to": 1, "surface": "포장", "rock": "목재계단",
          "note": "경사 30~35도 데크계단"},
-        {"from": 1, "surface": "거의 흙", "note": "완만한 능선 흙길"},
+        {"from": 1, "to": 2, "surface": "거의 흙", "note": "완만한 능선 흙길"},
     ]
 
 
 def test_아무것도_안_적은_구간은_버린다():
-    # Given: 자르기만 하고 노면도 설명도 안 적었을 때
+    # Given: 범위만 잡고 노면도 설명도 안 적었을 때
     # When: 저장하면
     # Then: 구간을 남기지 않는다 — 아무것도 말하지 않는 구분이다
     assert "segments" not in coerce(_ROUTES, [_route(segments=[
-        {"from": 0}, {"from": 1},
+        {"from": 0, "to": 1},
     ])])[0]
 
 
-def test_첫_구간은_경로_첫_점에서_시작한다():
-    # Given: 첫 구간이 중간부터 시작하는 값이 왔을 때
+def test_길_한가운데만_적어도_된다():
+    # Given: 계단이 있는 가운데 토막만 보고 앞뒤는 아직 못 봤을 때
     # When: 저장하면
-    # Then: 막는다 — 그러면 첫 점부터 그 자리까지가 어느 구간도 아닌 채로 남는다
-    with pytest.raises(ValueError, match="첫 점에서 시작"):
-        coerce(_ROUTES, [_route(segments=[{"from": 1, "surface": "포장"}])])
+    # Then: 그대로 남는다 — 안 적은 앞뒤는 '아직 안 봤다'이고, 이 파일에서 없는
+    #   것이 곧 미확인이다. 길 전체를 덮게 하면 안 본 걸음에도 노면을 적어야 한다
+    routes = coerce(_ROUTES, [{"points": [_A, _B, _A], "segments": [
+        {"from": 1, "to": 2, "surface": "거의 돌"},
+    ]}])
+    assert _tagged(routes[0])["segments"] == [
+        {"from": 1, "to": 2, "surface": "거의 돌"}
+    ]
 
 
-def test_없는_점에서_시작하는_구간을_막는다():
+def test_한_걸음도_안_덮는_구간을_막는다():
+    # Given: 시작과 끝이 같은 점인 구간이 왔을 때
+    # When: 저장하면
+    # Then: 막는다 — 길이 0 이라 노면을 적어도 어디를 말하는지 알 수 없다
+    with pytest.raises(ValueError, match="시작"):
+        coerce(_ROUTES, [_route(segments=[
+            {"from": 1, "to": 1, "surface": "포장"},
+        ])])
+
+
+def test_없는_점을_가리키는_구간을_막는다():
     with pytest.raises(ValueError, match="없는 점"):
         coerce(_ROUTES, [_route(segments=[
-            {"from": 0, "surface": "포장"}, {"from": 9, "surface": "포장"},
+            {"from": 0, "to": 9, "surface": "포장"},
         ])])
 
 
 def test_구간은_찍은_순서대로여야_한다():
     with pytest.raises(ValueError, match="순서대로"):
         coerce(_ROUTES, [{"points": [_A, _B, _A], "segments": [
-            {"from": 0, "surface": "포장"}, {"from": 2, "surface": "거의 흙"},
-            {"from": 1, "surface": "거의 돌"},
+            {"from": 1, "to": 2, "surface": "거의 흙"},
+            {"from": 0, "to": 1, "surface": "포장"},
+        ]}])
+
+
+def test_서로_겹치는_구간을_막는다():
+    # Given: 앞 구간이 3번까지인데 뒤 구간이 2번부터 시작할 때
+    # When: 저장하면
+    # Then: 막는다 — 한 걸음이 두 노면을 갖게 되고, 어느 쪽이 맞는지 알 수 없다.
+    #   경계 점 하나를 함께 쓰는 것(1~2번 · 2~3번)까지가 겹침이 아니다
+    with pytest.raises(ValueError, match="겹칩니다"):
+        coerce(_ROUTES, [{"points": [_A, _B, _A, _B], "segments": [
+            {"from": 0, "to": 2, "surface": "포장"},
+            {"from": 1, "to": 3, "surface": "거의 흙"},
         ]}])
 
 
@@ -170,9 +198,9 @@ def test_난이도는_더_받지_않는다():
     # Given: 예전에 있던 난이도 3단(쉬움·보통·어려움)을 그대로 보냈을 때
     # When: 저장하면
     # Then: 조용히 버린다 — 걷는 길의 '보통'은 적는 사람마다 다른 말이라 뺐다
-    #   (`decisions.md` §2.16). 자른 자리만 남으므로 구간 자체가 사라진다.
+    #   (`decisions.md` §2.16). 범위만 남으므로 구간 자체가 사라진다.
     assert "segments" not in coerce(
-        _ROUTES, [_route(segments=[{"from": 0, "level": "어려움"}])]
+        _ROUTES, [_route(segments=[{"from": 0, "to": 1, "level": "어려움"}])]
     )[0]
 
 
@@ -180,8 +208,12 @@ def test_노면만_적어도_구간이_남는다():
     # Given: 암릉도 설명도 아직 못 적고 노면만 봤을 때
     # When: 저장하면
     # Then: 구간이 남는다 — 노면 하나로도 그 구간은 무언가를 말하고 있다
-    routes = coerce(_ROUTES, [_route(segments=[{"from": 0, "surface": "포장"}])])
-    assert _tagged(routes[0])["segments"] == [{"from": 0, "surface": "포장"}]
+    routes = coerce(
+        _ROUTES, [_route(segments=[{"from": 0, "to": 1, "surface": "포장"}])]
+    )
+    assert _tagged(routes[0])["segments"] == [
+        {"from": 0, "to": 1, "surface": "포장"}
+    ]
 
 
 def test_모르는_노면을_막는다():
@@ -189,12 +221,16 @@ def test_모르는_노면을_막는다():
     # When: 저장하면
     # Then: 막는다 — 야자매트는 원문 축에 없다. 데크·포장이면 `포장` 이다
     with pytest.raises(ValueError, match="모르는 노면"):
-        coerce(_ROUTES, [_route(segments=[{"from": 0, "surface": "야자매트"}])])
+        coerce(
+            _ROUTES, [_route(segments=[{"from": 0, "to": 1, "surface": "야자매트"}])]
+        )
 
 
 def test_모르는_암릉을_막는다():
     with pytest.raises(ValueError, match="모르는 암릉"):
-        coerce(_ROUTES, [_route(segments=[{"from": 0, "rock": "바위 조금"}])])
+        coerce(
+            _ROUTES, [_route(segments=[{"from": 0, "to": 1, "rock": "바위 조금"}])]
+        )
 
 
 def test_지형은_배점표를_고르는_값이라_아무_말이나_못_적는다():

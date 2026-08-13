@@ -78,7 +78,7 @@ data/             정적 데이터 (.py 없음)
 
 ## 관측지 데이터
 
-`data/jeju_spots.json` — 후보 156곳. 큐레이션과 자동 발굴(`sweep_place_candidates.py` ·
+`data/jeju_spots.json` — 후보 120곳. 큐레이션과 자동 발굴(`sweep_place_candidates.py` ·
 `merge_upland_parking.py`)을 합친 것이고, 주차·화장실·도보 경로 같은 칸은 사람이 채운다.
 
 ```bash

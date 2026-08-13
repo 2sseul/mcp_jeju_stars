@@ -19,7 +19,7 @@
     ├─ [후보 층]  갈 만한 곳이 애초에 어디 있나              🔨 P9 진행 중
     │      자동 발굴(어둡기 ∩ 토지소유 ∩ 주차 ∩ 도로 접근)
     │      → 로드뷰 데스크 전수 검증 → 후보 풀 200곳
-    │      지금 156곳. 토지소유 필터는 아직, 검증은 진행 중
+    │      지금 120곳. 토지소유 필터는 아직, 검증은 진행 중
     │
     ├─ [판정 층]  그 곳이 오늘 밤(또는 지금) 어떤가          ✅ 구현됨
     │      astro(박명) · weather(구름) · darkness(광공해)
@@ -33,7 +33,7 @@
 다녀올 수 있는가"를 답하지 못한다. 그래서 현재 도구가 답하는 범위는 **"이 좌표가 오늘 밤
 어떤가"** 까지다 — 질문의 아래층이다.
 
-후보 층은 **데이터와 도구는 섰지만 도구(MCP)로는 안 나간다.** `data/jeju_spots.json` 156곳과
+후보 층은 **데이터와 도구는 섰지만 도구(MCP)로는 안 나간다.** `data/jeju_spots.json` 120곳과
 그 칸을 채우는 `scripts/edit_spots.py`(표고·탐방로 등급·도로·주차·장소·화장실을 한 화면에
 모은 것)가 그것이다. 이 축들은 **`judge` 에 들어가지 않는다** — 어두운 곳을 화장실이나 경사
 때문에 떨어뜨리지 않는다. 순위로 승격되는 것은 P10~P11 이다.
@@ -162,7 +162,7 @@ weather 는 예외를 밖으로 던지지 않으며, judge 는 API·장소를 �
 | **기상 예보** | Open-Meteo Forecast API | `api.open-meteo.com/v1/forecast` (캐시 1h + 재시도 5회) | ✅ | 정시별 **총운량(%)**·**시정(m)**. 한 시각(`fetch`) 또는 밤 구간 시계열(`fetch_series`) |
 | **지오코딩** | Photon (Komoot, OSM 기반) | `photon.komoot.io/api/` (키 불필요) | ✅ | 주소·지명 → 좌표 (`evaluate_place`) |
 | **광공해 — Sky Brightness** | NASA Black Marble(VNP46A4/VJ146A4) 기반, lightpollutionmap.info 산출(sb_2025). 귀속: "Jurij Stare, www.lightpollutionmap.info" + "NASA's Black Marble nighttime lights product" | `data/light_pollution/jeju_2025_GeoTIFF_raw.tif` → 전처리 `data/darkness/jeju_sb_grid.npz` | ✅ | 어둡기 축의 **광역 하늘밝기** 성분(주 기준) — 인공 밝기(mcd/m²) → **SQM·Falchi 등급** |
-| **다크스카이 관측지 큐레이션** | 관광공사·비짓제주·위키·문화대전 교차확인(59곳) + 카카오맵 전수 수집 자동 발굴(97곳 — 장소 `kakao_sweep` 44 · 중산간 주차장 `kakao_parking` 53) | `data/jeju_spots.json` (156곳) | ⚠️ 참고자료 | 좌표·정성 정보. **엔진엔 아직 미연결** — 자동 발굴분은 `discovery` 키로 구분한다. 발굴 직후 194곳이었고 로드뷰 데스크 검증에서 **41곳을 뺐다**(골프장·대학·병원의 사설 주차장이 대부분). 후보 풀(P9) **200곳** 목표로 확장 후 연결 |
+| **다크스카이 관측지 큐레이션** | 관광공사·비짓제주·위키·문화대전 교차확인(44곳) + 카카오맵 전수 수집 자동 발굴(76곳 — 장소 `kakao_sweep` 42 · 중산간 주차장 `kakao_parking` 34) | `data/jeju_spots.json` (120곳) | ⚠️ 참고자료 | 좌표·정성 정보. **엔진엔 아직 미연결** — 자동 발굴분은 `discovery` 키로 구분한다. 발굴 직후 194곳이었고 로드뷰 데스크 검증에서 **74곳을 뺐다**(골프장·대학·병원의 사설 주차장이 대부분). 후보 풀(P9) **200곳** 목표로 확장 후 연결 |
 | **야간광 (VIIRS)** | NASA Black Marble VNP46A4 (CC0) | `data/light_pollution/jeju_2025_viirs_npp.tif` → 전처리 `jeju_viirs_grid.npz` | ✅ | 어둡기 축의 **국지 지상광** 성분 — 반경 1·3km 최대 복사휘도. 픽셀 절댓값은 판정에 쓰지 않는다(유효 픽셀 71.9%가 0) |
 | **가로등·보안등** | 공공데이터포털 제주시(52,019) · 서귀포시(38,022). **이용허락범위 제한 없음** | `data/streetlight/*.csv` (import 시 직접 로드) | ✅ | 어둡기 축의 **발밑 광원** 성분 — 최근접 거리·반경 100m/500m/1km 개수. 제주시 파일의 위경도 뒤바뀜 15,514행을 교정해 쓴다(`decisions.md` §1.8) |
 | **지형 고도 — 관측지 한 점 · 도보 경로** | **FABDEM V1-2** — Copernicus GLO-30 에서 나무·건물을 걷어낸 **맨땅(DTM)**, 1초각 ~30m. Hawker et al. 2022 · Univ. of Bristol / Fathom · **CC BY-NC-SA 4.0** | 타일 1장 → `data/elevation/jeju_dem_grid.npz` (3.5MB). **커밋하지 않는다** — 라이선스상 재배포 불가라 `data/elevation/` 전체가 gitignore 다. `scripts/build_elevation_grid.py` 를 한 번 돌려 만든다 | ✅ | `server/core/elevation.py` 가 읽어 **관측지 한 점의 해발높이·주변 90m 격자 경사**(`at`·`slope_at`)와 **도보 경로·구간의 고도차·경사**를 낸다. 네트워크 없음. DSM(GLO-30·SRTM)을 쓰면 제주 육지 67%가 1m 이상 부풀어 숲길 오름이 실제보다 가팔라진다 — `decisions.md` §2.17. 관측지 두 칸은 `scripts/measure_elevation.py` 가 파일에 적고, `edit_spots` 가 저장할 때마다 다시 잰다(§2.20). 공표 표고가 아니라 **차를 세우고 설 그 자리**의 값이다 |
@@ -217,8 +217,8 @@ weather 는 예외를 밖으로 던지지 않으며, judge 는 API·장소를 �
   - 제주 범위 밖 결과는 버림. 못 찾으면 `None` → Host LLM 이 웹검색 등으로 좌표를 구해
     `evaluate_spot(lat, lon)` 을 호출하는 오케스트레이션에 맡긴다(MCP 표준, 서버 간 결합 회피).
 
-- **`data/jeju_spots.json`** (156곳) — 좌표·정성 광공해 정보(신뢰도 필드 포함). **엔진 미연결(참고자료)**.
-  - 큐레이션 59 + 자동 발굴 97(`discovery` 키로 구분). 발굴 직후 194곳에서 검증으로 41곳이 빠졌다 — **빠지는 것이 정상 동작이다**.
+- **`data/jeju_spots.json`** (120곳) — 좌표·정성 광공해 정보(신뢰도 필드 포함). **엔진 미연결(참고자료)**.
+  - 큐레이션 44 + 자동 발굴 76(`discovery` 키로 구분). 발굴 직후 194곳에서 검증으로 74곳이 빠졌다 — **빠지는 것이 정상 동작이다**.
   - 주차·화장실·도보 경로 같은 칸은 `scripts/edit_spots.py` 로 사람이 채운다. 모르는 항목은 **키를 만들지 않는다** — 없는 키가 곧 '미확인'이고 그것이 남은 작업 목록이다.
   - **도보 경로(`walk_routes`)의 좌표는 사람이 위성·로드뷰를 보고 찍은 것이 유일한 출처다**(현재 14곳). OSM 도로망에 보행로가 없고 지도 서비스도 오름 탐방로를 주지 않는다. 찍힌 선에서 `core.elevation` 이 고도차·경사를, `core.trail` 이 국립공원공단 등급을 낸다.
 

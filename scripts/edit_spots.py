@@ -371,6 +371,18 @@ class Spots:
         self.flush()
         return column
 
+    def restate_count(self) -> None:
+        """제목과 `meta.count` 를 지금 관측지 수에 맞춘다.
+
+        같은 수가 두 군데 적혀 있어 한쪽만 고치면 어느 쪽이 맞는지 알 수 없다 —
+        `merge_upland_parking.py` 도 편입 뒤에 같은 일을 한다. 지우기가 이걸 안 해서
+        실제로 파일이 120곳이 된 뒤에도 156 이 두 묶음 동안 남아 있었다.
+        """
+        self._doc["meta"]["count"] = len(self.spots)
+        self._doc["meta"]["title"] = (
+            f"제주 다크스카이 관측지 큐레이션 목록 ({len(self.spots)}곳)"
+        )
+
     def flush(self) -> None:
         tmp = self._file.with_suffix(".json.tmp")
         tmp.write_text(
@@ -3055,6 +3067,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         spots.pop(index)
+        self.store.restate_count()
         self.store.flush()
         # 화면은 곧 새로 고친다. 시작할 때 만들어 둔 페이지에는 지운 곳이 아직 박혀
         # 있으므로 여기서 다시 만든다.

@@ -18,6 +18,18 @@
 나오고, 칸 경계를 걸치면 그 경계 하나가 통째로 경사가 된다. `MIN_M` 보다 짧으면
 `None` 을 답한다 — 0° 로 답하면 '평평하다'로 읽힌다.
 
+도보 시간은 **사람이 나눠 둔 구간을 쓰지 않는다**
+--------------------------------------------------------------------------
+`data/jeju_spots.json` 의 `walk_routes[].segments` 는 사람이 노면·암릉을 적어 둔
+칸이라 길이가 제각각이고, **가장 가파른 목재계단이 대개 `MIN_M` 보다 짧다**. 그
+칸들만 보면 다랑쉬오름은 오름 209m 중 132m 밖에 잡히지 않는다 — 시간이 제일 많이
+드는 곳이 통째로 빠진다.
+
+그래서 `spans()` 가 원본 점을 `WALK_WIN_M` 이상으로 **다시 묶는다**. 격자가 계단을
+못 본 것이 아니라 30m 계단을 30m 격자로 나눌 때 분모가 작아 잡음이 컸을 뿐이라,
+묶어서 분모를 키우면 그대로 나온다(다랑쉬 132m → 209.5m, 경로 순고도 208.9m 와 일치).
+`segments` 는 노면·암릉에만 쓰고 경사·거리는 여기서 다시 잰다.
+
 격자 파일은 라이선스(CC BY-NC-SA)상 커밋하지 않으므로, 받은 저장소에서 처음
 쓸 때는 `scripts/build_elevation_grid.py` 를 한 번 돌려야 한다.
 """
@@ -25,6 +37,7 @@
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -145,3 +158,120 @@ def climb_m(points) -> float | None:
 def percent(climb: float, metres: float) -> float:
     """국립공원공단 배점표가 쓰는 백분율 경사. `core.trail` 이 이 값을 받는다."""
     return abs(climb) / metres * 100.0 if metres else 0.0
+
+
+# --- 도보 시간 ----------------------------------------------------------------
+
+#: 경사를 재려고 원본 점을 다시 묶는 길이(m). `MIN_M`(약 62m)보다 크기만 하면 되고,
+#: 62~250m 어디로 잡아도 소요시간이 대부분 5% 안에서 같아 어림수 70 을 쓴다.
+WALK_WIN_M: float = 70.0
+
+#: Márquez-Pérez 수정 Tobler 함수 `v = 4.8·exp(-5.3·|0.7·S + 0.03|)` (km/h).
+#: S 는 경사 tan. 원본 Tobler(1993)는 평지 5.04km/h·감쇠 3.5 인데, 이쪽은
+#: 평지 4.09km/h·감쇠 5.3 이라 **느리고 경사에 더 민감**하다.
+_WALK_A: float = 4.8
+_WALK_B: float = 5.3
+_WALK_C: float = 0.7
+_WALK_D: float = 0.03
+
+#: 논문이 밝힌 오차(분/km). 값을 내보낼 때 이 폭을 함께 적는다 — 단일값으로 주면
+#: 없는 정밀도가 생긴다.
+WALK_ERROR_MIN_PER_KM: tuple[float, float] = (1.8, 2.3)
+
+WALK_SOURCE: str = (
+    "도보 시간: Márquez-Pérez, Vallejo-Villalta & Álvarez-Francoso (2017), "
+    "Geografisk Tidsskrift-Danish Journal of Geography 117(1): 53-62"
+)
+
+
+@dataclass(frozen=True)
+class Span:
+    """다시 묶은 한 도막. 경사를 **잴 수 있는 길이**가 보장된다."""
+
+    metres: float
+    #: 도막 양 끝의 평균 경사(도). 오르막 양수. 표고 결측이면 None.
+    slope_deg: float | None
+    #: 도막 양 끝의 순 고도차(m). 표고 결측이면 None.
+    climb_m: float | None
+
+
+def spans(points, window: float = WALK_WIN_M) -> tuple[Span, ...]:
+    """경로를 `window` 이상 도막으로 다시 묶는다.
+
+    **마지막 자투리는 버리지 않고 직전 도막에 붙인다.** 버리면 짧은 경로에서
+    치명적이다 — 망동산(291m)은 자투리를 버릴 때 고도 31.1m 중 14.5m 만 잡혔다.
+    붙이면 마지막 도막이 `window`~2배 `window` 가 되고 경로 전체가 덮인다.
+
+    경로가 통째로 `MIN_M` 보다 짧으면 경사를 모르는 도막 하나를 답한다. 그 길이에서는
+    고도차가 몇 m 를 넘지 않아 시간에 영향이 없다 — 차를 대고 바로 서는 자리다.
+    """
+    if len(points) < 2:
+        return ()
+
+    # 먼저 도막 경계(점 인덱스)만 잡는다. 경사·고도는 경계가 확정된 뒤 한 번만 잰다 —
+    # 자투리를 붙이면 마지막 도막의 양 끝이 달라지므로 미리 재면 버리는 값이 생긴다.
+    bounds: list[tuple[int, int]] = []
+    i = 0
+    while i < len(points) - 1:
+        j = i + 1
+        while j < len(points) and length_m(points[i : j + 1]) < window:
+            j += 1
+        if j >= len(points):
+            break
+        bounds.append((i, j))
+        i = j
+
+    if not bounds:
+        return (Span(length_m(points), None, None),)
+    if bounds[-1][1] < len(points) - 1:
+        bounds[-1] = (bounds[-1][0], len(points) - 1)
+
+    out = []
+    for a, b in bounds:
+        piece = points[a : b + 1]
+        out.append(Span(length_m(piece), slope_deg(piece), climb_m(piece)))
+    return tuple(out)
+
+
+def ascent_m(points) -> float | None:
+    """경로가 실제로 **오른 만큼**(m). 표고를 모르면 None.
+
+    `climb_m` 은 양 끝의 순 고도차라 오르내리는 길에서 모자란다 — 저지오름은
+    순 111.7m 인데 실제로 오르는 것은 146.7m 다. 점마다 더하면 격자 잔 톱니가
+    전부 쌓이므로, 경사를 잴 수 있는 도막(`spans`) 단위로만 더한다.
+    """
+    got = spans(points)
+    if not got or all(s.climb_m is None for s in got):
+        return None
+    return round(sum(s.climb_m for s in got if s.climb_m and s.climb_m > 0), 1)
+
+
+def walk_speed_kmh(slope: float | None) -> float:
+    """그 경사에서의 보행 속도(km/h) — Márquez-Pérez(2017) 수정 Tobler 함수.
+
+    경사를 모르면 평지로 본다. 그런 도막은 `MIN_M` 보다 짧은 경로뿐이고, 그 길이의
+    고도차는 시간에 영향이 없다.
+    """
+    s = math.tan(math.radians(slope or 0.0))
+    return _WALK_A * math.exp(-_WALK_B * abs(_WALK_C * s + _WALK_D))
+
+
+def walk_minutes(points) -> float | None:
+    """경로를 걷는 **편도** 시간(분). 점이 모자라면 None.
+
+    도막마다 경사를 넣어 속도를 구하고 그 시간을 더한다. 경로 평균 경사로 한 번에
+    계산하면 안 된다 — 새별오름은 평균 7.6° 지만 실제로는 +15°·+21° 구간이 있고,
+    함수가 볼록해 평균으로 재면 늘 짧게 나온다.
+
+    **왕복은 이 값의 두 배가 아니다.** 함수가 오르막·내리막에 비대칭이라(내려올 때가
+    빠르다) 왕복이 필요하면 반대 방향으로 다시 적분해야 한다.
+
+    야간·짐은 들어 있지 않다. 그 감속을 잰 공표 자료를 찾지 못했고, 없는 계수를
+    지어내지 않는다(`docs/decisions.md`).
+    """
+    got = spans(points)
+    if not got:
+        return None
+    return round(
+        sum(s.metres / 1000.0 / walk_speed_kmh(s.slope_deg) * 60.0 for s in got), 1
+    )

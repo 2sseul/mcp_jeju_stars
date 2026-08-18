@@ -29,7 +29,6 @@ from server.core import elevation
 _ROUTES = Column("walk_routes", "도보 경로", "routes")
 _PARKING = Column("parking", "주차 지점", "parking")
 _TOILET = Column("toilet", "화장실 위치", "points")
-_AMENITIES = Column("amenities", "편의시설", "flags")
 _COORDS = Column("coords", "관측 좌표", "coords")
 _ELEVATION = Column("elevation_m", "해발높이(m)", "measured")
 
@@ -45,7 +44,7 @@ def _route(**kw) -> dict:
 #: 저장할 때 표고 격자에서 **잰** 값들(`_measure`). 사람이 적은 값을 보는 시험에서는
 #: 걷어내고 본다 — 여기서 지키는 것은 화면이 보낸 값을 어떻게 받아들이는가이지,
 #: DEM 이 무엇을 답했는가가 아니다 — 그쪽은 `core/elevation.py` 몫이다.
-_MEASURED = ("climb_m", "slope_deg", "over_m")
+_MEASURED = ("climb_m", "slope_deg", "over_m", "minutes", "ascent_m", "stair_m")
 
 
 def _tagged(value):
@@ -84,12 +83,15 @@ def test_제주_밖_좌표를_막는다():
         coerce(_ROUTES, [{"points": [_A, [35.1, 129.0]]}])
 
 
-def test_도보_시간은_받지_않는다():
-    # Given: 옛 화면이 길마다 도보 시간을 적게 하던 시절의 값이 섞여 들어올 때
+def test_도보_시간은_사람이_적은_값을_쓰지_않는다():
+    # Given: 사람이 길마다 도보 시간을 적어 보낼 때
     # When: 저장하면
-    # Then: 버린다 — 계단·오르막이 섞인 길의 분은 재도 눈대중이라 아예 두지 않는다.
-    #       힘든 정도는 경사·거리·노면·암릉으로 내는 탐방로 등급이 말한다
-    assert "minutes" not in coerce(_ROUTES, [_route(minutes="20")])[0]
+    # Then: 그 값이 아니라 **코드가 잰 값**이 남는다. 손으로 적힌 시간은 실제로
+    #   경로와 다른 지점까지의 시간이었다 — 새별오름은 경로가 관측 지점(504m)에서
+    #   끝나는데 적힌 30분은 정상(519.3m)까지였다
+    got = coerce(_ROUTES, [_route(minutes="20")])[0]
+    assert got["minutes"] != "20"
+    assert got["minutes"] == elevation.walk_minutes([_A, _B])
 
 
 # --- 여러 갈래 ----------------------------------------------------------------
@@ -330,31 +332,6 @@ def test_화장실에는_요금이_붙지_않는다():
 def test_화장실도_제주_밖을_막는다():
     with pytest.raises(ValueError, match="제주 밖"):
         coerce(_TOILET, [{"lat": 35.1, "lon": 129.0}])
-
-
-# --- 편의시설 -----------------------------------------------------------------
-
-
-def test_편의시설은_세_상태다():
-    # Given: 화장실을 가 봤는데 없던 관측지일 때
-    # When: 저장하면
-    # Then: false 가 그대로 남는다 — 한때 true 만 남겼는데, 그러면 확인하러 간
-    #   관측지와 아직 안 본 관측지가 파일에서 같아 보인다
-    assert coerce(_AMENITIES, {"toilet": False}) == {"toilet": False}
-    assert coerce(_AMENITIES, {"toilet": True}) == {"toilet": True}
-    assert coerce(_AMENITIES, {}) is None
-
-
-def test_편의시설의_미확인은_키가_없는_것이다():
-    # Given: 화면이 '미확인'을 고른 항목을 아예 빼고 보냈을 때
-    # When: 저장하면
-    # Then: 그 키가 없다. 남은 항목만 적힌다
-    assert coerce(_AMENITIES, {"toilet": False, "bench": None}) == {"toilet": False}
-
-
-def test_편의시설에_예_아니오가_아닌_값을_막는다():
-    with pytest.raises(ValueError, match="예·아니오"):
-        coerce(_AMENITIES, {"toilet": "있음"})
 
 
 # --- 만들어진 페이지 ----------------------------------------------------------

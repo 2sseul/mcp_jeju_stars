@@ -91,9 +91,9 @@ def absorb(spot: dict, row: dict) -> list[str]:
         # 검증에서 `edit_spots.py` 가 더한다.
         spot["parking"] = [row["parking_point"]]
         gained.append("주차좌표")
-    if row.get("toilet_on_site") and "amenities" not in spot:
-        spot["amenities"] = {"toilet": True}
-        gained.append("화장실")
+    # 화장실은 붙이지 않는다. 전수 수집이 아는 것은 '있다'뿐이고 `toilet` 은 자리
+    # 목록이라 좌표 없는 참을 담을 자리가 없다 — 키를 비워 두면 로드뷰 검증에서
+    # 사람이 좌표째 채운다("없는 키가 곧 미확인").
     if row.get("campsite") and "campsite" not in spot:
         spot["campsite"] = True
         gained.append("야영장")
@@ -121,8 +121,6 @@ def to_spot(row: dict) -> dict:
     }
     if "parking_point" in row:
         spot["parking"] = [row["parking_point"]]
-    if row.get("toilet_on_site"):
-        spot["amenities"] = {"toilet": True}
     if row.get("campsite"):
         spot["campsite"] = True
     if row.get("url"):
@@ -178,14 +176,13 @@ def main() -> None:
     print(f"\n{'점수':>6s} 표식 {'이름':24s} {'지역':4s} 유형")
     for score, spot in added:
         mark = ("P" if "parking" in spot else " ") \
-             + ("T" if "amenities" in spot else " ") \
              + ("C" if "campsite" in spot else " ")
         print(f"{score:6.3f} {mark}  {spot['name_ko'][:24]:24s} "
               f"{spot['region']:4s} {spot['type']}")
 
     swept = sum("discovery" in s for s in spots)
     print(f"\n총 {len(spots)}곳 · 자동발굴 {swept} · 큐레이션 {len(spots) - swept}")
-    for key in ("parking", "amenities", "campsite", "cautions", "sources"):
+    for key in ("parking", "campsite", "cautions", "sources"):
         print(f"  {key:11s} {sum(key in s for s in spots):3d}곳")
 
 

@@ -6,7 +6,10 @@
 
 from __future__ import annotations
 
-from server.core import trail
+import json
+
+from server import path
+from server.core import elevation, trail
 
 
 def test_경사도_배점이_지형마다_다르다():
@@ -103,3 +106,62 @@ def test_용눈이오름_회귀():
     # 매우쉬움·쉬움은 점수 말고 부가 조건이 붙는데 우리는 그것을 못 본다
     assert "노면폭" in got.unverified
     assert got.partial is True
+
+
+# --- 경로 하나에 구간이 여럿일 때 -----------------------------------------------
+
+
+def test_가장_나쁜_노면과_암릉을_고른다():
+    # Given: 흙길 사이에 목재계단이 낀 경로에서(다랑쉬오름이 그렇다)
+    segments = [
+        {"surface": "포장", "rock": "목재계단"},
+        {"surface": "거의 흙", "rock": "없음"},
+        {"surface": "비교적 돌", "rock": "없음"},
+    ]
+    # When: 등급에 넣을 값을 고르면
+    surface, rock = trail.worst(segments)
+    # Then: 평균이 아니라 제일 나쁜 자리다 — 밤에 초행으로 걷는 사람이 걸리는
+    #   곳이 거기이고, 평균을 내면 계단이 흙길로 뭉개진다
+    assert surface == "비교적 돌"
+    assert rock == "목재계단"
+
+
+def test_아무것도_안_적힌_구간에서는_고르지_않는다():
+    # Given: 자른 자리만 있고 노면·암릉을 아직 안 적은 구간들에서
+    # When: 값을 고르면
+    # Then: 빈 문자열이다 — `assess` 가 이것을 받으면 등급을 내지 않는다.
+    #   못 본 것을 '없음' 1점으로 채우면 등급이 실제보다 쉽게 나온다
+    assert trail.worst([{"from": 0, "to": 3}]) == ("", "")
+    assert trail.worst([]) == ("", "")
+    assert trail.assess(
+        slope_percent=10.0, distance_m=500.0,
+        terrain=trail.RIDGE, surface="", rock="",
+    ) is None
+
+
+def test_관측지_파일의_경로에_등급이_나온다():
+    # Given: 지형·노면·암릉이 다 적힌 경로들에서(편집 화면이 등급을 띄우는 조건)
+    doc = json.loads(path.SPOTS.read_text(encoding="utf-8"))
+    graded, missing = 0, []
+    for spot in doc["spots"]:
+        for route in spot.get("walk_routes") or []:
+            surface, rock = trail.worst(route.get("segments"))
+            if not (route.get("terrain") and surface and rock
+                    and route.get("over_m") and route.get("climb_m") is not None):
+                continue
+            # When: 파이썬으로 등급을 내면
+            got = trail.assess(
+                slope_percent=elevation.percent(route["climb_m"], route["over_m"]),
+                distance_m=route["over_m"],
+                terrain=route["terrain"],
+                surface=surface,
+                rock=rock,
+            )
+            # Then: 화면이 띄우는 것과 같은 조건에서 같이 나온다. 화면은 이 모듈이
+            #   내보낸 표로 셈만 하므로, 파이썬이 못 내면 화면도 못 낸다
+            if got is None:
+                missing.append(spot["name_ko"])
+            else:
+                graded += 1
+    assert not missing, "등급을 못 낸 경로: " + "·".join(missing)
+    assert graded >= 50, f"등급이 나온 경로가 {graded}개뿐이다"

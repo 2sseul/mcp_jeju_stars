@@ -106,10 +106,9 @@
 남은 일이 파일에서 그대로 보인다. 그래서 화면에서 칸을 비우면 키를 지우고, 예·아니오
 칸은 3단(미확인·예·아니오)이다 — "아니오"와 "아직 안 봤다"는 다른 말이다.
 
-같은 규약이 **한 겹 안쪽에서도** 선다. 편의시설(`amenities`)은 항목마다 3단이라
-`{"toilet": false}` 가 "가 봤는데 없다"이고, 키가 아예 없는 것이 "아직 안 봤다"이다 —
-한때 '있다'만 적었는데, 그러면 화장실을 확인하러 간 관측지와 아직 안 본 관측지가
-파일에서 같아 보인다. 주차 자리의 요금(`유료`·`무료`)도 마찬가지로 없으면 미확인이다.
+같은 규약이 **한 겹 안쪽에서도** 선다. 주차 자리의 요금(`유료`·`무료`)은 키가 없으면
+미확인이고, 빈 문자열이 아니다 — 요금을 확인하러 간 자리와 아직 안 본 자리를
+파일에서 갈라 놓아야 남은 일이 보인다.
 
 컬럼을 늘릴 수 있다
 --------------------------------------------------------------------------
@@ -139,6 +138,7 @@ import numpy as np
 
 from scripts import env
 from scripts.measure_elevation import ELEVATION_KEY, SLOPE_KEY, measure_site
+from scripts.measure_walk_time import measure_route
 from scripts.review_parking import Server, site_fields
 from server import path
 from server.core import (
@@ -251,7 +251,7 @@ class Column:
 
         text·textarea  문자열              choice  문자열(기존 값 추천, 자유 입력)
         number         숫자                bool    3단(미확인·예·아니오)
-        list           문자열 목록(줄 단위) flags   {이름: 3단} 묶음(편의시설)
+        list           문자열 목록(줄 단위)
         point          {name, lat, lon}    coords  관측지 자신의 lat·lon
         points         자리 여럿 — `point` 의 세 상태 그대로에 좌표만 여럿(화장실)
         parking        주차 자리 여럿 — `points` 에 자리마다 요금이 더 붙는다
@@ -304,13 +304,9 @@ _BUILTIN: tuple[Column, ...] = (
            "목록에 없으면 지도 우클릭으로 찍고, 가 봤는데 없으면 [없음]"),
     Column("store", "가게 위치", "point",
            "밤에 들를 가게. 목록에 없으면 지도 우클릭으로 찍고, 없으면 [없음]"),
-    Column("amenities", "편의시설", "flags",
-           "좌표까지는 모르고 '있다'만 아는 것. 자리를 특정했으면 위 두 칸에 적는다"),
     Column("hours", "운영시간", "text"),
     Column("fee", "요금", "text"),
     Column("night_access", "야간 개방", "text", "제한이 있으면 그 내용과 출처"),
-    Column("rest_year", "자연휴식년제", "bool",
-           "해당하면 기간·고시 출처를 야간 개방 칸에 함께 적는다"),
     Column("pets", "반려동물", "choice", "출입 가부",
            options=("가능", "불가", "목줄 착용 시 가능")),
     Column("campsite", "야영 가능", "bool"),
@@ -318,7 +314,7 @@ _BUILTIN: tuple[Column, ...] = (
     Column("sources", "출처 URL", "list", "한 줄에 하나"),
 )
 
-#: 화면에서 만들 수 있는 칸 형식. 구조가 걸린 것(point·coords·flags)은 뺀다 —
+#: 화면에서 만들 수 있는 칸 형식. 구조가 걸린 것(point·coords)은 뺀다 —
 #: 그건 화면과 서버가 짝으로 알아야 하는 것이라 데이터로 늘릴 수 없다.
 ADDABLE = ("text", "textarea", "number", "choice", "bool", "list")
 
@@ -433,20 +429,6 @@ def coerce(column: Column, value):
     if column.type == "list":
         items = [line.strip() for line in (value or []) if str(line).strip()]
         return items or None
-
-    if column.type == "flags":
-        # 항목마다 세 상태다 — 키 없음(미확인) · true(있다) · false(가 봤는데 없다).
-        # 이 파일의 "없는 키가 곧 미확인"이 사전 한 겹 안쪽에서도 그대로 선다.
-        # 한때 true 만 남기고 false 를 버렸는데, 그러면 확인하러 간 관측지와 아직
-        # 안 본 관측지가 파일에서 같아 보인다.
-        flags = {}
-        for name, flag in (value or {}).items():
-            if flag is None or flag == "":
-                continue
-            if not isinstance(flag, bool):
-                raise ValueError(f"{column.label} {name}: 예·아니오가 아닙니다")
-            flags[name] = flag
-        return flags or None
 
     if column.type in ("points", "parking"):
         # `point` 의 세 상태에 **여럿**이 더해진 것 — 키 없음(미확인) ·
@@ -569,10 +551,17 @@ def _route(value, label: str, named: bool) -> dict:
 #:     climb_m    출발점 → 도착점 순 고도차(m). 오르막이면 양수
 #:     slope_deg  그 고도차를 경로 길이로 나눈 전체 평균 경사(도)
 #:     over_m     경로 길이(m)
+#:     minutes    그 경로를 걷는 **편도** 시간(분)
+#:     ascent_m   실제로 오르는 높이(m) — 오르내리는 길에서 `climb_m` 과 갈린다
+#:     stair_m    계단·로프 등 손발을 더 쓰는 구간의 길이(m)
 #:
 #: 잴 수 없으면(격자 두 칸보다 짧거나 격자 밖) **키를 만들지 않는다** — 이 파일의
 #: 규약대로 없는 키가 곧 '못 쟀다'이고, 0 으로 채우면 '평평하다'로 읽힌다.
-_MEASURED = ("climb_m", "slope_deg", "over_m")
+#:
+#: 뒤의 셋은 `scripts/measure_walk_time.py` 가 배치로도 채운다. 같은 함수를 부르므로
+#: 어느 쪽으로 채워도 값이 같다 — 여기서 재는 것은 선을 고친 사람이 그 자리에서
+#: 결과를 봐야 하기 때문이다.
+_MEASURED = ("climb_m", "slope_deg", "over_m", "minutes", "ascent_m", "stair_m")
 
 
 def _measure(route: dict) -> None:
@@ -587,6 +576,8 @@ def _measure(route: dict) -> None:
         route["climb_m"] = climb
         route["slope_deg"] = slope
         route["over_m"] = round(elevation.length_m(points), 1)
+
+    measure_route(route)
 
     # 구간마다의 경사. 짧은 구간은 못 재고, 못 잰 것은 비워 둔다 — 어디가 가파른지가
     # 여기서 보여야 사람이 구간을 어디까지로 잡을지 정할 수 있다.
@@ -898,16 +889,6 @@ def choices(spots: list[dict], columns: list[Column]) -> dict[str, list[str]]:
     return out
 
 
-def flag_keys(spots: list[dict]) -> list[str]:
-    """편의시설(`amenities`)에 쓰인 항목 이름들. 화면이 이만큼 칸을 세운다."""
-    found: set[str] = set()
-    for spot in spots:
-        value = spot.get("amenities")
-        if isinstance(value, dict):
-            found.update(value)
-    return sorted(found)
-
-
 def spot_row(index: int, spot: dict) -> dict:
     """지도·목록이 쓰는 한 줄. 값 전체를 그대로 싣고 어둡기는 여기서 잰다."""
     site = site_fields(spot["lat"], spot["lon"])
@@ -1101,10 +1082,6 @@ _HTML = """<meta charset="utf-8">
                   border: 1px solid var(--hairline); border-radius: 5px; }
   .point button.on { color: var(--ink); border-color: var(--save); }
   .point button.danger { color: var(--danger); border-color: var(--danger); }
-  .flags { display: grid; gap: 5px; }
-  .flags .one { display: flex; align-items: center; gap: 8px; font-size: 12px; }
-  .flags .one .nm { flex: 1 1 auto; }
-  .flags .one .seg { flex: 0 0 auto; width: 132px; }
   /* 여러 자리를 담는 칸(주차·화장실). 주차는 자리마다 요금 3단이 붙어 편의시설과
      같은 줄 모양이고, 화장실은 그 자리가 비어 이름과 [빼기] 만 선다. 이름이
      길어질 수 있어(카카오 검색 이름) 넘치면 자른다. */
@@ -1955,20 +1932,6 @@ function init() {
       body = '<textarea id="' + id + '">' + esc((v || []).join('\\n')) + '</textarea>';
     } else if (col.type === 'bool') {
       body = segHtml(id, v);
-    } else if (col.type === 'flags') {
-      /* 항목마다 3단이다 — 이 파일의 "없는 키가 곧 미확인"이 `amenities` 사전
-         안쪽에서도 그대로 서기 때문이다: 키 없음(미확인) · true(있다) ·
-         false(가 봤는데 없다). 한때 '있다'만 적었는데, 그러면 화장실을 확인하러
-         간 관측지와 아직 안 본 관측지가 파일에서 같아 보인다. */
-      body = '<div class="flags" id="' + id + '">'
-        + DATA.flagKeys.map(function (k) {
-            const f = v ? v[k] : undefined;
-            return '<div class="one"><span class="nm">' + esc(k) + '</span>'
-              + segHtml(id + '_' + k, typeof f === 'boolean' ? f : undefined,
-                        [['', '미확인'], ['yes', '있음'], ['no', '없음']])
-              + '</div>';
-          }).join('')
-        + '</div>';
     } else if (col.type === 'parking' || col.type === 'points') {
       body = placesFieldHtml(col, v);
     } else if (col.type === 'point') {
@@ -2084,16 +2047,6 @@ function init() {
       if (col.type === 'bool') {
         bindSeg(node, function (v) {
           setValue(col.key, v === '' ? null : v === 'yes');
-        });
-      } else if (col.type === 'flags') {
-        DATA.flagKeys.forEach(function (k) {
-          bindSeg(el('f_' + col.key + '_' + k), function (v) {
-            const now = Object.assign({}, value(col.key) || {});
-            /* '미확인'은 키를 지우는 것이다 — 이 파일에서 없는 키가 곧 미확인이라
-               false 로 두면 '가 봤는데 없다'가 되어 다른 말이 된다. */
-            if (v === '') delete now[k]; else now[k] = v === 'yes';
-            setValue(col.key, Object.keys(now).length ? now : null);
-          });
         });
       } else if (col.type === 'parking') {
         places(col.key).forEach(function (_, i) {
@@ -2948,7 +2901,6 @@ def build_page(key: str, store: Spots) -> str:
         "spots": rows,
         "columns": [vars(c) for c in columns],
         "choices": choices(spots, columns),
-        "flagKeys": flag_keys(spots),
         "parkingFee": list(PARKING_FEE),
         "addable": [[t, _TYPE_LABEL[t]] for t in ADDABLE],
         "colors": {
@@ -2964,9 +2916,9 @@ def build_page(key: str, store: Spots) -> str:
             "rock": trail.ROCK, "rockHelp": _ROCK_HELP,
             "terrain": trail.TERRAIN, "terrainHelp": _TERRAIN_HELP,
             "weight": trail.WEIGHT, "omitted": trail.OMITTED,
-            "slopePct": {k: list(v) for k, v in trail._SLOPE_PCT.items()},
-            "distanceM": {k: list(v) for k, v in trail._DISTANCE_M.items()},
-            "grades": list(trail._GRADE), "hardest": trail.HARDEST,
+            "slopePct": {k: list(v) for k, v in trail.SLOPE_PCT.items()},
+            "distanceM": {k: list(v) for k, v in trail.DISTANCE_M.items()},
+            "grades": list(trail.GRADE), "hardest": trail.HARDEST,
             "source": trail.SOURCE,
         },
         "demSource": elevation.SOURCE,

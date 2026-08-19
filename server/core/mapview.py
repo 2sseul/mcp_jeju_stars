@@ -17,8 +17,17 @@
 `core` 는 I/O 를 하지 않으므로 이 모듈은 HTML **문자열**까지만 만든다. 그것을 어디에
 저장하고 어떤 주소로 내보낼지는 `server/maps.py` 소관이다.
 
-타일만 인터넷에서 받는다(CARTO·Leaflet CDN). 나머지 데이터는 전부 파일 안에 들어
-있어서, 지도를 띄우는 데 이 서버가 살아 있을 필요가 없다.
+배경은 위성사진이 기본이다
+--------------------------------------------------------------------------
+주차 자리가 포장인지 흙바닥인지, 탐방로가 어디로 나 있는지는 **선 지도로는 안 보인다**.
+그래서 Esri World Imagery 를 기본 배경으로 깔고 일반 지도를 토글로 둔다.
+
+제주 상공의 실제 사진은 **z18 까지**다(그 위 줌은 빈 타일이 온다 — 새별오름·성판악·
+해안 세 곳에서 z19 부터 2KB 짜리가 왔다). 그래서 `maxNativeZoom` 을 18 로 두어 더
+당기면 z18 타일을 늘려 보여준다. 빈 타일을 그대로 받으면 화면이 회색으로 비어 버린다.
+
+타일과 Leaflet 만 인터넷에서 받는다. 나머지 데이터는 전부 파일 안에 들어 있어서,
+지도를 띄우는 데 이 서버가 살아 있을 필요가 없다.
 """
 
 from __future__ import annotations
@@ -157,6 +166,9 @@ _TEMPLATE = """<!doctype html>
   .leaflet-popup-content {{ margin:10px 12px; font-size:12px; line-height:1.6; }}
   .leaflet-popup-content b {{ display:block; font-size:13px; margin-bottom:2px; }}
   .leaflet-popup-content .k {{ color:#64748b; font-size:11px; }}
+  /* 위성 배경 위에서는 글자·컨트롤이 묻히므로 바탕을 확실히 준다. */
+  .leaflet-control-layers {{ font-size:12px; }}
+  .leaflet-control-attribution {{ font-size:10px; }}
 </style>
 </head>
 <body>
@@ -171,12 +183,28 @@ _TEMPLATE = """<!doctype html>
 const D = {data};
 
 const map = L.map('map', {{ zoomControl: true }});
-const TILES =
-  'https://{{s}}.basemaps.cartocdn.com/rastertiles/voyager/{{z}}/{{x}}/{{y}}{{r}}.png';
-const CREDIT =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' +
-  ' 기여자 · 타일 &copy; <a href="https://carto.com/attributions">CARTO</a>';
-L.tileLayer(TILES, {{ maxZoom: 20, attribution: CREDIT }}).addTo(map);
+// 위성사진 — 기본 배경. 제주 실사진은 z18 까지라 그 위는 늘려 보여준다.
+const SAT = L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/' +
+  'MapServer/tile/{{z}}/{{y}}/{{x}}',
+  {{
+    maxZoom: 20, maxNativeZoom: 18,
+    attribution: '위성사진 &copy; Esri · Maxar · Earthstar Geographics'
+  }}
+);
+// 일반 지도 — 지명·도로 이름을 읽어야 할 때. 위성 위에서는 글자가 잘 안 읽힌다.
+const PLAIN = L.tileLayer(
+  'https://{{s}}.basemaps.cartocdn.com/rastertiles/voyager/{{z}}/{{x}}/{{y}}{{r}}.png',
+  {{
+    maxZoom: 20,
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' +
+      ' 기여자 · 타일 &copy; <a href="https://carto.com/attributions">CARTO</a>'
+  }}
+);
+SAT.addTo(map);
+L.control.layers({{ '위성사진': SAT, '일반 지도': PLAIN }}, null,
+                 {{ collapsed: false }}).addTo(map);
 L.control.scale({{ imperial:false }}).addTo(map);
 
 const bounds = [];

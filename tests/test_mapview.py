@@ -110,6 +110,37 @@ def test_제목과_설명은_HTML로_새지_않는다():
     assert "&lt;script&gt;" in document
 
 
+# --- 배경 (위성이 기본) -----------------------------------------------------------
+
+
+def test_배경은_위성사진이_기본이다():
+    # Given: 관측지 지도를 그리면
+    document = mapview.render("배경", [SPOT])
+    # When: 어느 배경이 지도에 붙는지 보면
+    # Then: 위성이 붙고 일반 지도는 토글로만 있다. 주차 자리가 포장인지 흙바닥인지,
+    #       탐방로가 어디로 났는지는 선 지도로는 안 보인다
+    assert "SAT.addTo(map)" in document
+    assert "PLAIN.addTo(map)" not in document
+    assert "'일반 지도': PLAIN" in document
+
+
+def test_위성_최대_실사진_줌을_넘겨_당기지_않는다():
+    # Given: 제주 상공 실사진은 z18 까지다(z19 부터 빈 타일이 온다)
+    document = mapview.render("줌", [SPOT])
+    # When: 위성 레이어 설정을 보면
+    # Then: maxNativeZoom 이 18 이다 — 없으면 더 당겼을 때 화면이 회색으로 빈다
+    assert "maxNativeZoom: 18" in document
+
+
+def test_두_배경_모두_출처를_밝힌다():
+    # Given: 타일은 남의 것이다
+    document = mapview.render("출처", [SPOT])
+    # When: 문서를 보면
+    # Then: 위성·일반 각각의 귀속이 들어 있다(attribution 은 축약·생략하지 않는다)
+    assert "Esri" in document
+    assert "OpenStreetMap" in document
+
+
 # --- 파일과 주소 ------------------------------------------------------------------
 
 

@@ -11,7 +11,7 @@
 
 | 단계 | 축 | 답하는 질문 | 산출물 |
 |---|---|---|---|
-| **P0** | 걷는 뼈대 | (스키마만) | FastMCP stateless `/mcp`, 고정 응답 스키마, 제주 범위 가드 |
+| **P0** | 걷는 뼈대 | (스키마만) | fastmcp stateless `/mcp`, 고정 응답 스키마, 제주 범위 가드 |
 | **P1** | 시간 (박명) | "지금 하늘이 어두운가" | `core/astro.py` — DE421 태양 고도 → 박명 4단계 등급 |
 | **P2** | 지명 입력 | "성산일출봉이 어디인가" | `clients/geocode.py` — Photon, `evaluate_place` 도구 |
 | **P3** | 구름 (예보) | "볼 수 있나" | `clients/open_meteo.py` + `core/judge.py` — 총운량 사다리. P7 에서 역할이 *예보 담당*으로 좁혀진다 |

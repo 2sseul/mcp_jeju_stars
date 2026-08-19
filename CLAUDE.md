@@ -1,16 +1,18 @@
 # 제주 밤하늘 관측 MCP
 
 좌표·시각 → 별이 보이는지 판정. 외부 LLM이 툴콜로 호출.
-FastMCP(공식 `mcp` SDK) + LangGraph / uv / Python 3.13 / 온프레미스.
+fastmcp v2 + LangGraph / uv / Python 3.13 / 온프레미스.
 
 `server/core` 순수함수(astro·judge·tonight·darkness) · `clients` 네트워크 ·
-`engine/graph.py` 조립 · `scripts` 배치 · `data` 정적(.py 없음)
+`engine/graph.py` 조립 · `tools.py` 도구 본체(순수 함수) · `app.py` 진입점(등록·전송) ·
+`scripts` 배치 · `data` 정적(.py 없음)
 
 ## Do Not
 - 임계값 임의 변경 — 전부 근거값 (`docs/decisions.md`)
 - 경로를 `path.py` 밖에서 계산 · `Path(__file__)` 사용
 - `sys.path` 조작 · de421.bsp 자동 다운로드 의존
 - `core/`에 네트워크·LLM 호출
+- `tools.py`에 `@mcp.tool` — 등록은 `app.py`만 (판정 함수는 평범한 함수로 남긴다)
 - Open-Meteo KMA 계열 모델 (제주 좌표 NaN)
 
 ## Done

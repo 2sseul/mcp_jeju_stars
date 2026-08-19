@@ -1,30 +1,32 @@
-"""mcp_server — 가드레일과 도구 계약.
+"""tools — 가드레일과 판정 계약.
 
 네트워크가 필요 없는 경로만 검증한다(범위 밖·형식 오류·scope 오류는 외부 호출 전에
-단락된다). 실제 판정 경로는 `uv run python -m server.mcp_server` 로 확인한다.
+단락된다). 실제 판정 경로는 `uv run python -m server.app` 로 확인한다.
+
+도구 **등록**(이 함수들이 MCP 로 노출되는지)은 `test_app.py` 소관이다.
 """
 
 from __future__ import annotations
 
 import pytest
 
-from server import mcp_server
+from server import tools
 from server.core import astro
-from server.mcp_server import evaluate_place, evaluate_spot
+from server.tools import evaluate_place, evaluate_spot
 
 EXPECTED_KEYS = {"verdict", "reasons", "numbers", "attribution", "as_of", "resolved"}
 
 
 def test_geocode는_모듈이_아니라_호출_가능한_함수여야_한다():
-    # Given: mcp_server 가 지오코딩을 이름으로 가져다 쓸 때
+    # Given: tools 가 지오코딩을 이름으로 가져다 쓸 때
     # When: 그 이름을 확인하면
     # Then: 모듈이 아니라 함수다.
     #       `from server.clients import geocode` 로 모듈을 바인딩하면 호출 시
     #       TypeError 가 나는데, evaluate_place 의 `except Exception` 이 이를 삼켜
     #       **입력과 무관하게 항상 '주소 확인 실패'** 가 된다. 조용히 죽는 실패라
     #       계약으로 못박는다.
-    assert callable(mcp_server.geocode)
-    assert not hasattr(mcp_server.geocode, "__path__"), "모듈이 바인딩돼 있다"
+    assert callable(tools.geocode)
+    assert not hasattr(tools.geocode, "__path__"), "모듈이 바인딩돼 있다"
 
 
 # --- 가드레일 ------------------------------------------------------------------
@@ -151,7 +153,7 @@ def test_evaluate_place는_지오코딩보다_먼저_입력을_검증한다(monk
         called.append(a)
         raise AssertionError("입력이 잘못됐는데 지오코딩을 호출했다")
 
-    monkeypatch.setattr(mcp_server, "geocode", spy)
+    monkeypatch.setattr(tools, "geocode", spy)
 
     # When: 잘못된 scope·날짜로 지명 평가를 요청하면
     bad_scope = evaluate_place("성산일출봉", scope="tonight")
@@ -166,7 +168,7 @@ def test_evaluate_place는_지오코딩보다_먼저_입력을_검증한다(monk
 
 def test_좌표_경로와_지명_경로의_입력_판정이_같다(monkeypatch):
     # Given: 지오코딩이 항상 실패하는 상황에서(네트워크 장애 등)
-    monkeypatch.setattr(mcp_server, "geocode", lambda *a, **kw: None)
+    monkeypatch.setattr(tools, "geocode", lambda *a, **kw: None)
     # When: 같은 잘못된 입력을 두 도구에 주면
     for kwargs in ({"scope": "tonight"}, {"date": "엉터리"}, {"date": "2100-01-01"}):
         spot = evaluate_spot(33.4762, 126.8229, **kwargs)

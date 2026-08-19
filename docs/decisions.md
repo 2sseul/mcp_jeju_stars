@@ -294,7 +294,8 @@ Open-Meteo 는 시간당 값 하나를 주므로 한 시간 안의 10분 변동�
 
 ### 2.9 지오코딩 import — 모듈이 아니라 함수를 바인딩한다 (버그 수정 이력)
 
-`server/geocode.py` → `server/clients/geocode.py` 이관 때 `mcp_server.py` 의 import 가
+`server/geocode.py` → `server/clients/geocode.py` 이관 때 도구 모듈(당시 `mcp_server.py`,
+지금 `tools.py`) 의 import 가
 **모듈을 바인딩**하도록 바뀌어 있었다.
 
 ```python
@@ -307,7 +308,7 @@ from server.clients.geocode import geocode   # ← 올바른 형태
   **`evaluate_place` 가 입력과 무관하게 항상 "주소 확인 실패"** 를 반환했다.
 - **왜 안 잡혔나**: import 도 서버 기동도 성공한다. 실패가 정상 응답 스키마로 환원되므로
   로그에도 남지 않는다 — CLAUDE.md 의 "import 통과 ≠ 동작" 이 정확히 이 경우다.
-- **재발 방지**: `tests/test_mcp_server.py` 가 `mcp_server.geocode` 의 호출 가능 여부를
+- **재발 방지**: `tests/test_tools.py` 가 `tools.geocode` 의 호출 가능 여부를
   계약으로 검사한다. 외부 I/O 를 감싸는 `except Exception` 은 유지한다(의도된 규율) —
   대신 **감싸는 대상이 살아 있는지**를 테스트로 못박는다.
 

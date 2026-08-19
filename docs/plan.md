@@ -82,7 +82,8 @@
 
 ```
 server/
-  mcp_server.py       # /mcp 엔드포인트, stateless, 도구 등록
+  app.py              # /mcp 엔드포인트, stateless, 도구 등록 (진입점)
+  tools.py            # 도구 본체 — MCP 를 모르는 순수 함수
   schema.py           # 응답 스키마 (고정 2)
   path.py             # 모든 데이터 경로 상수
   core/               # 순수 함수 — 네트워크·LLM 호출 금지

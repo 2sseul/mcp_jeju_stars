@@ -61,7 +61,7 @@
 ```
 uv run ruff check .          # F821 은 0개여야 한다
 uv run pytest
-uv run python -m server.mcp_server    # 파이프라인 실제 실행
+uv run python -m server.app           # 파이프라인 실제 실행
 ```
 
 경로·import 를 바꿨으면 **파이프라인을 실제로 돌린다**. import 가 통과했다고 동작이

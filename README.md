@@ -2,7 +2,7 @@
 
 좌표·시각을 받아 **별이 보이는지** 판정하는 MCP 서버. 외부 LLM이 툴콜로 호출한다.
 
-FastMCP(공식 `mcp` SDK) + LangGraph · uv · Python 3.13 · 온프레미스.
+fastmcp v2 + LangGraph · uv · Python 3.13 · 온프레미스.
 
 ## 무엇을 답하나
 
@@ -44,7 +44,7 @@ evaluate_place(query, date=None, time=None, scope="moment")     # 지명 → 지
 
 ```bash
 uv sync
-uv run python -m server.mcp_server     # → http://127.0.0.1:8000/mcp
+uv run python -m server.app            # → http://127.0.0.1:8000/mcp
 ```
 
 서버는 키가 없어도 뜬다 — 판정에 쓰는 데이터가 전부 로컬 파일이거나 무인증 API 이기

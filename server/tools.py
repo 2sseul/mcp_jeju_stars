@@ -1,6 +1,15 @@
-"""제주 밤하늘 관측 MCP 서버.
+"""도구 본체 — 좌표·지명을 받아 고정 스키마 dict 를 돌려주는 **순수 파이썬 함수**.
 
-FastMCP · stateless · streamable HTTP `/mcp`. 도구는 **입력 방식**으로만 둘이다:
+여기에는 MCP 가 없다. 등록(`@mcp.tool`)과 전송(streamable HTTP)은 `server/app.py`
+소관이고, 이 모듈은 "무엇을 판정하는가"만 안다. 갈라 둔 이유는 둘이다:
+
+1. fastmcp v2 의 `@mcp.tool` 은 함수가 아니라 `FunctionTool` 객체를 돌려준다.
+   도구 정의와 판정 로직이 한 파일에 있으면 테스트가 판정을 직접 부를 수 없어
+   `.fn` 같은 SDK 내부 속성에 묶인다.
+2. `core`(순수) · `clients`(네트워크) · `engine`(조립) 과 같은 결 — 전송 계층은
+   맨 바깥 한 겹에만 둔다.
+
+도구는 **입력 방식**으로만 둘이다:
 
     evaluate_spot(좌표)      — 좌표를 직접 받는다.
     evaluate_place(주소·지명) — geocode 로 좌표화한 뒤 evaluate_spot 과 동일 처리.
@@ -16,16 +25,12 @@ FastMCP · stateless · streamable HTTP `/mcp`. 도구는 **입력 방식**으�
 가능/불가를 매기지 않고 시간 수를 그대로 돌려준다 — 충분한지는 호출자가 정한다.
 
 제주 범위 밖·형식 오류는 프롬프트형 에러. 별 개수 축은 아직 numbers 에 없다.
-
-실행:  uv run python -m server.mcp_server   → http://127.0.0.1:8000/mcp
 """
 
 from __future__ import annotations
 
 from datetime import datetime
 from zoneinfo import ZoneInfo
-
-from mcp.server.fastmcp import FastMCP
 
 from server.clients.geocode import geocode
 from server.core import astro
@@ -39,8 +44,6 @@ KST = ZoneInfo("Asia/Seoul")
 # 경계점이 포함되도록 최소는 내림·최대는 올림했다.
 _LAT_MIN, _LAT_MAX = 33.1908, 33.5639
 _LON_MIN, _LON_MAX = 126.1452, 126.9723
-
-mcp = FastMCP("jeju-star", stateless_http=True)
 
 
 def _in_jeju(lat: float, lon: float) -> bool:
@@ -220,7 +223,6 @@ def _evaluate(
     return _evaluate_moment(lat, lon, date, time, resolved)
 
 
-@mcp.tool()
 def evaluate_spot(
     lat: float,
     lon: float,
@@ -252,7 +254,6 @@ def evaluate_spot(
     return _evaluate(lat, lon, date, time, scope)
 
 
-@mcp.tool()
 def evaluate_place(
     query: str,
     date: str | None = None,
@@ -430,7 +431,3 @@ def _evaluate_night(
         as_of=when.isoformat(timespec="minutes"),
         resolved=resolved,
     ).to_dict()
-
-
-if __name__ == "__main__":
-    mcp.run(transport="streamable-http")

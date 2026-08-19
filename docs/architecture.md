@@ -491,10 +491,31 @@ LangGraph 그래프가 아니라 계산 모듈을 조립하는 함수다.
 
 ---
 
-## 4. MCP 서버 계층 (`server/mcp_server.py`)
+## 4. MCP 서버 계층 (`server/tools.py` + `server/app.py`)
 
-- **FastMCP · stateless · streamable HTTP `/mcp`**. 실행: `uv run python -m server.mcp_server`
-  → `http://127.0.0.1:8000/mcp`.
+두 파일로 나뉜다. **판정**과 **전송**은 바뀌는 이유가 달라서다.
+
+| 파일 | 아는 것 | 모르는 것 |
+|---|---|---|
+| `tools.py` | 좌표·시각 → 고정 스키마 dict (도구 본체) | MCP·HTTP·fastmcp |
+| `app.py` | 도구 등록, streamable HTTP, 바인딩 주소 | 판정 내용 |
+
+`app.py` 는 데코레이터를 쓰지 않고 이미 정의된 함수를 넘겨 등록한다:
+
+```python
+mcp = FastMCP("jeju-star")
+mcp.tool(tools.evaluate_spot)
+mcp.tool(tools.evaluate_place)
+```
+
+fastmcp v2 의 `@mcp.tool` 은 함수 자리에 `FunctionTool` 객체를 남긴다. 데코레이터를
+쓰면 `tools.evaluate_spot` 이 더는 평범한 함수가 아니어서, 테스트·스크립트가 판정을
+직접 부르려면 `.fn` 같은 SDK 내부 속성에 묶인다. 등록만 따로 하면 판정 함수는 함수로
+남고, 도구 설명·입력 스키마는 여전히 `tools.py` 의 docstring·시그니처 **한 곳**에서
+나온다(계약이 두 벌로 갈리지 않는다). 이 이음매는 `tests/test_app.py` 가 지킨다.
+
+- **fastmcp v2 · stateless · streamable HTTP `/mcp`**. 실행: `uv run python -m server.app`
+  → `http://127.0.0.1:8000/mcp`. 바인딩은 `MCP_HOST`·`MCP_PORT`(기본 `127.0.0.1:8000`).
 - 응답 스키마(`server/schema.py`, `Response`): `verdict / reasons / numbers / attribution /
   as_of / resolved`. 값이 부분/하드코딩이라도 응답 **모양은 최종형으로 고정**한다.
   - `numbers` 는 구조화 수치를 문장과 분리 — **LLM 이 숫자를 지어내지 못하게**.

@@ -51,10 +51,10 @@ _FALLBACK = ("#94a3b8", "·", "지점")
 
 #: 도보 구간 갈래 → 색. "20분 걷는다"까지만 보이면 **어디서 계단이 시작되는지**를
 #: 모른다. 밤에 초행으로 오르는 사람에게는 그게 준비를 가르는 정보다.
-#: 밟기 힘든 순으로 색이 진해진다 — 포장(하늘) → 흙(주황) → 돌(황토) → 암반(갈색)
+#: 밟기 힘든 순으로 색이 진해진다 — 포장길(하늘) → 흙(주황) → 돌(황토) → 암반(갈색)
 #: → 계단(빨강). 모르는 구간은 회색으로, 쉬운 쪽으로 오해되지 않게 둔다.
 _WALK_COLORS: dict[str, str] = {
-    "포장": "#38bdf8",
+    "포장길": "#38bdf8",
     "흙길": "#f59e0b",
     "돌길": "#a16207",
     "암반": "#b45309",
@@ -410,8 +410,14 @@ if (D.items.length) {{
   }});
 }}
 
-if (bounds.length > 1) map.fitBounds(bounds, {{ padding:[48, 48] }});
-else map.setView(bounds[0], 15);
+// 실사진이 있는 줌보다 더 당기지 않는다. 도보 경로가 짧은 곳(1100고지는 25m·26m·
+// 10m·7m)은 fitBounds 가 z20 까지 당기는데, 그 줌엔 사진이 없어 마지막 타일을 늘린
+// 흐릿한 화면이 된다. 조금 덜 확대하고 선명한 편이 낫다.
+if (bounds.length > 1) {{
+  map.fitBounds(bounds, {{ padding:[48, 48], maxZoom: D.sat.maxNative }});
+}} else {{
+  map.setView(bounds[0], Math.min(16, D.sat.maxNative));
+}}
 </script>
 </body>
 </html>

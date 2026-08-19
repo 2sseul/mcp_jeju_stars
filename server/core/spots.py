@@ -60,7 +60,7 @@ WALK_MARGIN_MIN_PER_KM: float = elevation.WALK_ERROR_MIN_PER_KM[1]
 WALK_STAIR = "계단"
 WALK_ROCK = "암반"
 WALK_STONE = "돌길"
-WALK_PAVED = "포장"
+WALK_PAVED = "포장길"
 WALK_DIRT = "흙길"
 WALK_UNKNOWN = "모름"
 
@@ -91,8 +91,10 @@ class WalkSegment:
     rock: str
     #: 이 구간의 길이(m). 점렬을 따라 잰 값.
     metres: float
-    #: 구간 평균 경사(도). 원본이 안 잰 구간은 None.
+    #: 구간 평균 경사(도) — 양 끝 고도차를 걸은 거리로 나눈 값. 안 잰 구간은 None.
     slope_deg: float | None
+    #: 구간 안 가장 가파른 창의 경사(도). 평균이 상쇄로 가리는 비탈을 드러낸다.
+    slope_max_deg: float | None
 
 
 def _segment_kind(surface: str, rock: str) -> str:
@@ -298,7 +300,7 @@ def _segments_of(routes: list[dict] | None) -> tuple[WalkSegment, ...]:
             whole = tuple(pts)
             out.append(WalkSegment(
                 points=whole, kind=WALK_UNKNOWN, surface="", rock="",
-                metres=_path_metres(whole), slope_deg=None,
+                metres=_path_metres(whole), slope_deg=None, slope_max_deg=None,
             ))
             continue
 
@@ -320,6 +322,7 @@ def _segments_of(routes: list[dict] | None) -> tuple[WalkSegment, ...]:
                     rock=rock,
                     metres=_path_metres(piece),
                     slope_deg=part.get("slope_deg"),
+                    slope_max_deg=part.get("slope_max_deg"),
                 )
             )
     return tuple(out)

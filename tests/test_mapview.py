@@ -69,7 +69,7 @@ def test_범례는_실제로_그린_갈래만_싣는다():
     #       없는 것을 범례에만 두면 "왜 안 보이지"가 된다
     assert "흙길" in document
     assert "계단" in document
-    assert "포장" not in document
+    assert "포장길" not in document
     assert "차로 가는 길" not in document
 
 
@@ -110,7 +110,8 @@ def test_구간을_누르면_길이가_뜬다():
 def test_모르는_갈래는_쉬운_색으로_칠하지_않는다():
     # Given: 구간 정보가 없어 갈래를 못 정한 경로에서
     data = _payload(mapview.render("모름", [SPOT], walk_segments=[(WALK, "모름", "")]))
-    known = _payload(mapview.render("포장", [SPOT], walk_segments=[(WALK, "포장", "")]))
+    paved = mapview.render("포장길", [SPOT], walk_segments=[(WALK, "포장길", "")])
+    known = _payload(paved)
     # When: 색을 보면
     # Then: 가장 쉬운 갈래(포장)와 다른 색이다 — 모르는 길을 쉬운 색으로 칠하면
     #       확인되지 않은 것이 확인된 것처럼 읽힌다

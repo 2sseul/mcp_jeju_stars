@@ -145,6 +145,22 @@ def slope_deg(points) -> float | None:
     return round(math.degrees(math.atan2(end - start, metres)), 1)
 
 
+def slope_max_deg(points) -> float | None:
+    """구간 안에서 **가장 가파른 창**의 경사(도). 창이 하나뿐이면 그 값과 같다.
+
+    `slope_deg` 는 양 끝만 보므로 올랐다 내려오면 상쇄된다 — 저지오름의 한 구간은
+    평균 0.0° 인데 실제로는 7.7° 창이 들어 있고, 송악산 전망대는 평균 -0.9° 에
+    최대 -14.1° 다. 평균만 보여 주면 그 비탈이 통째로 사라진다.
+
+    부호는 절댓값이 가장 큰 창의 것을 그대로 쓴다 — 내리막도 밤에는 위험하다.
+    창 나누기는 `spans()` 가 하므로 격자 잔 톱니가 다시 끼지 않는다.
+    """
+    got = [s.slope_deg for s in spans(points) if s.slope_deg is not None]
+    if not got:
+        return None
+    return max(got, key=abs)
+
+
 def climb_m(points) -> float | None:
     """양 끝의 순 고도차(m). 오르막이면 양수."""
     if len(points) < 2:

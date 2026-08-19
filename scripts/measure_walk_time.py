@@ -55,9 +55,31 @@ from server.core import elevation, trail
 MINUTES_KEY = "minutes"
 ASCENT_KEY = "ascent_m"
 STAIR_KEY = "stair_m"
+SLOPE_MAX_KEY = "slope_max_deg"
 
 #: 이 배치가 대신하는, 사람이 손으로 적던 칸.
 LEGACY_KEY = "walk_minutes"
+
+
+def measure_segments(route: dict) -> None:
+    """구간마다의 **최대 경사**를 다시 잰다.
+
+    평균(`slope_deg`)은 양 끝만 보므로 올랐다 내려오면 상쇄된다 — 저지오름의 한 구간은
+    평균 0.0° 인데 7.7° 창이 들어 있다. 평균만 내보내면 그 비탈이 통째로 사라진다.
+
+    평균을 못 잰 구간(격자 두 칸보다 짧다)은 최대도 안 적는다. 둘 중 하나만 있으면
+    화면이 "평균은 모르는데 최대는 안다"는 이상한 말을 하게 된다.
+    """
+    points = route.get("points") or []
+    for segment in route.get("segments") or []:
+        lo, hi = segment.get("from"), segment.get("to")
+        segment.pop(SLOPE_MAX_KEY, None)
+        if lo is None or hi is None or segment.get("slope_deg") is None:
+            continue
+        piece = points[max(0, int(lo)):min(len(points), int(hi) + 1)]
+        steepest = elevation.slope_max_deg(piece)
+        if steepest is not None:
+            segment[SLOPE_MAX_KEY] = steepest
 
 
 def measure_route(route: dict) -> None:
@@ -121,6 +143,7 @@ def main() -> None:
         for route in routes:
             before = route.get(MINUTES_KEY)
             measure_route(route)
+            measure_segments(route)
             after = route.get(MINUTES_KEY)
             if after != before:
                 changed.append((spot["name_ko"], before, after))
@@ -172,6 +195,22 @@ def main() -> None:
         print(f"  계단이 있는 경로 {len(stairs):,}개 — 비중이 가장 높은 곳은 "
               f"{name} ({route['over_m']:.0f}m 중 {route[STAIR_KEY]:.0f}m, "
               f"{share * 100:.0f}%)")
+    # 평균이 가리는 비탈이 얼마나 되나 — 최대가 평균보다 확실히 큰 구간을 센다.
+    hidden = [
+        (abs(g[SLOPE_MAX_KEY]) - abs(g["slope_deg"]), s["name_ko"], g)
+        for s in spots
+        for r in (s.get("walk_routes") or [])
+        for g in (r.get("segments") or [])
+        if g.get(SLOPE_MAX_KEY) is not None and g.get("slope_deg") is not None
+        and abs(g[SLOPE_MAX_KEY]) > abs(g["slope_deg"]) + 0.5
+    ]
+    if hidden:
+        hidden.sort(reverse=True)
+        _, name, seg = hidden[0]
+        print(f"  평균이 비탈을 가리는 구간 {len(hidden):,}개 — 가장 큰 곳은 "
+              f"{name} (평균 {seg['slope_deg']:.1f}° · 최대 "
+              f"{seg[SLOPE_MAX_KEY]:.1f}°)")
+
     lo, hi = elevation.WALK_ERROR_MIN_PER_KM
     print(f"  오차 km당 {lo}~{hi}분. 야간·짐은 들어 있지 않다.")
 

@@ -436,21 +436,33 @@ def _walk_phrase(s: spots.Spot) -> str:
     """
     minutes = s.walk_minutes_safe or s.walk_minutes
     if minutes is None:
-        return f"도보: {s.walk_type or '정보 없음'}"
+        return "도보 시간은 재지 못했어요"
     if minutes < 1:
-        return f"주차 후 바로 관측 가능해요 ({s.walk_type or '평지'})"
-
-    detail = [s.walk_type or "정보 없음"]
-    if s.walk_climb_m:
-        detail.append(f"오르막 {s.walk_climb_m:.0f}m")
-    if s.walk_stair_m:
-        detail.append(f"계단 {s.walk_stair_m:.0f}m")
-    if s.trail_grade:
-        detail.append(f"난이도 {s.trail_grade}")
+        return "주차 후 바로 관측 가능해요"
     return (
         f"주차장에서 편도 약 {minutes:.0f}분 걸어요 "
-        f"(넉넉히 잡은 값 · 잰 값 {s.walk_minutes:.0f}분, " + ", ".join(detail) + ")"
+        f"(넉넉히 잡은 값 · 잰 값 {s.walk_minutes:.0f}분)"
     )
+
+
+def _terrain_phrase(s: spots.Spot) -> str | None:
+    """길이 어떤지 한 줄. 걸을 게 없으면 None.
+
+    도보 문장과 갈라 둔다 — 한 문장에 시간·지형·오르막·계단·난이도를 다 넣으면
+    괄호가 길어져 어느 것도 안 읽힌다.
+    """
+    if not s.walk_minutes:
+        return None
+    bits = []
+    if s.trail_grade:
+        bits.append(f"난이도 {s.trail_grade}")
+    if s.walk_climb_m:
+        bits.append(f"오르막 {s.walk_climb_m:.0f}m")
+    if s.walk_stair_m:
+        bits.append(f"계단 {s.walk_stair_m:.0f}m")
+    if s.walk_type:
+        bits.append(s.walk_type)
+    return "길: " + " · ".join(bits) if bits else None
 
 
 # --- 지도 (경로·편의시설을 한 장에) ----------------------------------------------
@@ -650,19 +662,53 @@ def _spot_item(spot: spots.Spot, label: str, route=None) -> Item:
     )
 
 
+#: 국립공원공단 노면 낱말 → 사람이 읽는 말. 원문은 배점표의 이름이라 그대로 쓰면
+#: "노면 포장"처럼 무엇을 밟는지가 안 보인다. 괄호 안은 원문 정의 그대로다.
+_SURFACE_WORDS: dict[str, str] = {
+    "포장": "데크·콘크리트 같은 단단한 길",
+    "거의 흙": "거의 흙바닥",
+    "비교적 흙": "흙바닥에 돌이 섞임",
+    "비교적 돌": "돌바닥에 흙이 섞임",
+    "거의 돌": "거의 돌바닥",
+}
+
+#: 암릉 낱말 → 사람이 읽는 말. '목재계단' 은 갈래 이름(계단)이 이미 말하므로 뺀다 —
+#: "계단 · 노면 포장 · 목재계단"처럼 같은 말이 세 번 나오면 오히려 안 읽힌다.
+_ROCK_WORDS: dict[str, str] = {
+    "약간의 암반": "암반 조금",
+    "로프·사다리": "로프·사다리를 잡고 오르는 구간",
+    "손 사용": "손으로 잡고 오르내리는 구간",
+}
+
+
 def _segment_note(seg: spots.WalkSegment) -> str:
     """구간을 눌렀을 때 뜨는 한 줄 — 길이가 먼저다.
 
     "계단"만 떠서는 각오할 양을 모른다. 10m 계단과 260m 계단은 다른 이야기다.
-    노면·경사는 원본이 잰 구간만 붙는다(짐작으로 채우지 않는다).
+
+    낱말은 국립공원공단 배점표의 이름을 그대로 쓰지 않는다. "노면 포장"은 무엇을 밟는지
+    안 보이고, 계단인데 "노면 포장 · 목재계단"이라 적히면 오히려 헷갈린다. 갈래 이름이
+    이미 말하는 것은 빼고, 노면은 어떤 땅인지로 풀어 쓴다.
+
+    경사는 원본이 잰 구간만 붙는다(짐작으로 채우지 않는다).
     """
     parts = [f"{seg.metres:.0f}m"]
-    if seg.surface:
-        parts.append(f"노면 {seg.surface}")
-    if seg.rock and seg.rock != "없음":
-        parts.append(seg.rock)
+
+    # 계단·암반은 갈래 이름이 이미 무엇을 밟는지 말한다. 노면을 또 적지 않는다.
+    if seg.kind in (spots.WALK_STAIR, spots.WALK_ROCK):
+        extra = _ROCK_WORDS.get(seg.rock)
+        if extra:
+            parts.append(extra)
+    elif seg.surface:
+        parts.append(_SURFACE_WORDS.get(seg.surface, seg.surface))
     if seg.slope_deg is not None:
-        parts.append(f"경사 {seg.slope_deg:.0f}°")
+        # 평균은 양 끝만 보므로 올랐다 내려오면 상쇄된다. 구간 안 가장 가파른 창이
+        # 그보다 크면 함께 적는다 — 안 적으면 그 비탈이 통째로 사라진다.
+        steep = seg.slope_max_deg
+        if steep is not None and abs(steep) > abs(seg.slope_deg) + 0.5:
+            parts.append(f"평균 경사 {seg.slope_deg:.0f}° · 최대 {steep:.0f}°")
+        else:
+            parts.append(f"평균 경사 {seg.slope_deg:.0f}°")
     return " · ".join(parts)
 
 
@@ -1288,7 +1334,13 @@ def spot_details(name: str, origin: str | None = None,
     row = _spot_row(hit, detail=True, route=route)
     map_url = _spot_map(hit, route)
 
-    reasons = [f"{hit.name} ({hit.region}·{hit.kind}) — {hit.why}"]
+    reasons = [f"{hit.name} — {_where(hit)}"]
+    if hit.why:
+        reasons.append(hit.why)
+    # `notes` 는 내보내지 않는다. 사람이 읽을 메모와 **좌표 교정 기록**이 한 칸에
+    # 섞여 있어서다("좌표 교정(2026-08-05): ... scripts/check_spot_coords.py").
+    # 63곳 중 3곳이 그렇다. 낱말로 걸러 낼 수는 있지만 그건 데이터가 섞인 것을
+    # 코드로 덮는 일이라, 칸이 갈릴 때까지 `why`(큐레이션된 설명)만 쓴다.
     if route is not None:
         reasons.append(f"차로 약 {route.minutes:.0f}분 / {route.km:.0f}km 거리예요")
     if hit.parking:
@@ -1298,6 +1350,9 @@ def spot_details(name: str, origin: str | None = None,
     else:
         reasons.append("주차: 확인된 주차장이 없어요")
     reasons.append(_walk_phrase(hit))
+    terrain = _terrain_phrase(hit)
+    if terrain:
+        reasons.append(terrain)
     if hit.access:
         reasons.append(f"진입: {hit.access}")
     reasons.append(f"야간 출입: {hit.night_access or '확인 필요'}")

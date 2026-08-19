@@ -561,7 +561,10 @@ def _route(value, label: str, named: bool) -> dict:
 #: 뒤의 셋은 `scripts/measure_walk_time.py` 가 배치로도 채운다. 같은 함수를 부르므로
 #: 어느 쪽으로 채워도 값이 같다 — 여기서 재는 것은 선을 고친 사람이 그 자리에서
 #: 결과를 봐야 하기 때문이다.
-_MEASURED = ("climb_m", "slope_deg", "over_m", "minutes", "ascent_m", "stair_m")
+_MEASURED = (
+    "climb_m", "slope_deg", "slope_max_deg", "over_m",
+    "minutes", "ascent_m", "stair_m",
+)
 
 
 def _measure(route: dict) -> None:
@@ -584,11 +587,17 @@ def _measure(route: dict) -> None:
     for segment in route.get("segments") or []:
         piece = points[segment["from"]:segment["to"] + 1]
         segment.pop("slope_deg", None)
+        segment.pop("slope_max_deg", None)
         segment.pop("over_m", None)
         got = elevation.slope_deg(piece)
         if got is not None:
             segment["slope_deg"] = got
             segment["over_m"] = round(elevation.length_m(piece), 1)
+            # 평균은 양 끝만 보므로 올랐다 내려오면 상쇄된다. 구간 안 가장 가파른
+            # 창을 함께 적어야 어디가 힘든지가 사라지지 않는다.
+            steepest = elevation.slope_max_deg(piece)
+            if steepest is not None:
+                segment["slope_max_deg"] = steepest
 
 
 #: 구간이 **무언가를 말하고 있다**고 볼 키들. 자른 자리(`from`)만 있는 구간은

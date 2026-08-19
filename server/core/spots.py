@@ -54,6 +54,9 @@ class Spot:
     walk_minutes: float | None
     walk_climb_m: float | None
     walk_terrain: str | None
+    #: 주차 지점 → 관측 지점 도보 경로의 점렬들. 지도에 선으로 그린다.
+    #: 값(분·고도차)과 달리 이건 **모양**이라, 요약할 수 없어 원본을 그대로 든다.
+    walk_paths: tuple[tuple[tuple[float, float], ...], ...]
     elevation_m: float | None
     slope_deg: float | None
     parking: list[dict]
@@ -117,6 +120,20 @@ def _walk_of(
     return (top.get("minutes"), top.get("climb_m"), top.get("terrain"))
 
 
+def _paths_of(routes: list[dict] | None) -> tuple[tuple[tuple[float, float], ...], ...]:
+    """도보 경로들의 점렬. 점이 둘 미만인 경로는 선이 안 되므로 버린다."""
+    out = []
+    for route in routes or []:
+        pts = tuple(
+            (float(p[0]), float(p[1]))
+            for p in (route.get("points") or [])
+            if isinstance(p, (list, tuple)) and len(p) >= 2
+        )
+        if len(pts) > 1:
+            out.append(pts)
+    return tuple(out)
+
+
 def _to_spot(raw: dict) -> Spot:
     minutes, climb, terrain = _walk_of(raw.get("walk_routes"))
     return Spot(
@@ -133,6 +150,7 @@ def _to_spot(raw: dict) -> Spot:
         walk_minutes=minutes,
         walk_climb_m=climb,
         walk_terrain=terrain,
+        walk_paths=_paths_of(raw.get("walk_routes")),
         elevation_m=raw.get("elevation_m"),
         slope_deg=raw.get("slope_deg"),
         parking=list(raw.get("parking") or []),

@@ -16,6 +16,7 @@ from server.tools import evaluate_place, recommend_spots, spot_details
 
 EXPECTED_KEYS = {
     "verdict", "reasons", "numbers", "attribution", "as_of", "resolved", "spots",
+    "map_url",
 }
 
 # 제주 안의 실좌표(교래리 부근). 가드에 걸리지 않는 좌표가 필요할 때 쓴다.
@@ -282,6 +283,66 @@ def test_제주_밖_출발지는_주행시간을_지어내지_않는다(_no_weat
     #       배·비행기 구간을 차로 몇 분이라 답할 수는 없다
     assert result["verdict"] == "양호"
     assert "drive" not in result["numbers"]
+
+
+# --- 지도 (경로·편의시설) --------------------------------------------------------
+
+
+def test_좌표로_준_출발지도_지도에_실린다():
+    # Given: 출발지를 지명이 아니라 **좌표로** 줬을 때 (현재 위치)
+    result = spot_details("새별오름", origin_lat=AIRPORT[0], origin_lon=AIRPORT[1])
+    # When: 지도를 보면
+    url = result["map_url"]
+    name = url.rsplit("/", 1)[-1]
+    document = tools.maps.read(name) or ""
+    # Then: 주행 경로와 출발지 마커가 들어 있다.
+    #       `_locate` 는 좌표를 직접 받으면 resolved 를 None 으로 주는데, 거기서
+    #       좌표를 꺼내려 하면 좌표로 준 출발지가 지도에서 통째로 사라진다(회귀).
+    assert '"kindLabel": "출발지"' in document
+    assert '"drive": [[' in document
+
+
+def test_출발지가_없으면_주행선을_긋지_않는다():
+    # Given: 출발지 없이 상세를 조회하면
+    result = spot_details("새별오름")
+    document = tools.maps.read(result["map_url"].rsplit("/", 1)[-1]) or ""
+    # When: 지도를 보면
+    # Then: 주행선이 비어 있다 — 없는 길을 그으면 있는 것처럼 보인다
+    assert '"drive": []' in document
+    assert "출발지" not in document
+
+
+def test_등록된_곳은_사람이_확인한_주차_화장실을_쓴다():
+    # Given: 주차·화장실이 확인된 관측지에서
+    spot = next(
+        s for s in tools.spots.all_spots() if s.parking and s.toilet and s.walk_paths
+    )
+    result = spot_details(spot.name)
+    document = tools.maps.read(result["map_url"].rsplit("/", 1)[-1]) or ""
+    # When: 지도를 보면
+    # Then: 그 곳의 확인된 자리와 도보 경로가 실린다. 반경 검색이 아니라 검증분을
+    #       쓰는 것은, 확인된 자리가 그 관측지에 실제로 쓰는 자리이기 때문이다
+    assert spot.parking[0]["name"] in document
+    assert '"walks": [[' in document
+
+
+def test_미등록_장소는_반경_안_편의시설만_표기한다(_no_weather):
+    # Given: 검증 목록에 없는 자리(서귀포 시내)를 물으면
+    result = evaluate_place(lat=33.2447, lon=126.5606)
+    document = tools.maps.read(result["map_url"].rsplit("/", 1)[-1]) or ""
+    # When: 응답과 지도를 보면
+    # Then: 반경 안 편의시설은 표기하되 **도보 경로는 그리지 않는다**.
+    #       어디에 세우고 어디로 걷는지는 사람이 확인한 곳에만 있는 정보다
+    assert any(f"{tools.NEARBY_M:.0f}m 안에" in r for r in result["reasons"])
+    assert '"walks": []' in document
+
+
+def test_편의시설이_없으면_없다고_말한다(_no_weather):
+    # Given: 반경 안에 아무것도 없는 자리에서 (한라산 중턱)
+    result = evaluate_place(lat=33.3620, lon=126.5330)
+    # When: 응답을 보면
+    # Then: 조용히 빼지 않고 없다고 적는다 — "없음"과 "모름"은 계획이 달라진다
+    assert any("없어요" in r and "m 안에" in r for r in result["reasons"])
 
 
 # --- 도구 3: 관측지 상세 --------------------------------------------------------

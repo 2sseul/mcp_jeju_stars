@@ -28,8 +28,10 @@ from __future__ import annotations
 import os
 
 from fastmcp import FastMCP
+from starlette.requests import Request
+from starlette.responses import HTMLResponse, PlainTextResponse
 
-from server import tools
+from server import maps, tools
 
 HOST = os.getenv("MCP_HOST", "127.0.0.1")
 PORT = int(os.getenv("MCP_PORT", "8000"))
@@ -41,6 +43,18 @@ mcp = FastMCP("jeju-star")
 mcp.tool(tools.recommend_spots)
 mcp.tool(tools.evaluate_place)
 mcp.tool(tools.spot_details)
+
+
+# 도구가 만든 경로 지도를 이 서버가 직접 서빙한다(`plan.md` P13 — 정적 HTML → URL).
+# 별도 웹서버를 세우지 않는 것은 포트가 하나면 컨테이너 노출도 하나로 끝나서다.
+# 이름은 내용 해시라 세션 상태가 생기지 않고, `maps.read` 가 모양을 검사해
+# 경로 탈출을 막는다.
+@mcp.custom_route("/maps/{name}", methods=["GET"])
+async def serve_map(request: Request):
+    document = maps.read(request.path_params["name"])
+    if document is None:
+        return PlainTextResponse("지도를 찾을 수 없습니다.", status_code=404)
+    return HTMLResponse(document)
 
 
 def main() -> None:

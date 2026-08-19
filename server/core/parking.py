@@ -27,9 +27,13 @@ from __future__ import annotations
 
 import csv
 import io
+import math
 from dataclasses import dataclass
 
+import numpy as np
+
 from server import path
+from server.core import lamps
 
 # --- 상수 --------------------------------------------------------------------
 
@@ -123,3 +127,58 @@ COUNT: int = len(_LOTS)
 def lots() -> tuple[Parking, ...]:
     """전체 공영주차장. 읽기 전용 뷰."""
     return _LOTS
+
+
+# --- 반경 조회 ------------------------------------------------------------------
+#
+# `core.toilet` 과 같은 모양이다. 관측 자리에서 "걸어서 닿는 것"을 묻는 축이 둘(화장실·
+# 주차장)인데 조회 방식이 다르면 응답에서 둘을 나란히 놓을 수 없다.
+
+#: 기본 반경(m). `toilet.WALK_M` 과 같은 값을 같은 이유로 쓴다 — 차를 두고 다녀올 수
+#: 있고 밤에 손전등 하나로 오갈 만한 거리.
+WALK_M: float = 200.0
+
+
+@dataclass(frozen=True)
+class Nearby:
+    """관측 자리에서 본 주차장 한 곳 — 그 자리와의 거리를 함께."""
+
+    parking: Parking
+    distance_m: float
+
+
+_LAT = np.array([p.lat for p in _LOTS], dtype=np.float64)
+_LON = np.array([p.lon for p in _LOTS], dtype=np.float64)
+
+
+def _distances_m(lat: float, lon: float) -> np.ndarray:
+    """모든 주차장까지의 거리(m). 몇 km 규모라 등거리 평면 근사로 충분하다
+    (`core.toilet._distances_m` 와 같은 근사)."""
+    dy = (_LAT - lat) * lamps.KM_PER_DEG
+    dx = (_LON - lon) * lamps.KM_PER_DEG * math.cos(math.radians(lat))
+    return np.hypot(dx, dy) * 1000.0
+
+
+def near(lat: float, lon: float, radius_m: float = WALK_M) -> tuple[Nearby, ...]:
+    """반경 안의 공영주차장 — 가까운 순. 없으면 빈 튜플."""
+    if not _LOTS:
+        return ()
+    distance = _distances_m(lat, lon)
+    hit = np.flatnonzero(distance <= radius_m)
+    order = hit[np.argsort(distance[hit])]
+    return tuple(
+        Nearby(parking=_LOTS[int(i)], distance_m=float(distance[int(i)]))
+        for i in order
+    )
+
+
+def nearest(lat: float, lon: float) -> Nearby | None:
+    """반경과 무관하게 가장 가까운 주차장 하나. 하나도 없으면 None.
+
+    "없음"과 "300m 밖에 있음"은 계획이 달라지므로 거리를 말할 수 있게 둔다.
+    """
+    if not _LOTS:
+        return None
+    distance = _distances_m(lat, lon)
+    i = int(np.argmin(distance))
+    return Nearby(parking=_LOTS[i], distance_m=float(distance[i]))

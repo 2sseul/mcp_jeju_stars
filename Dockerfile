@@ -36,7 +36,8 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     MCP_HOST=0.0.0.0 \
-    MCP_PORT=8000
+    MCP_PORT=8000 \
+    MAP_BASE_URL=http://127.0.0.1:8000
 
 WORKDIR /app
 
@@ -68,6 +69,10 @@ COPY data/road/jeju_road_graph.npz ./data/road/
 # 재시작마다 캐시가 비어 있다.
 #
 #   docker run -p 8000:8000 -v jeju-star-cache:/app/.cache jeju-star
+#
+# 경로 지도(`/maps/...`)도 같은 포트로 나간다. 겉 주소는 `MAP_BASE_URL` 이 정하는데,
+# 바인딩 주소(0.0.0.0)는 브라우저가 열 수 있는 주소가 아니라 따로 둔다. 다른 기기에서
+# 열어야 하면 `-e MAP_BASE_URL=http://<호스트>:8000` 으로 덮는다.
 #
 # VOLUME 을 선언해 두면 -v 를 잊어도 익명 볼륨이 붙어 컨테이너 수명 동안은 남는다.
 #

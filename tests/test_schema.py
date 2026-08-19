@@ -11,6 +11,7 @@ from server.schema import Response
 
 EXPECTED_KEYS = {
     "verdict", "reasons", "numbers", "attribution", "as_of", "resolved", "spots",
+    "map_url",
 }
 
 
@@ -34,6 +35,7 @@ def test_resolved가_없어도_키는_항상_존재한다():
     assert set(result) == EXPECTED_KEYS
     assert result["resolved"] is None
     assert result["spots"] is None
+    assert result["map_url"] is None
 
 
 def test_spots가_있으면_그대로_실린다():

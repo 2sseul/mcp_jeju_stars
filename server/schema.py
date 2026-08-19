@@ -10,11 +10,14 @@
 - as_of:        평가 기준 시각(ISO8601, +09:00)
 - resolved:     지오코딩으로 해석된 위치(질의·좌표 등). 좌표를 직접 받은 경우나
                 해석 실패 시에는 None. 필드 자체는 모든 응답에 항상 존재한다.
+- map_url:      경로 지도(정적 HTML) 주소. 출발지·주차·도보 경로와 근처 편의시설을
+                한 장에 그린다. 그릴 것이 없으면 None — 좌표를 말로 설명하지 않기
+                위한 것이라(`plan.md` P13) 빈 지도를 내보내지 않는다.
 - spots:        이 응답이 말하는 **검증된 관측지들**. 추천은 여러 곳, 상세조회·등록된
                 장소 평가는 한 곳, 미등록 장소 평가는 None 이다. 최상위 필드는 그대로
                 두고 목록만 얹는 형태다(`plan.md` §72).
 
-resolved·spots 는 일부 경로에서만 값이 차지만, 성공/실패에 따라 응답의 필드 집합이
+resolved·spots·map_url 은 일부 경로에서만 값이 차지만, 성공/실패에 따라 응답의 필드 집합이
 달라지지 않도록 **모든 경로에서 키를 항상 내보낸다**(없으면 None). 응답 '모양'을
 고정한다는 원칙을 도구·경로에 걸쳐 지키기 위함이다.
 """
@@ -33,6 +36,7 @@ class Response:
     as_of: str
     resolved: dict | None = None
     spots: list[dict] | None = None
+    map_url: str | None = None
 
     def to_dict(self) -> dict:
         """MCP 도구 반환용 순수 dict. 복사본을 만들어 내부 상태 유출을 막는다."""
@@ -44,4 +48,5 @@ class Response:
             "as_of": self.as_of,
             "resolved": dict(self.resolved) if self.resolved is not None else None,
             "spots": [dict(s) for s in self.spots] if self.spots is not None else None,
+            "map_url": self.map_url,
         }

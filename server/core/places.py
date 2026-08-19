@@ -21,9 +21,13 @@ from __future__ import annotations
 
 import csv
 import io
+import math
 from dataclasses import dataclass
 
+import numpy as np
+
 from server import path
+from server.core import lamps
 
 #: 좌표 유효 범위. `lamps.py`·`parking.py` 와 같은 경계 — 세 데이터를 한 지도에
 #: 겹쳐 쓰므로 한쪽에만 있는 지점이 생기면 안 된다.
@@ -115,3 +119,54 @@ def counts() -> dict[str, int]:
     for place in _PLACES:
         out[place.source] += 1
     return out
+
+
+# --- 반경 조회 ------------------------------------------------------------------
+#
+# `core.toilet`·`core.parking` 과 같은 모양이다. 공영 표준데이터가 담지 않는
+# 오름·해변·관광지 주차장이 여기 있어(카카오 1,912곳), 등록되지 않은 자리 주변을
+# 물을 때는 둘을 함께 봐야 "주차할 데가 있나"에 답할 수 있다.
+
+#: 기본 반경(m). `toilet.WALK_M`·`parking.WALK_M` 과 같은 값·같은 이유.
+WALK_M: float = 200.0
+
+
+@dataclass(frozen=True)
+class Nearby:
+    """어떤 자리에서 본 장소 하나 — 그 자리와의 거리를 함께."""
+
+    place: Place
+    distance_m: float
+
+
+_LAT = np.array([p.lat for p in _PLACES], dtype=np.float64)
+_LON = np.array([p.lon for p in _PLACES], dtype=np.float64)
+_SOURCE = np.array([p.source for p in _PLACES], dtype="<U16")
+
+
+def _distances_m(lat: float, lon: float) -> np.ndarray:
+    """모든 장소까지의 거리(m). 등거리 평면 근사(`core.toilet` 와 같다)."""
+    dy = (_LAT - lat) * lamps.KM_PER_DEG
+    dx = (_LON - lon) * lamps.KM_PER_DEG * math.cos(math.radians(lat))
+    return np.hypot(dx, dy) * 1000.0
+
+
+def near(
+    lat: float,
+    lon: float,
+    radius_m: float = WALK_M,
+    source: str | None = None,
+) -> tuple[Nearby, ...]:
+    """반경 안의 장소 — 가까운 순. `source` 를 주면 그 갈래만(예: "parking")."""
+    if not _PLACES:
+        return ()
+    distance = _distances_m(lat, lon)
+    within = distance <= radius_m
+    if source is not None:
+        within &= _SOURCE == source
+    hit = np.flatnonzero(within)
+    order = hit[np.argsort(distance[hit])]
+    return tuple(
+        Nearby(place=_PLACES[int(i)], distance_m=float(distance[int(i)]))
+        for i in order
+    )

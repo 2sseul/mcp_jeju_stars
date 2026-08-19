@@ -121,14 +121,18 @@ def snap(lat: float, lon: float) -> tuple[int, float]:
 
 def _dijkstra(
     start: int, budget_s: float, targets: set[int]
-) -> dict[int, tuple[float, float]]:
-    """start 에서 각 노드까지 최단 시간. {노드: (초, m)}.
+) -> tuple[dict[int, tuple[float, float]], dict[int, int]]:
+    """start 에서 각 노드까지 최단 시간. ({노드: (초, m)}, {노드: 직전 노드}).
 
     budget_s 를 넘는 노드는 넣지 않는다. targets 를 모두 찾으면 즉시 멈춘다 —
     둘 다 "제주 전체를 풀지 않기 위한" 장치다.
+
+    직전 노드를 함께 모으는 것은 **경로를 그리기 위해서**다(`route_path`). 시간·거리만
+    쓰는 호출자는 두 번째 값을 버리면 되고, 모으는 비용은 dict 하나뿐이다.
     """
     best_s: dict[int, float] = {start: 0.0}
     best_m: dict[int, float] = {start: 0.0}
+    prev: dict[int, int] = {}
     done: set[int] = set()
     left = set(targets)
     left.discard(start)
@@ -158,9 +162,10 @@ def _dijkstra(
             if ns < best_s.get(v, math.inf):
                 best_s[v] = ns
                 best_m[v] = met + float(_METERS[e])
+                prev[v] = u
                 heapq.heappush(queue, (ns, best_m[v], v))
 
-    return {n: (best_s[n], best_m[n]) for n in done}
+    return {n: (best_s[n], best_m[n]) for n in done}, prev
 
 
 def drive_times(
@@ -191,7 +196,7 @@ def drive_times(
 
     budget_s = math.inf if budget_minutes is None else budget_minutes * 60.0
     targets = {n for n, _ in snapped}
-    reached = _dijkstra(o_node, budget_s, targets)
+    reached, _ = _dijkstra(o_node, budget_s, targets)
 
     out: list[Route | None] = []
     for node, d_snap in snapped:
@@ -220,3 +225,42 @@ def drive_time(
 ) -> Route | None:
     """출발지 → 목적지 한 건. `drive_times` 의 단건 형태."""
     return drive_times(origin, [destination], budget_minutes)[0]
+
+
+def route_path(
+    origin: tuple[float, float],
+    destination: tuple[float, float],
+    budget_minutes: float | None = None,
+) -> list[tuple[float, float]] | None:
+    """출발지 → 목적지의 **실제 지나가는 길**(위도·경도 점렬). 못 가면 None.
+
+    `drive_time` 이 "몇 분"을 답한다면 이건 "어느 길로"를 답한다. 지도에 선을 그리는
+    쪽만 쓰므로 `Route` 에 넣지 않았다 — 점이 수백 개라 도구 응답에 실으면 사람도
+    LLM 도 읽지 않는 덩어리가 응답의 대부분을 차지한다.
+
+    Returns:
+        [(lat, lon), ...] — 출발 노드에서 도착 노드까지 순서대로. 길이 2 미만이면
+        None(붙일 도로가 없거나 같은 노드).
+    """
+    o_node, o_snap = snap(*origin)
+    d_node, d_snap = snap(*destination)
+    if o_snap > SNAP_LIMIT_M or d_snap > SNAP_LIMIT_M:
+        return None
+
+    budget_s = math.inf if budget_minutes is None else budget_minutes * 60.0
+    reached, prev = _dijkstra(o_node, budget_s, {d_node})
+    if d_node not in reached:
+        return None
+
+    # 도착에서 출발까지 거꾸로 타고 올라간 뒤 뒤집는다.
+    nodes = [d_node]
+    while nodes[-1] != o_node:
+        step = prev.get(nodes[-1])
+        if step is None:      # 출발 노드까지 이어지지 않는다(도달 못 한 경우)
+            return None
+        nodes.append(step)
+    nodes.reverse()
+
+    if len(nodes) < 2:
+        return None
+    return [(float(_LAT[n]), float(_LON[n])) for n in nodes]

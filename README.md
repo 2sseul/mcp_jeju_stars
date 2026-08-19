@@ -58,7 +58,13 @@ spot_details(name, origin=None, origin_lat=None, origin_lon=None)
 (주행 가능 도로 22.6만 노드) 위에서 다익스트라로 최단 시간을 푼다 — 정체를 따지지
 않는 야간 자유주행 기준이라 외부 교통 API 없이 온프레미스로 돈다.
 
-응답은 언제나 같은 모양이다 — `verdict` / `reasons` / `numbers` / `attribution` / `as_of` / `resolved` / `spots`.
+응답은 언제나 같은 모양이다 — `verdict` / `reasons` / `numbers` / `attribution` / `as_of` / `resolved` / `spots` / `map_url`.
+
+**`map_url` 은 경로 지도다.** 출발지를 주면 주행 경로를, 검증된 관측지면 주차
+지점에서 관측 지점까지의 **실측 도보 경로**와 주차장·화장실을 한 장에 그린다.
+등록되지 않은 자리는 반경 200m 안의 주차장·화장실만 표기하고 도보 경로는 그리지
+않는다 — 어디에 세우고 어디로 걷는지는 사람이 확인한 곳에만 있는 정보라서다.
+서버가 `/maps/{name}` 으로 직접 서빙하고, 겉 주소는 `MAP_BASE_URL` 로 바꾼다.
 `numbers`는 구조화 수치를 문장과 분리해 **LLM이 숫자를 지어내지 못하게** 한다.
 
 ## 실행

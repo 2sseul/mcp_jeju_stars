@@ -40,8 +40,10 @@ import math
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+from server import maps
 from server.clients.geocode import geocode
-from server.core import astro, darkness, routing, spots
+from server.core import astro, darkness, parking, places, routing, spots, toilet
+from server.core.mapview import Marker
 from server.engine import graph
 from server.schema import Response
 
@@ -433,6 +435,150 @@ def _walk_phrase(s: spots.Spot) -> str:
     )
 
 
+# --- 지도 (경로·편의시설을 한 장에) ----------------------------------------------
+#
+# 좌표를 말로 설명하지 않는다(`plan.md` P13). "차로 29분" 다음에 사람이 실제로 묻는
+# 것은 "어느 길로, 어디에 세우고, 거기서 얼마나 걷나"이고 그건 선으로 보여야 한다.
+
+#: 등록되지 않은 자리에서 편의시설을 훑는 반경(m). `toilet.WALK_M` 과 같은 값이다 —
+#: 차를 두고 다녀올 수 있고 밤에 손전등 하나로 오갈 만한 거리.
+NEARBY_M: float = toilet.WALK_M
+
+
+def _amenity_markers(lat: float, lon: float, radius_m: float) -> list[Marker]:
+    """반경 안의 주차장·화장실 마커. 등록 데이터가 없는 자리에서 쓴다.
+
+    주차장은 두 출처를 합친다 — 공영 표준데이터는 오름·해변 주차장을 담지 않아
+    카카오 수집분이 없으면 "주차할 데가 없다"고 잘못 답하게 된다. 같은 자리가 양쪽에
+    있으면 가까운 쪽 하나만 남긴다(50m 안이면 같은 곳으로 본다).
+    """
+    out: list[Marker] = []
+    seen: list[tuple[float, float]] = []
+
+    def _dup(la: float, lo: float) -> bool:
+        return any(_haversine_m(la, lo, a, b) < 50.0 for a, b in seen)
+
+    for hit in parking.near(lat, lon, radius_m):
+        seen.append((hit.parking.lat, hit.parking.lon))
+        out.append(Marker(
+            hit.parking.lat, hit.parking.lon, "parking", hit.parking.name,
+            f"{hit.distance_m:.0f}m · {hit.parking.fee} · 공영",
+        ))
+    for hit in places.near(lat, lon, radius_m, source="parking"):
+        if _dup(hit.place.lat, hit.place.lon):
+            continue
+        seen.append((hit.place.lat, hit.place.lon))
+        out.append(Marker(
+            hit.place.lat, hit.place.lon, "parking", hit.place.name,
+            f"{hit.distance_m:.0f}m · 카카오맵",
+        ))
+    for hit in toilet.near(lat, lon, radius_m):
+        out.append(Marker(
+            hit.toilet.lat, hit.toilet.lon, "toilet", hit.toilet.name,
+            f"{hit.distance_m:.0f}m · {hit.toilet.hours}"
+            + (" · 비상벨" if hit.toilet.bell else ""),
+        ))
+    return out
+
+
+def _amenity_reason(markers: list[Marker], radius_m: float) -> str:
+    """편의시설 마커를 한 줄로. 없으면 없다고 말한다 — 모르는 것과 다르다."""
+    n_park = sum(1 for m in markers if m.kind == "parking")
+    n_toilet = sum(1 for m in markers if m.kind == "toilet")
+    if not markers:
+        return f"반경 {radius_m:.0f}m 안에 등록된 주차장·화장실이 없어요"
+    parts = []
+    if n_park:
+        parts.append(f"주차장 {n_park}곳")
+    if n_toilet:
+        parts.append(f"화장실 {n_toilet}곳")
+    return f"반경 {radius_m:.0f}m 안에 " + " · ".join(parts) + "이 있어요"
+
+
+def _origin_marker(resolved: dict | None, lat: float, lon: float) -> Marker:
+    name = (resolved or {}).get("display_name") or "출발지"
+    return Marker(lat, lon, "origin", str(name))
+
+
+def _spot_map(
+    spot: spots.Spot,
+    origin: tuple[float, float] | None,
+    origin_resolved: dict | None,
+    route,
+) -> str | None:
+    """검증된 관측지 한 곳의 지도 — 주행 경로 + 도보 경로 + 주차·화장실.
+
+    편의시설은 **사람이 확인한 것**을 쓴다(반경 검색이 아니라 `jeju_spots.json`).
+    확인된 자리가 그 관측지에 실제로 쓰는 자리이기 때문이다.
+    """
+    markers = [Marker(spot.lat, spot.lon, "spot", spot.name, spot.kind)]
+    walk_paths: list[list[tuple[float, float]]] = []
+
+    for lot in spot.parking:
+        if lot.get("lat") is None or lot.get("lon") is None:
+            continue
+        markers.append(Marker(
+            float(lot["lat"]), float(lot["lon"]), "parking",
+            lot.get("name", "주차장"), lot.get("fee", ""),
+        ))
+    for wc in spot.toilet:
+        if wc.get("lat") is None or wc.get("lon") is None:
+            continue
+        markers.append(Marker(
+            float(wc["lat"]), float(wc["lon"]), "toilet", wc.get("name", "화장실"),
+        ))
+    walk_paths.extend(list(pts) for pts in spot.walk_paths)
+
+    drive_path = None
+    caption_parts = []
+    if origin is not None:
+        drive_path = routing.route_path(origin, spot.drive_target())
+        markers.append(_origin_marker(origin_resolved, *origin))
+        if route is not None:
+            caption_parts.append(f"차로 약 {route.minutes:.0f}분 / {route.km:.0f}km")
+    caption_parts.append(_walk_phrase(spot))
+
+    return maps.write(
+        title=f"{spot.name} 가는 길",
+        markers=markers,
+        drive_path=drive_path,
+        walk_paths=walk_paths,
+        caption=" · ".join(caption_parts),
+    )
+
+
+def _place_map(
+    lat: float,
+    lon: float,
+    name: str,
+    origin: tuple[float, float] | None,
+    origin_resolved: dict | None,
+    route,
+) -> tuple[str | None, list[Marker]]:
+    """등록되지 않은 자리의 지도 — 그 점 + 반경 안 편의시설(+ 출발지면 주행 경로).
+
+    도보 경로는 그리지 않는다. 어디에 세우고 어디로 걷는지는 사람이 확인한 곳에만
+    있는 정보라, 없는 선을 그리면 있는 것처럼 보인다.
+    """
+    amenities = _amenity_markers(lat, lon, NEARBY_M)
+    markers = [Marker(lat, lon, "spot", name, "등록되지 않은 지점"), *amenities]
+
+    drive_path = None
+    caption = f"반경 {NEARBY_M:.0f}m 안 편의시설"
+    if origin is not None:
+        drive_path = routing.route_path(origin, (lat, lon))
+        markers.append(_origin_marker(origin_resolved, *origin))
+        if route is not None:
+            caption = f"차로 약 {route.minutes:.0f}분 / {route.km:.0f}km · " + caption
+
+    return maps.write(
+        title=f"{name} 주변",
+        markers=markers,
+        drive_path=drive_path,
+        caption=caption,
+    ), amenities
+
+
 # --- 출발지 해석 ----------------------------------------------------------------
 
 
@@ -460,7 +606,7 @@ def _locate(query: str | None, lat: float | None, lon: float | None):
 
     try:
         geo = geocode(query)
-    except Exception:  # noqa: BLE001 — 외부 지오코딩 실패도 스키마로 환원
+    except Exception:
         geo = None
     if geo is None:
         return None
@@ -646,9 +792,32 @@ def recommend_spots(
         row["bortle"] = final.get("numbers", {}).get("bortle")
         rows.append(row)
 
+    # 지도 — 고른 곳들을 한 장에. 출발지가 있으면 1등까지의 주행 경로도 긋는다.
+    # 곳마다 경로를 다 그으면 선이 겹쳐 어느 것이 어디로 가는 길인지 안 보인다.
+    markers = [
+        Marker(s.lat, s.lon, "spot", f"{i}. {s.name}", f"{s.region}·{s.kind}")
+        for i, (s, _) in enumerate(top, start=1)
+    ]
+    drive_path = None
+    if origin_resolved is not None and top:
+        o = (float(origin_resolved["lat"]), float(origin_resolved["lon"]))
+        markers.append(_origin_marker(origin_resolved, *o))
+        drive_path = routing.route_path(o, top[0][0].drive_target())
+    map_url = maps.write(
+        title=f"관측지 추천 {len(rows)}곳",
+        markers=markers,
+        drive_path=drive_path,
+        walk_paths=[list(p) for s, _ in top for p in s.walk_paths],
+        caption=_recommend_verdict(rows, origin_resolved),
+    )
+
+    reasons = _recommend_reasons(top, routes)
+    if map_url:
+        reasons.append(f"고른 곳들을 지도로 봤어요 → {map_url}")
+
     return Response(
         verdict=_recommend_verdict(rows, origin_resolved),
-        reasons=_recommend_reasons(top, routes),
+        reasons=reasons,
         numbers={
             "candidates": len(candidates),
             "evaluated": len(pool),
@@ -659,6 +828,7 @@ def recommend_spots(
         as_of=when.isoformat(timespec="minutes"),
         resolved=origin_resolved,
         spots=rows,
+        map_url=map_url,
     ).to_dict()
 
 
@@ -787,11 +957,16 @@ def evaluate_place(
     # 경로를 함께 답한다).
     # 차로 향할 지점은 등록된 곳이면 주차장, 아니면 그 좌표 자체다.
     route = None
+    origin_ok = False
+    o_lat = o_lon = 0.0
+    origin_resolved: dict | None = None
     if origin or (origin_lat is not None and origin_lon is not None):
         o = _locate(origin, origin_lat, origin_lon)
         if o is not None and _in_jeju(o[0], o[1]):
+            o_lat, o_lon, origin_resolved = o
+            origin_ok = True
             target = known.drive_target() if known is not None else (p_lat, p_lon)
-            route = routing.drive_time((o[0], o[1]), target)
+            route = routing.drive_time((o_lat, o_lon), target)
 
     spot_rows = [_spot_row(known, route=route)] if known is not None else None
     result = _evaluate(p_lat, p_lon, date, time, scope, resolved, spot_rows)
@@ -803,6 +978,21 @@ def evaluate_place(
     if route is not None:
         result["numbers"]["drive"] = route.to_dict()
         result.setdefault("attribution", []).append(routing.SOURCE)
+
+    # 지도 — 등록된 곳은 사람이 확인한 주차·화장실과 도보 경로를, 등록되지 않은 곳은
+    # 반경 안 편의시설만 그린다. 없는 선을 그리면 있는 것처럼 보인다.
+    origin_pt = (o_lat, o_lon) if origin_ok else None
+    if known is not None:
+        result["map_url"] = _spot_map(known, origin_pt, origin_resolved, route)
+        amenities = []
+    else:
+        label = (resolved or {}).get("display_name") or (query or "이 지점")
+        result["map_url"], amenities = _place_map(
+            p_lat, p_lon, str(label), origin_pt, origin_resolved, route
+        )
+        for source in (parking.SOURCE, places.SOURCE, toilet.SOURCE):
+            if source not in result.setdefault("attribution", []):
+                result["attribution"].append(source)
 
     reasons = result.setdefault("reasons", [])
     if resolved is not None:
@@ -839,6 +1029,7 @@ def evaluate_place(
         )
         result.setdefault("attribution", []).append(spots.source())
     elif route is not None:
+        reasons.append(_amenity_reason(amenities, NEARBY_M))
         reasons.append(
             "다만 이 위치는 검증된 관측지 목록에 없어요. 하늘 상태(날씨·광공해·박명)와 "
             "위 주행시간은 좌표만으로 계산되지만, **주차 가능 여부·야간 출입·진입로 "
@@ -846,12 +1037,16 @@ def evaluate_place(
             "recommend_spots 로 검증된 곳을 받아 보시는 편이 안전해요"
         )
     else:
+        reasons.append(_amenity_reason(amenities, NEARBY_M))
         reasons.append(
             "이 위치는 검증된 관측지 목록에 없어요. 하늘 상태(날씨·광공해·박명)는 "
             "위와 같이 판정했지만 **주차 가능 여부·야간 출입·진입로 상태·도보 난이도는 "
             "확인되지 않았습니다.** 초행에 밤에 가신다면 recommend_spots 로 검증된 "
             "곳을 받아 보시는 편이 안전해요"
         )
+
+    if result.get("map_url"):
+        reasons.append(f"경로와 주변을 지도로 봤어요 → {result['map_url']}")
 
     return result
 
@@ -917,16 +1112,25 @@ def spot_details(name: str, origin: str | None = None,
 
     attribution = [spots.source()]
     route = None
+    origin_pt: tuple[float, float] | None = None
     origin_resolved = None
     if origin or (origin_lat is not None and origin_lon is not None):
         found = _locate(origin, origin_lat, origin_lon)
         if found is not None:
             o_lat, o_lon, origin_resolved = found
             if _in_jeju(o_lat, o_lon):
-                route = routing.drive_time((o_lat, o_lon), hit.drive_target())
+                # **좌표는 여기서 들고 간다.** `_locate` 는 좌표를 직접 받으면
+                # resolved 를 None 으로 준다(해석할 지명이 없으므로). 거기서 좌표를
+                # 꺼내려 하면 좌표로 준 출발지가 지도에서 통째로 사라진다.
+                origin_pt = (o_lat, o_lon)
+                route = routing.drive_time(origin_pt, hit.drive_target())
                 attribution.append(routing.SOURCE)
+            else:
+                # 제주 밖 출발지는 주행을 답하지 않으므로 지도에도 싣지 않는다.
+                origin_resolved = None
 
     row = _spot_row(hit, detail=True, route=route)
+    map_url = _spot_map(hit, origin_pt, origin_resolved, route)
 
     reasons = [f"{hit.name} ({hit.region}·{hit.kind}) — {hit.why}"]
     if route is not None:
@@ -952,6 +1156,8 @@ def spot_details(name: str, origin: str | None = None,
         reasons.append(f"요금: {hit.fee}")
     for c in hit.cautions:
         reasons.append(f"주의: {c}")
+    if map_url:
+        reasons.append(f"주차 자리와 걷는 길을 지도로 봤어요 → {map_url}")
 
     return Response(
         verdict=f"{hit.name} 접근성 정보예요",
@@ -968,4 +1174,5 @@ def spot_details(name: str, origin: str | None = None,
         as_of=_now_iso(),
         resolved=origin_resolved,
         spots=[row],
+        map_url=map_url,
     ).to_dict()

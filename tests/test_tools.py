@@ -288,28 +288,27 @@ def test_제주_밖_출발지는_주행시간을_지어내지_않는다(_no_weat
 # --- 지도 (경로·편의시설) --------------------------------------------------------
 
 
-def test_좌표로_준_출발지도_지도에_실린다():
-    # Given: 출발지를 지명이 아니라 **좌표로** 줬을 때 (현재 위치)
+def test_출발지는_지도가_아니라_숫자와_문장으로_답한다():
+    # Given: 출발지를 준 상세 조회에서
     result = spot_details("새별오름", origin_lat=AIRPORT[0], origin_lon=AIRPORT[1])
-    # When: 지도를 보면
-    url = result["map_url"]
-    name = url.rsplit("/", 1)[-1]
-    document = tools.maps.read(name) or ""
-    # Then: 주행 경로와 출발지 마커가 들어 있다.
-    #       `_locate` 는 좌표를 직접 받으면 resolved 를 None 으로 주는데, 거기서
-    #       좌표를 꺼내려 하면 좌표로 준 출발지가 지도에서 통째로 사라진다(회귀).
-    assert '"kindLabel": "출발지"' in document
-    assert '"drive": [[' in document
+    document = tools.maps.read(result["map_url"].rsplit("/", 1)[-1]) or ""
+    # When: 응답과 지도를 견주면
+    # Then: 주행시간은 응답에 있고 지도에는 없다. 섬을 가로지르는 선이 들어오면
+    #       지도가 줌아웃되어 도보 경로·계단이 뭉개진다
+    assert result["numbers"]["drive"]["minutes"] > 0
+    assert any("차로 약" in r for r in result["reasons"])
+    assert "출발지" not in document
+    assert '"drive"' not in document
 
 
-def test_출발지가_없으면_주행선을_긋지_않는다():
+def test_출발지가_없어도_지도는_그대로_나온다():
     # Given: 출발지 없이 상세를 조회하면
     result = spot_details("새별오름")
     document = tools.maps.read(result["map_url"].rsplit("/", 1)[-1]) or ""
-    # When: 지도를 보면
-    # Then: 주행선이 비어 있다 — 없는 길을 그으면 있는 것처럼 보인다
-    assert '"drive": []' in document
-    assert "출발지" not in document
+    # When: 응답을 보면
+    # Then: 주행 항목만 빠지고 지도(도보·주차·화장실)는 그대로다
+    assert "drive" not in result["numbers"]
+    assert '"walks":' in document
 
 
 def test_등록된_곳은_사람이_확인한_주차_화장실을_쓴다():

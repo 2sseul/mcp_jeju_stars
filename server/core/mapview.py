@@ -3,14 +3,15 @@
 좌표를 말로 설명하지 않는다(`plan.md` P13). "차로 29분" 다음에 사람이 실제로 묻는
 것은 "어느 길로, 어디에 세우고, 거기서 얼마나 걷나"이고, 그건 선으로 보여야 한다.
 
-무엇을 그리나 — 축마다 선·점이 다르다
+무엇을 그리나 — **도착한 다음**만 그린다
 --------------------------------------------------------------------------
-    주행 경로   출발지 → 주차 지점.  `core.routing.route_path` 의 점렬(실제 도로)
-    도보 경로   주차 지점 → 관측 지점. `jeju_spots.json` 의 `walk_routes[].points`
-    마커        출발지 · 관측지 · 주차장 · 화장실
+    도보 경로   주차 지점 → 관측 지점. `jeju_spots.json` 의 `walk_routes[].segments`
+    마커        관측지 · 주차장 · 화장실
 
-**두 선을 다르게 그린다.** 차로 가는 구간과 걸어 올라가는 구간은 준비가 다르다 —
-주행 20분에 도보 20분인 곳을 한 색으로 그으면 "40분 거리"로 뭉개진다.
+**주행 경로는 그리지 않는다.** 제주를 가로지르는 선이 들어오면 지도가 섬 전체로
+줌아웃되고, 그러면 정작 봐야 할 것 — 어디에 세우고 어디로 걷고 어디가 계단인지 —
+가 점으로 뭉개진다. 주행시간은 도구 응답의 숫자와 문장으로 답하면 되고, 지도는
+**도착한 다음**을 맡는다.
 
 파일 쓰기와 URL 은 여기 없다
 --------------------------------------------------------------------------
@@ -39,15 +40,11 @@ from dataclasses import dataclass
 #: 마커 갈래 → (색, 표시 문자, 사람이 읽는 이름). 갈래를 색으로만 나누면 색맹·흑백
 #: 출력에서 구분이 사라지므로 문자를 함께 찍는다.
 _KINDS: dict[str, tuple[str, str, str]] = {
-    "origin": ("#3b82f6", "출", "출발지"),
     "spot": ("#f59e0b", "★", "관측 지점"),
     "parking": ("#22c55e", "P", "주차"),
     "toilet": ("#a855f7", "화", "화장실"),
 }
 _FALLBACK = ("#94a3b8", "·", "지점")
-
-#: 주행선 색. 도보와 준비가 다른 구간이라 눈에 갈려야 한다(실선 대 파선).
-_DRIVE_COLOR = "#3b82f6"
 
 #: 도보 구간 갈래 → 색. "20분 걷는다"까지만 보이면 **어디서 계단이 시작되는지**를
 #: 모른다. 밤에 초행으로 오르는 사람에게는 그게 준비를 가르는 정보다.
@@ -104,7 +101,6 @@ def _points(path: list[tuple[float, float]] | None) -> list[list[float]]:
 def render(
     title: str,
     markers: list[Marker],
-    drive_path: list[tuple[float, float]] | None = None,
     walk_segments: list[tuple[list[tuple[float, float]], str]] | None = None,
     caption: str = "",
     items: list[Item] | None = None,
@@ -114,7 +110,6 @@ def render(
     Args:
         title: 문서 제목이자 화면 왼쪽 위 제목.
         markers: 찍을 점들. 하나도 없으면 지도를 만들지 않는다(빈 문자열).
-        drive_path: 주행 경로 점렬. 없으면 선을 안 그린다(출발지를 안 준 경우).
         walk_segments: (점렬, 갈래) 짝들. 갈래는 `계단`·`돌길`·`흙길`·`포장` 처럼
             무엇을 밟는가이며, 색이 거기서 갈린다.
         caption: 제목 아래 한 줄 설명(소요시간 등).
@@ -141,7 +136,6 @@ def render(
             }
             for m in markers
         ],
-        "drive": _points(drive_path),
         "walks": [
             {
                 "points": _points(pts),
@@ -161,20 +155,17 @@ def render(
             }
             for it in (items or [])
         ],
-        "driveColor": _DRIVE_COLOR,
     }
 
     # 범례는 실제로 그린 것만 싣는다. 없는 것을 범례에만 두면 "왜 안 보이지"가 된다.
     legend = []
-    if data["drive"]:
-        legend.append(f'<i class="ln" style="--c:{_DRIVE_COLOR}"></i>차로 가는 길')
     # 도보는 갈래마다 한 칸씩. 실제로 그린 갈래만, 밟기 힘든 순으로 싣는다.
     drawn = {w["kind"] for w in data["walks"]}
     for kind in _WALK_COLORS:
         if kind in drawn:
             color = _WALK_COLORS[kind]
             legend.append(f'<i class="ln dash" style="--c:{color}"></i>{kind}')
-    for kind in ("origin", "spot", "parking", "toilet"):
+    for kind in ("spot", "parking", "toilet"):
         if any(m.kind == kind for m in markers):
             color, glyph, label = _KINDS[kind]
             legend.append(f'<i class="pin" style="--c:{color}">{glyph}</i>{label}')
@@ -297,15 +288,8 @@ L.control.scale({{ imperial:false }}).addTo(map);
 
 const bounds = [];
 
-// 주행 경로 — 실선. 흰 테두리를 깔아 타일 위에서 선이 묻히지 않게 한다.
-if (D.drive.length > 1) {{
-  L.polyline(D.drive, {{ color:'#ffffff', weight:8, opacity:.9 }}).addTo(map);
-  L.polyline(D.drive, {{ color:D.driveColor, weight:4, opacity:.95 }}).addTo(map);
-  D.drive.forEach(p => bounds.push(p));
-}}
-
-// 도보 경로 — 파선에 갈래별 색. 차로 가는 구간과 눈에 갈려야 하고(파선),
-// 계단이 어디서 시작되는지도 보여야 한다(색).
+// 도보 경로 — 갈래별 색. 계단이 어디서 시작되는지가 보여야 한다.
+// 흰 테두리를 깔아 위성 타일 위에서 선이 묻히지 않게 한다.
 D.walks.forEach(w => {{
   L.polyline(w.points, {{ color:'#ffffff', weight:8, opacity:.9 }}).addTo(map);
   L.polyline(w.points, {{

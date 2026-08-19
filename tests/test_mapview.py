@@ -23,7 +23,6 @@ WALK = [(33.3651, 126.3611), (33.3658, 126.3595), (33.3663, 126.3576)]
 #: (점렬, 갈래) — 지도는 갈래로 색을 가른다.
 WALK_DIRT = [(WALK, "흙길")]
 WALK_MIXED = [(WALK, "흙길"), (WALK[:2], "계단")]
-DRIVE = [(33.5070, 126.4930), (33.4500, 126.4200), (33.3651, 126.3611)]
 
 
 def _payload(document: str) -> dict:
@@ -42,14 +41,24 @@ def test_마커가_없으면_지도를_만들지_않는다():
     assert maps.write("제목", []) is None
 
 
-def test_경로가_없으면_선을_긋지_않는다():
-    # Given: 출발지도 도보 경로도 없이 점 하나만 있을 때 (출발지를 안 준 평가)
-    document = mapview.render("한 지점", [SPOT])
-    data = _payload(document)
+def test_도보_경로가_없으면_선을_긋지_않는다():
+    # Given: 점 하나만 있고 도보 경로가 없을 때 (미등록 장소)
+    data = _payload(mapview.render("한 지점", [SPOT]))
     # When: 데이터를 보면
     # Then: 선 자료가 비어 있다 — 없는 길을 그으면 있는 것처럼 보인다
-    assert data["drive"] == []
     assert data["walks"] == []
+
+
+def test_주행_경로는_지도에_아예_없다():
+    # Given: 어떤 지도든
+    document = mapview.render("도착 이후", [SPOT, PARK], walk_segments=WALK_DIRT)
+    data = _payload(document)
+    # When: 자료와 문서를 보면
+    # Then: 주행선을 담는 자리 자체가 없다. 제주를 가로지르는 선이 들어오면 지도가
+    #       섬 전체로 줌아웃되어 정작 봐야 할 도보 경로·계단이 점으로 뭉개진다 —
+    #       주행시간은 도구 응답의 숫자와 문장이 답한다
+    assert "drive" not in data
+    assert "출발지" not in document
 
 
 def test_범례는_실제로_그린_갈래만_싣는다():
@@ -75,19 +84,6 @@ def test_점이_둘_미만인_구간은_아예_빠진다():
 
 
 # --- 두 축을 눈으로 갈라 놓는다 ----------------------------------------------------
-
-
-def test_주행선과_도보선은_다른_색이다():
-    # Given: 주행과 도보가 모두 있는 지도에서
-    data = _payload(
-        mapview.render("둘 다", [SPOT, PARK], drive_path=DRIVE,
-                       walk_segments=WALK_DIRT)
-    )
-    # When: 두 선의 색을 보면
-    # Then: 다르다. 주행 20분 + 도보 20분인 곳을 한 색으로 그으면 "40분 거리"로 뭉개진다
-    assert data["driveColor"] != data["walks"][0]["color"]
-    assert len(data["drive"]) == 3
-    assert len(data["walks"][0]["points"]) == 3
 
 
 def test_도보_갈래마다_색이_다르다():

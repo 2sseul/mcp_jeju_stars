@@ -47,7 +47,6 @@ def base_url() -> str:
 def write(
     title: str,
     markers: list[Marker],
-    drive_path: list[tuple[float, float]] | None = None,
     walk_segments: list[tuple[list[tuple[float, float]], str]] | None = None,
     caption: str = "",
     items: list[Item] | None = None,
@@ -60,7 +59,6 @@ def write(
     document = render(
         title=title,
         markers=markers,
-        drive_path=drive_path,
         walk_segments=walk_segments,
         caption=caption,
         items=items,

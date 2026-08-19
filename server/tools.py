@@ -537,18 +537,12 @@ def _spot_item(spot: spots.Spot, label: str, route=None) -> Item:
     )
 
 
-def _origin_marker(resolved: dict | None, lat: float, lon: float) -> Marker:
-    name = (resolved or {}).get("display_name") or "출발지"
-    return Marker(lat, lon, "origin", str(name))
+def _spot_map(spot: spots.Spot, route=None) -> str | None:
+    """검증된 관측지 한 곳의 지도 — 도보 경로 + 주차·화장실.
 
-
-def _spot_map(
-    spot: spots.Spot,
-    origin: tuple[float, float] | None,
-    origin_resolved: dict | None,
-    route,
-) -> str | None:
-    """검증된 관측지 한 곳의 지도 — 주행 경로 + 도보 경로 + 주차·화장실.
+    **주행 경로는 그리지 않는다.** 제주를 가로지르는 선이 들어오면 지도가 섬 전체로
+    줌아웃되어, 정작 봐야 할 도보 경로와 계단 구간이 점으로 뭉개진다. 주행시간은
+    숫자와 문장으로 답하고(`numbers.drive`·설명 줄), 지도는 도착한 다음을 맡는다.
 
     편의시설은 **사람이 확인한 것**을 쓴다(반경 검색이 아니라 `jeju_spots.json`).
     확인된 자리가 그 관측지에 실제로 쓰는 자리이기 때문이다.
@@ -569,19 +563,14 @@ def _spot_map(
         markers.append(Marker(
             float(wc["lat"]), float(wc["lon"]), "toilet", wc.get("name", "화장실"),
         ))
-    drive_path = None
     caption_parts = []
-    if origin is not None:
-        drive_path = routing.route_path(origin, spot.drive_target())
-        markers.append(_origin_marker(origin_resolved, *origin))
-        if route is not None:
-            caption_parts.append(f"차로 약 {route.minutes:.0f}분 / {route.km:.0f}km")
+    if route is not None:
+        caption_parts.append(f"차로 약 {route.minutes:.0f}분 / {route.km:.0f}km")
     caption_parts.append(_walk_phrase(spot))
 
     return maps.write(
-        title=f"{spot.name} 가는 길",
+        title=f"{spot.name} 도착 이후",
         markers=markers,
-        drive_path=drive_path,
         walk_segments=walk_segments,
         caption=" · ".join(caption_parts),
         items=[_spot_item(spot, spot.name, route)],
@@ -592,9 +581,7 @@ def _place_map(
     lat: float,
     lon: float,
     name: str,
-    origin: tuple[float, float] | None,
-    origin_resolved: dict | None,
-    route,
+    route=None,
 ) -> tuple[str | None, list[Marker]]:
     """등록되지 않은 자리의 지도 — 그 점 + 반경 안 편의시설(+ 출발지면 주행 경로).
 
@@ -604,18 +591,13 @@ def _place_map(
     amenities = _amenity_markers(lat, lon, NEARBY_M)
     markers = [Marker(lat, lon, "spot", name, "등록되지 않은 지점"), *amenities]
 
-    drive_path = None
     caption = f"반경 {NEARBY_M:.0f}m 안 편의시설"
-    if origin is not None:
-        drive_path = routing.route_path(origin, (lat, lon))
-        markers.append(_origin_marker(origin_resolved, *origin))
-        if route is not None:
-            caption = f"차로 약 {route.minutes:.0f}분 / {route.km:.0f}km · " + caption
+    if route is not None:
+        caption = f"차로 약 {route.minutes:.0f}분 / {route.km:.0f}km · " + caption
 
     return maps.write(
         title=f"{name} 주변",
         markers=markers,
-        drive_path=drive_path,
         caption=caption,
     ), amenities
 
@@ -833,8 +815,8 @@ def recommend_spots(
         row["bortle"] = final.get("numbers", {}).get("bortle")
         rows.append(row)
 
-    # 지도 — 고른 곳들을 한 장에. 출발지가 있으면 1등까지의 주행 경로도 긋는다.
-    # 곳마다 경로를 다 그으면 선이 겹쳐 어느 것이 어디로 가는 길인지 안 보인다.
+    # 지도 — 고른 곳들을 한 장에. 주행 경로는 긋지 않는다(섬 전체로 줌아웃된다).
+    # 주행시간은 목록 박스의 `차 N분` 조각과 응답의 `drive` 로 답한다.
     markers = [
         Marker(s.lat, s.lon, "spot", f"{i}. {s.name}", f"{s.region}·{s.kind}")
         for i, (s, _) in enumerate(top, start=1)
@@ -843,15 +825,9 @@ def recommend_spots(
         _spot_item(s, f"{i}. {s.name}", routes.get(s.name))
         for i, (s, _) in enumerate(top, start=1)
     ]
-    drive_path = None
-    if origin_resolved is not None and top:
-        o = (float(origin_resolved["lat"]), float(origin_resolved["lon"]))
-        markers.append(_origin_marker(origin_resolved, *o))
-        drive_path = routing.route_path(o, top[0][0].drive_target())
     map_url = maps.write(
         title=f"관측지 추천 {len(rows)}곳",
         markers=markers,
-        drive_path=drive_path,
         walk_segments=[
             (list(g.points), g.kind) for s, _ in top for g in s.walk_segments
         ],
@@ -1002,19 +978,15 @@ def evaluate_place(
 
     # 출발지가 있으면 주행시간을 잰다. 등록 여부와 무관하다 — 도로 그래프는 좌표만
     # 있으면 답한다(architecture §0 의 2×2: 출발지가 있으면 목적지를 지정했든 아니든
-    # 경로를 함께 답한다).
+    # 걸리는 시간을 함께 답한다). 답하는 것은 **숫자와 문장**이고, 지도에는 싣지 않는다
+    # — 섬을 가로지르는 선이 들어오면 지도가 줌아웃되어 도보 경로가 뭉개진다.
     # 차로 향할 지점은 등록된 곳이면 주차장, 아니면 그 좌표 자체다.
     route = None
-    origin_ok = False
-    o_lat = o_lon = 0.0
-    origin_resolved: dict | None = None
     if origin or (origin_lat is not None and origin_lon is not None):
         o = _locate(origin, origin_lat, origin_lon)
         if o is not None and _in_jeju(o[0], o[1]):
-            o_lat, o_lon, origin_resolved = o
-            origin_ok = True
             target = known.drive_target() if known is not None else (p_lat, p_lon)
-            route = routing.drive_time((o_lat, o_lon), target)
+            route = routing.drive_time((o[0], o[1]), target)
 
     spot_rows = [_spot_row(known, route=route)] if known is not None else None
     result = _evaluate(p_lat, p_lon, date, time, scope, resolved, spot_rows)
@@ -1029,15 +1001,12 @@ def evaluate_place(
 
     # 지도 — 등록된 곳은 사람이 확인한 주차·화장실과 도보 경로를, 등록되지 않은 곳은
     # 반경 안 편의시설만 그린다. 없는 선을 그리면 있는 것처럼 보인다.
-    origin_pt = (o_lat, o_lon) if origin_ok else None
     if known is not None:
-        result["map_url"] = _spot_map(known, origin_pt, origin_resolved, route)
+        result["map_url"] = _spot_map(known, route)
         amenities = []
     else:
         label = (resolved or {}).get("display_name") or (query or "이 지점")
-        result["map_url"], amenities = _place_map(
-            p_lat, p_lon, str(label), origin_pt, origin_resolved, route
-        )
+        result["map_url"], amenities = _place_map(p_lat, p_lon, str(label), route)
         for source in (parking.SOURCE, places.SOURCE, toilet.SOURCE):
             if source not in result.setdefault("attribution", []):
                 result["attribution"].append(source)
@@ -1160,25 +1129,20 @@ def spot_details(name: str, origin: str | None = None,
 
     attribution = [spots.source()]
     route = None
-    origin_pt: tuple[float, float] | None = None
     origin_resolved = None
     if origin or (origin_lat is not None and origin_lon is not None):
         found = _locate(origin, origin_lat, origin_lon)
         if found is not None:
             o_lat, o_lon, origin_resolved = found
             if _in_jeju(o_lat, o_lon):
-                # **좌표는 여기서 들고 간다.** `_locate` 는 좌표를 직접 받으면
-                # resolved 를 None 으로 준다(해석할 지명이 없으므로). 거기서 좌표를
-                # 꺼내려 하면 좌표로 준 출발지가 지도에서 통째로 사라진다.
-                origin_pt = (o_lat, o_lon)
-                route = routing.drive_time(origin_pt, hit.drive_target())
+                route = routing.drive_time((o_lat, o_lon), hit.drive_target())
                 attribution.append(routing.SOURCE)
             else:
                 # 제주 밖 출발지는 주행을 답하지 않으므로 지도에도 싣지 않는다.
                 origin_resolved = None
 
     row = _spot_row(hit, detail=True, route=route)
-    map_url = _spot_map(hit, origin_pt, origin_resolved, route)
+    map_url = _spot_map(hit, route)
 
     reasons = [f"{hit.name} ({hit.region}·{hit.kind}) — {hit.why}"]
     if route is not None:

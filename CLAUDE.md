@@ -16,7 +16,7 @@ fastmcp v2 + LangGraph / uv / Python 3.13 / 온프레미스.
 - `sys.path` 조작 · de421.bsp 자동 다운로드 의존
 - `core/`에 네트워크·LLM 호출
 - `tools.py`에 `@mcp.tool` — 등록은 `app.py`만 (판정 함수는 평범한 함수로 남긴다)
-- Open-Meteo KMA 계열 모델 (제주 좌표 NaN)
+- Open-Meteo KMA 계열 모델 (`models=kma_*`) — 전 변수·전 지점 null (`decisions.md` §2.30)
 - 거리를 직선거리로 재기 — 한라산이 가운데라 뒤집힌다. `core/routing.py` 를 쓴다
 - `_JUNCTION_S` 를 근거 없이 바꾸기 — `scripts/check_route_calibration.py` 로 재보정한다
 

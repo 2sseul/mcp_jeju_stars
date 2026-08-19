@@ -55,6 +55,12 @@ PARKING_REVIEW = DATA / "candidates" / "parking_review.jsonl"
 # 지도에서 사람이 직접 찍어 둔 지점(주차장 목록에 없는 자리). 위와 같은 입력 데이터.
 SPOT_PINS = DATA / "candidates" / "spot_pins.jsonl"
 
+# Open-Meteo 응답 캐시(requests-cache 가 `.sqlite` 를 붙인다). 판정 결과가 아니라
+# 외부 응답의 사본이라 지워도 재생성되지만, 지운 만큼 외부 호출이 다시 나간다.
+# 작업 디렉터리가 아니라 저장소 루트에 두는 것은 어디서 실행하든 같은 캐시를
+# 쓰기 위함이다 — 컨테이너에서는 이 자리를 볼륨으로 잡으면 재시작에도 살아남는다.
+FORECAST_CACHE = ROOT / ".cache"
+
 # 발표용 산출물(HTML). 저장소에 커밋하지 않는다 — 스크립트로 언제든 재생성한다.
 LIGHT_MAP   = OUTPUTS / "jeju_light_map.html"
 SPOT_REPORT = OUTPUTS / "jeju_spot_report.html"

@@ -61,9 +61,20 @@ COPY data/streetlight ./data/streetlight
 COPY data/jeju_spots.json ./data/
 COPY data/road/jeju_road_graph.npz ./data/road/
 
-# 비루트로 돌린다. /app 소유권을 넘기는 것은 Open-Meteo 클라이언트가 작업
-# 디렉터리에 `.cache.sqlite`(requests-cache)를 만들기 때문이다 — 못 쓰면 매 호출이
-# 캐시 없이 나간다.
+# 예보 캐시(requests-cache) 자리. `server/path.py` 의 CACHE_DIR 과 같은 자리다.
+#
+# **볼륨으로 잡는 편이 좋다** — 컨테이너를 지우면 캐시도 사라지고, 그만큼 Open-Meteo
+# 호출이 다시 나간다(관측지 63곳 하룻밤 기준 37회). 잡지 않아도 서버는 뜨고 돌지만
+# 재시작마다 캐시가 비어 있다.
+#
+#   docker run -p 8000:8000 -v jeju-star-cache:/app/.cache jeju-star
+#
+# VOLUME 을 선언해 두면 -v 를 잊어도 익명 볼륨이 붙어 컨테이너 수명 동안은 남는다.
+RUN mkdir -p /app/.cache
+VOLUME ["/app/.cache"]
+
+# 비루트로 돌린다. /app 소유권을 넘기는 것은 위 캐시 디렉터리에 써야 하기 때문이다 —
+# 못 쓰면 매 호출이 캐시 없이 나간다.
 RUN useradd --create-home --uid 10001 app && chown -R app:app /app
 USER app
 

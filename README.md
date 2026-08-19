@@ -72,8 +72,11 @@ uv run python -m server.app            # → http://127.0.0.1:8000/mcp
 
 ```bash
 docker build -t jeju-star .
-docker run --rm -p 8000:8000 jeju-star  # → http://127.0.0.1:8000/mcp
+docker run --rm -p 8000:8000 -v jeju-star-cache:/app/.cache jeju-star
 ```
+
+`-v` 로 잡는 것은 Open-Meteo 예보 캐시다. 없어도 뜨지만 재시작마다 캐시가 비어
+외부 호출이 다시 나간다(관측지 63곳 하룻밤 기준 37회).
 
 서버는 키가 없어도 뜬다 — 판정에 쓰는 데이터가 전부 로컬 파일이거나 무인증 API 이기
 때문이다. 키는 아래 **배치 스크립트**만 쓴다. 이름은 `.env.example` 에 있다

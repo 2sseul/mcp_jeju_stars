@@ -57,9 +57,11 @@ SPOT_PINS = DATA / "candidates" / "spot_pins.jsonl"
 
 # Open-Meteo 응답 캐시(requests-cache 가 `.sqlite` 를 붙인다). 판정 결과가 아니라
 # 외부 응답의 사본이라 지워도 재생성되지만, 지운 만큼 외부 호출이 다시 나간다.
-# 작업 디렉터리가 아니라 저장소 루트에 두는 것은 어디서 실행하든 같은 캐시를
-# 쓰기 위함이다 — 컨테이너에서는 이 자리를 볼륨으로 잡으면 재시작에도 살아남는다.
-FORECAST_CACHE = ROOT / ".cache"
+# 작업 디렉터리가 아니라 저장소 루트에 두는 것은 어디서 실행하든 같은 캐시를 쓰기
+# 위함이다. **파일이 아니라 디렉터리 안에 두는 것**은 컨테이너에서 `CACHE_DIR` 을
+# 볼륨으로 잡기 위해서다 — 없는 파일 하나를 볼륨으로 마운트할 수는 없다.
+CACHE_DIR      = ROOT / ".cache"
+FORECAST_CACHE = CACHE_DIR / "forecast"
 
 # 발표용 산출물(HTML). 저장소에 커밋하지 않는다 — 스크립트로 언제든 재생성한다.
 LIGHT_MAP   = OUTPUTS / "jeju_light_map.html"

@@ -62,6 +62,8 @@ _ANCHOR_HOUR = 12
 
 # 캐시(1h)+재시도로 감싼 클라이언트 — 모듈 로드 시 1회만 만든다.
 # 캐시 파일 자리는 `path.py` 가 정한다(작업 디렉터리에 따라 캐시가 갈리지 않게).
+# 디렉터리는 여기서 만든다 — 컨테이너가 볼륨을 안 잡아 줬어도 서버는 떠야 한다.
+path.CACHE_DIR.mkdir(parents=True, exist_ok=True)
 _cache_session = requests_cache.CachedSession(
     str(path.FORECAST_CACHE), expire_after=3600
 )

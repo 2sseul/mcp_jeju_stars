@@ -159,7 +159,6 @@ def render(
     markers: list[Marker],
     satellite: Tiles | None = None,
     walk_segments: list[tuple[list[tuple[float, float]], str, str]] | None = None,
-    caption: str = "",
     items: list[Item] | None = None,
 ) -> str:
     """지도 HTML 한 장. 열기만 하면 되는 자립형 문서다.
@@ -171,11 +170,8 @@ def render(
         walk_segments: (점렬, 갈래, 설명) 짝들. 갈래는 `계단`·`돌길`·`흙길`·`포장`
             처럼 무엇을 밟는가이며 색이 거기서 갈린다. 설명은 구간을 눌렀을 때 뜨는
             한 줄(길이·노면·경사)이다.
-        caption: 제목 아래 설명. 줄바꿈(`
-`)으로 나누면 화면에서도 줄이 갈린다 —
-            "차로 25분"과 "걸어서 1분"은 다른 이야기라 한 줄에 붙이면 뭉쳐 읽힌다.
-        items: 옆에 펼 목록. 여러 곳을 그릴 때 어디가 어디인지와 각 곳의 난이도·
-            계단·도보를 한눈에 견주게 한다. 비면 목록 박스를 만들지 않는다.
+        items: 패널에 펼 목록. 여러 곳을 그릴 때 어디가 어디인지와 각 곳의 난이도·
+            계단·도보를 한눈에 견주게 한다.
 
     Returns:
         완결된 HTML 문자열. 마커가 하나도 없으면 빈 문자열 — 그릴 것이 없는데
@@ -246,15 +242,8 @@ def render(
             color, glyph, label = _KINDS[kind]
             legend.append(f'<i class="pin" style="--c:{color}">{glyph}</i>{label}')
 
-    # 줄마다 따로 이스케이프하고 <br> 로 잇는다. 통째로 이스케이프한 뒤 태그를 끼워
-    # 넣으면 순서가 뒤집혀 주입 구멍이 된다.
-    caption_html = "<br>".join(
-        html.escape(line) for line in caption.splitlines() or [""]
-    )
-
     return _TEMPLATE.format(
         title=html.escape(title),
-        caption=caption_html,
         legend="".join(f"<span>{item}</span>" for item in legend),
         data=json.dumps(data, ensure_ascii=False),
     )
@@ -275,17 +264,10 @@ _TEMPLATE = """<!doctype html>
     font-family: system-ui, -apple-system, "Malgun Gothic", sans-serif;
   }}
   #map {{ position:absolute; inset:0; background:var(--bg); }}
-  .panel {{
-    position:absolute; z-index:1000; top:12px; left:12px;
-    max-width:min(340px, calc(100% - 24px));
-    background:var(--card); border-radius:10px; padding:12px 14px;
-    box-shadow:0 2px 12px rgba(15,23,42,.16); color:var(--ink);
-  }}
-  .panel h1 {{ margin:0 0 4px; font-size:15px; font-weight:650; }}
-  .panel p {{ margin:0 0 10px; font-size:12px; color:var(--ink-2); line-height:1.5; }}
   .legend {{
-    display:flex; flex-wrap:wrap; gap:6px 12px;
-    font-size:11.5px; color:var(--ink);
+    display:flex; flex-wrap:wrap; gap:5px 10px;
+    font-size:11px; color:var(--ink-2);
+    padding:9px 9px 3px; border-top:1px solid #e2e8f0; margin-top:4px;
   }}
   .legend span {{ display:inline-flex; align-items:center; gap:5px; }}
   .pin {{
@@ -302,12 +284,17 @@ _TEMPLATE = """<!doctype html>
   .leaflet-popup-close-button {{ padding:6px 6px 0 0 !important; }}
   .leaflet-popup-content b {{ display:block; font-size:13px; margin-bottom:2px; }}
   .leaflet-popup-content .k {{ color:#64748b; font-size:11px; }}
-  /* 목록 박스 — 여러 곳을 한눈에 견주는 표. 좁은 화면에서는 지도 아래로 내린다. */
-  .list {{
-    position:absolute; z-index:1000; top:12px; right:12px; width:290px;
+  /* 패널 하나에 제목·목록·범례를 담는다. 둘로 나누면 화면 양쪽을 다 가린다.
+     좁은 화면에서는 지도 아래로 내린다. */
+  .panel {{
+    position:absolute; z-index:1000; top:12px; right:12px; width:300px;
     max-height:calc(100% - 24px); overflow-y:auto;
-    background:var(--card); border-radius:10px; padding:8px;
+    background:var(--card); border-radius:10px; padding:4px;
     box-shadow:0 2px 12px rgba(15,23,42,.16); color:var(--ink);
+  }}
+  .panel h1 {{
+    margin:0; padding:9px 9px 8px; font-size:14px; font-weight:650;
+    border-bottom:1px solid #e2e8f0;
   }}
   .row {{
     display:block; width:100%; text-align:left; border:0; background:none;
@@ -323,11 +310,11 @@ _TEMPLATE = """<!doctype html>
     white-space:nowrap;
   }}
   @media (max-width: 640px) {{
-    .list {{
-      position:static; width:auto; max-height:45%; margin:0;
+    .panel {{
+      position:static; width:auto; max-height:42%; margin:0;
       border-radius:0; box-shadow:none; border-top:1px solid #e2e8f0;
     }}
-    #map {{ position:absolute; inset:0 0 45% 0; }}
+    #map {{ position:absolute; inset:0 0 42% 0; }}
     body {{ display:flex; flex-direction:column; }}
   }}
   /* 위성 배경 위에서는 글자·컨트롤이 묻히므로 바탕을 확실히 준다. */
@@ -339,10 +326,9 @@ _TEMPLATE = """<!doctype html>
 <div id="map"></div>
 <div class="panel">
   <h1>{title}</h1>
-  <p>{caption}</p>
+  <div id="list"></div>
   <div class="legend">{legend}</div>
 </div>
-<div class="list" id="list" hidden></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const D = {data};
@@ -384,6 +370,30 @@ D.walks.forEach(w => {{
   w.points.forEach(p => bounds.push(p));
 }});
 
+// 같은 자리에 겹친 점은 살짝 벌려 그린다. 공공데이터의 화장실과 충전소가 같은
+// 주소로 지오코딩돼 좌표가 0.1m 차이인 경우가 있는데, 그대로 두면 나중에 그린 것이
+// 앞의 것을 통째로 덮어 "있다고 적혀 있는데 핀이 없다"가 된다.
+//
+// **좌표를 고치는 게 아니라 그리기만 옮긴다.** 팝업의 이름·거리는 원래 값 그대로다.
+const SPREAD_M = 7;
+const seen = new Map();
+const pins = new Map();
+D.markers.forEach(m => {{
+  const key = m.lat.toFixed(5) + ',' + m.lon.toFixed(5);
+  const n = seen.get(key) || 0;
+  seen.set(key, n + 1);
+  m.drawLat = m.lat;
+  m.drawLon = m.lon;
+  if (n > 0) {{
+    const angle = (n - 1) * (Math.PI * 2 / 6) + Math.PI / 6;
+    const dLat = (SPREAD_M / 111194) * Math.cos(angle);
+    const dLon = (SPREAD_M / (111320 * Math.cos(m.lat * Math.PI / 180)))
+                 * Math.sin(angle);
+    m.drawLat += dLat;
+    m.drawLon += dLon;
+  }}
+}});
+
 // 마커 — 갈래마다 색과 글자를 함께 준다(색만으로 나누지 않는다).
 D.markers.forEach(m => {{
   const icon = L.divIcon({{
@@ -396,17 +406,17 @@ D.markers.forEach(m => {{
     iconSize: [22, 22], iconAnchor: [11, 11], popupAnchor: [0, -12]
   }});
   const note = m.note ? '<span class="k">' + m.note + '</span>' : '';
-  L.marker([m.lat, m.lon], {{ icon }})
+  const pin = L.marker([m.drawLat, m.drawLon], {{ icon }})
     .bindPopup('<b>' + m.name + '</b><span class="k">' + m.kindLabel + '</span>' +
                (note ? '<br>' + note : ''))
     .addTo(map);
+  pins.set(m.lat.toFixed(5) + ',' + m.lon.toFixed(5), pin);
   bounds.push([m.lat, m.lon]);
 }});
 
-// 목록 박스 — 마커만으로는 어디가 어디인지 모른다. 눌러서 그 자리로 이동한다.
+// 목록 — 마커만으로는 어디가 어디인지 모른다. 눌러서 그 자리로 이동한다.
 if (D.items.length) {{
   const box = document.getElementById('list');
-  box.hidden = false;
   D.items.forEach(it => {{
     const row = document.createElement('button');
     row.className = 'row';
@@ -422,7 +432,11 @@ if (D.items.length) {{
       tag.style.color = f.fg;
       fx.appendChild(tag);
     }});
-    row.addEventListener('click', () => map.setView([it.lat, it.lon], 16));
+    row.addEventListener('click', () => {{
+      map.setView([it.lat, it.lon], Math.min(16, D.sat.maxNative));
+      const pin = pins.get(it.lat.toFixed(5) + ',' + it.lon.toFixed(5));
+      if (pin) pin.openPopup();
+    }});
     box.appendChild(row);
   }});
 }}
@@ -430,8 +444,17 @@ if (D.items.length) {{
 // 실사진이 있는 줌보다 더 당기지 않는다. 도보 경로가 짧은 곳(1100고지는 25m·26m·
 // 10m·7m)은 fitBounds 가 z20 까지 당기는데, 그 줌엔 사진이 없어 마지막 타일을 늘린
 // 흐릿한 화면이 된다. 조금 덜 확대하고 선명한 편이 낫다.
+//
+// 반대쪽 끝도 막는다. 섬 양끝의 관측지 넷을 한 화면에 담으면 z10 쯤이 되는데, 그
+// 줌에서는 점 넷이 어디인지 알아볼 수가 없다. 목록에서 눌러 옮겨 다니는 것이 전제라
+// **처음 화면은 한 곳을 알아볼 수 있는 정도**로 연다. 화면 밖 지점은 목록으로 간다.
+const MIN_START_ZOOM = 13;
 if (bounds.length > 1) {{
   map.fitBounds(bounds, {{ padding:[48, 48], maxZoom: D.sat.maxNative }});
+  if (map.getZoom() < MIN_START_ZOOM) {{
+    const focus = D.items.length ? [D.items[0].lat, D.items[0].lon] : map.getCenter();
+    map.setView(focus, MIN_START_ZOOM);
+  }}
 }} else {{
   map.setView(bounds[0], Math.min(16, D.sat.maxNative));
 }}

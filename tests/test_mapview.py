@@ -136,13 +136,25 @@ def test_모르는_갈래도_그리기는_한다():
     assert data["markers"][0]["name"] == "무엇"
 
 
-def test_제목과_설명은_HTML로_새지_않는다():
+def test_제목은_HTML로_새지_않는다():
     # Given: 꺾쇠가 든 이름이 주어졌을 때 (지오코딩 결과가 그대로 들어올 수 있다)
-    document = mapview.render("<script>x</script>", [SPOT], caption="<b>굵게</b>")
+    document = mapview.render("<script>x</script>", [SPOT])
     # When: 문서를 보면
     # Then: 태그로 살아나지 않는다
     assert "<script>x</script>" not in document
     assert "&lt;script&gt;" in document
+
+
+def test_패널은_하나다():
+    # Given: 제목·목록·범례가 있는 지도에서
+    document = mapview.render(
+        "패널", [SPOT], walk_segments=WALK_DIRT,
+        items=[mapview.Item(label="1. 새별오름", lat=33.36, lon=126.35)],
+    )
+    # When: 패널 수를 세면
+    # Then: 하나다. 둘로 나누면 화면 양쪽을 다 가린다
+    assert document.count('class="panel"') == 1
+    assert 'class="list"' not in document
 
 
 # --- 배경 (위성이 기본) -----------------------------------------------------------

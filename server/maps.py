@@ -86,7 +86,6 @@ def write(
     title: str,
     markers: list[Marker],
     walk_segments: list[tuple[list[tuple[float, float]], str, str]] | None = None,
-    caption: str = "",
     items: list[Item] | None = None,
 ) -> str | None:
     """지도를 파일로 떨어뜨리고 주소를 돌려준다. 그릴 것이 없으면 None.
@@ -99,7 +98,6 @@ def write(
         satellite=satellite(),
         markers=markers,
         walk_segments=walk_segments,
-        caption=caption,
         items=items,
     )
     if not document:

@@ -768,16 +768,12 @@ def _spot_map(spot: spots.Spot, route=None) -> str | None:
             continue
         same.append((extra.lat, extra.lon))
         markers.append(extra)
-    caption_parts = []
-    if route is not None:
-        caption_parts.append(f"차로 약 {route.minutes:.0f}분 / {route.km:.0f}km")
-    caption_parts.append(_walk_phrase(spot))
-
+    # 설명 문단을 따로 두지 않는다 — 목록 한 줄의 조각(차 N분·도보 N분·계단…)이
+    # 같은 내용을 이미 말한다. 두 번 적으면 패널만 길어진다.
     return maps.write(
         title=f"{spot.name} 도착 이후",
         markers=markers,
         walk_segments=walk_segments,
-        caption="\n".join(caption_parts),
         items=[_spot_item(spot, spot.name, route)],
     )
 
@@ -796,14 +792,16 @@ def _place_map(
     amenities = _amenity_markers(lat, lon, NEARBY_M)
     markers = [Marker(lat, lon, "spot", name, "등록되지 않은 지점"), *amenities]
 
-    caption = f"반경 {NEARBY_M:.0f}m 안 편의시설"
+    facts = [Fact(f"반경 {NEARBY_M:.0f}m 안 편의시설", "plain")]
     if route is not None:
-        caption = f"차로 약 {route.minutes:.0f}분 / {route.km:.0f}km\n" + caption
+        facts.insert(0, Fact(f"차 {route.minutes:.0f}분", "drive"))
+    facts.append(Fact("등록되지 않은 지점", "warn"))
 
     return maps.write(
         title=f"{name} 주변",
         markers=markers,
-        caption=caption,
+        items=[Item(label=name, lat=lat, lon=lon, sub="등록되지 않은 지점",
+                    facts=tuple(facts))],
     ), amenities
 
 
@@ -1045,7 +1043,6 @@ def recommend_spots(
         title=f"관측지 추천 {len(rows)}곳",
         markers=markers,
         walk_segments=[layer for s, _ in top for layer in _walk_layers(s)],
-        caption=conditions + f"\n조건에 맞는 관측지 {len(rows)}곳을 추천드립니다",
         items=items,
     )
 

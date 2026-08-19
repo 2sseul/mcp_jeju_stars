@@ -44,6 +44,7 @@ from dataclasses import dataclass
 #: 출력에서 구분이 사라지므로 문자를 함께 찍는다.
 _KINDS: dict[str, tuple[str, str, str]] = {
     "spot": ("#f59e0b", "★", "관측 지점"),
+    "origin": ("#3b82f6", "출", "출발지"),
     "parking": ("#22c55e", "P", "주차"),
     "toilet": ("#a855f7", "화", "화장실"),
 }
@@ -238,7 +239,7 @@ def render(
         if kind in drawn:
             color = _WALK_COLORS[kind]
             legend.append(f'<i class="ln" style="--c:{color}"></i>{kind}')
-    for kind in ("spot", "parking", "toilet"):
+    for kind in ("spot", "parking", "toilet", "origin"):
         if any(m.kind == kind for m in markers):
             color, glyph, label = _KINDS[kind]
             legend.append(f'<i class="pin" style="--c:{color}">{glyph}</i>{label}')
@@ -424,6 +425,11 @@ D.markers.forEach(m => {{
     // 화면 범위는 관측지로만 잡는다. 편의시설까지 넣으면 처음 화면이 넓어져
     // 정작 봐야 할 점들이 더 작아진다.
     bounds.push([m.lat, m.lon]);
+  }} else if (m.kind === 'origin') {{
+    // 출발지는 늘 보이되 **화면 범위에는 넣지 않는다**. 넣으면 제주를 가로지르는
+    // 사각형이 되어 지도가 섬 전체로 줌아웃된다 — 그러면 정작 봐야 할 도보 경로와
+    // 계단이 점으로 뭉개진다. 줌아웃하면 "내가 여기서 저만큼 떨어져 있구나"가 보인다.
+    pin.addTo(map);
   }} else {{
     facilities.addLayer(pin);
   }}

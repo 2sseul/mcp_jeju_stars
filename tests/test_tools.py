@@ -288,17 +288,17 @@ def test_제주_밖_출발지는_주행시간을_지어내지_않는다(_no_weat
 # --- 지도 (경로·편의시설) --------------------------------------------------------
 
 
-def test_출발지는_지도가_아니라_숫자와_문장으로_답한다():
+def test_출발지는_점으로만_찍고_선은_긋지_않는다():
     # Given: 출발지를 준 상세 조회에서
     result = spot_details("새별오름", origin_lat=AIRPORT[0], origin_lon=AIRPORT[1])
     document = tools.maps.read(result["map_url"].rsplit("/", 1)[-1]) or ""
     # When: 응답과 지도를 견주면
-    # Then: 주행시간은 응답에 있고 지도에는 없다. 섬을 가로지르는 선이 들어오면
-    #       지도가 줌아웃되어 도보 경로·계단이 뭉개진다
+    # Then: 출발지 점은 찍히되 주행선은 없다. "내가 여기서 저만큼 떨어져 있구나"는
+    #       점만으로 보이고, 섬을 가로지르는 선이 들어오면 지도가 줌아웃되어 도보
+    #       경로·계단이 뭉개진다
     assert result["numbers"]["drive"]["minutes"] > 0
-    assert any("차로 약" in r for r in result["reasons"])
-    assert "출발지" not in document
-    assert '"drive"' not in document
+    assert '"kind": "origin"' in document
+    assert '"drive":' not in document
 
 
 def test_출발지가_없어도_지도는_그대로_나온다():

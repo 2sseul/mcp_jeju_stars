@@ -49,16 +49,27 @@ def test_도보_경로가_없으면_선을_긋지_않는다():
     assert data["walks"] == []
 
 
-def test_주행_경로는_지도에_아예_없다():
+def test_주행_경로_선은_지도에_아예_없다():
     # Given: 어떤 지도든
     document = mapview.render("도착 이후", [SPOT, PARK], walk_segments=WALK_DIRT)
     data = _payload(document)
-    # When: 자료와 문서를 보면
+    # When: 자료를 보면
     # Then: 주행선을 담는 자리 자체가 없다. 제주를 가로지르는 선이 들어오면 지도가
     #       섬 전체로 줌아웃되어 정작 봐야 할 도보 경로·계단이 점으로 뭉개진다 —
     #       주행시간은 도구 응답의 숫자와 문장이 답한다
     assert "drive" not in data
-    assert "출발지" not in document
+
+
+def test_출발지는_점으로만_찍고_화면_범위에_넣지_않는다():
+    # Given: 출발지가 함께 주어진 지도에서
+    origin = Marker(33.5070, 126.4930, "origin", "제주국제공항", "여기서 차로 약 47분")
+    document = mapview.render("출발지", [SPOT, origin])
+    # When: 그리는 방식을 보면
+    # Then: 점은 찍되 화면 범위(bounds)에는 안 들어간다. 넣으면 제주를 가로지르는
+    #       사각형이 되어 지도가 섬 전체로 줌아웃된다 — 줌아웃하면 그때 보인다
+    assert "출발지" in document
+    assert "m.kind === 'origin'" in document
+    assert "여기서 차로 약 47분" in document
 
 
 def test_범례는_실제로_그린_갈래만_싣는다():

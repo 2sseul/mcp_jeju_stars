@@ -378,6 +378,7 @@ D.walks.forEach(w => {{
 const SPREAD_M = 7;
 const seen = new Map();
 const pins = new Map();
+const drawn = [];
 D.markers.forEach(m => {{
   const key = m.lat.toFixed(5) + ',' + m.lon.toFixed(5);
   const n = seen.get(key) || 0;
@@ -411,7 +412,32 @@ D.markers.forEach(m => {{
                (note ? '<br>' + note : ''))
     .addTo(map);
   pins.set(m.lat.toFixed(5) + ',' + m.lon.toFixed(5), pin);
+  drawn.push(pin);
   bounds.push([m.lat, m.lon]);
+}});
+
+// 실사진이 있는 줌보다 더 당기지 않는다. 도보 경로가 짧은 곳(1100고지는 25m·26m·
+// 10m·7m)은 fitBounds 가 z20 까지 당기는데, 그 줌엔 사진이 없어 마지막 타일을 늘린
+// 흐릿한 화면이 된다. 조금 덜 확대하고 선명한 편이 낫다.
+//
+// **처음 화면은 찍은 것이 전부 보이게** 연다. 어디가 어디쯤인지를 먼저 잡고, 목록에서
+// 하나를 누르면 그때 들여다본다.
+if (bounds.length > 1) {{
+  map.fitBounds(bounds, {{ padding:[48, 48], maxZoom: D.sat.maxNative }});
+}} else {{
+  map.setView(bounds[0], Math.min(16, D.sat.maxNative));
+}}
+
+// 목록에서 한 곳을 눌렀을 때 들어갈 깊이 — 처음 화면에서 세 단계다. 고정값(z16)으로
+// 두면 전체가 이미 좁은 지도(한 곳만 그린 경우)에서는 거의 안 움직이고, 섬 전체가
+// 보이는 지도에서는 너무 깊이 들어간다. 처음 화면을 기준으로 잡아야 둘 다 맞는다.
+const OVERVIEW_ZOOM = map.getZoom();
+const FOCUS_ZOOM = Math.min(OVERVIEW_ZOOM + 3, D.sat.maxNative);
+
+// 점을 눌러도 목록 줄을 누른 것과 같이 움직인다. 전체가 보이는 화면에서 점 하나를
+// 겨우 눌렀는데 팝업만 뜨고 화면이 그대로면, 결국 손으로 다시 확대하게 된다.
+drawn.forEach(pin => {{
+  pin.on('click', () => map.setView(pin.getLatLng(), FOCUS_ZOOM));
 }});
 
 // 목록 — 마커만으로는 어디가 어디인지 모른다. 눌러서 그 자리로 이동한다.
@@ -433,30 +459,12 @@ if (D.items.length) {{
       fx.appendChild(tag);
     }});
     row.addEventListener('click', () => {{
-      map.setView([it.lat, it.lon], Math.min(16, D.sat.maxNative));
+      map.setView([it.lat, it.lon], FOCUS_ZOOM);
       const pin = pins.get(it.lat.toFixed(5) + ',' + it.lon.toFixed(5));
       if (pin) pin.openPopup();
     }});
     box.appendChild(row);
   }});
-}}
-
-// 실사진이 있는 줌보다 더 당기지 않는다. 도보 경로가 짧은 곳(1100고지는 25m·26m·
-// 10m·7m)은 fitBounds 가 z20 까지 당기는데, 그 줌엔 사진이 없어 마지막 타일을 늘린
-// 흐릿한 화면이 된다. 조금 덜 확대하고 선명한 편이 낫다.
-//
-// 반대쪽 끝도 막는다. 섬 양끝의 관측지 넷을 한 화면에 담으면 z10 쯤이 되는데, 그
-// 줌에서는 점 넷이 어디인지 알아볼 수가 없다. 목록에서 눌러 옮겨 다니는 것이 전제라
-// **처음 화면은 한 곳을 알아볼 수 있는 정도**로 연다. 화면 밖 지점은 목록으로 간다.
-const MIN_START_ZOOM = 13;
-if (bounds.length > 1) {{
-  map.fitBounds(bounds, {{ padding:[48, 48], maxZoom: D.sat.maxNative }});
-  if (map.getZoom() < MIN_START_ZOOM) {{
-    const focus = D.items.length ? [D.items[0].lat, D.items[0].lon] : map.getCenter();
-    map.setView(focus, MIN_START_ZOOM);
-  }}
-}} else {{
-  map.setView(bounds[0], Math.min(16, D.sat.maxNative));
 }}
 </script>
 </body>

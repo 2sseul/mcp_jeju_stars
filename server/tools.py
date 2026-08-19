@@ -696,7 +696,8 @@ def _segment_note(seg: spots.WalkSegment) -> str:
     안 보이고, 계단인데 "노면 포장 · 목재계단"이라 적히면 오히려 헷갈린다. 갈래 이름이
     이미 말하는 것은 빼고, 노면은 어떤 땅인지로 풀어 쓴다.
 
-    경사는 원본이 잰 구간만 붙는다(짐작으로 채우지 않는다).
+    경사는 원본이 잰 구간만 붙는다(짐작으로 채우지 않는다). 사람이 적어 둔 말이 있으면
+    맨 뒤에 그대로 붙인다.
     """
     parts = [f"{seg.metres:.0f}m"]
 
@@ -715,6 +716,12 @@ def _segment_note(seg: spots.WalkSegment) -> str:
             parts.append(f"평균 경사 {seg.slope_deg:.0f}° · 최대 {steep:.0f}°")
         else:
             parts.append(f"평균 경사 {seg.slope_deg:.0f}°")
+
+    # 사람이 그 구간에 적어 둔 말은 **맨 뒤에 그대로** 붙인다. 배점표 낱말로는 담기지
+    # 않는 것이 여기 들어간다 — "좌측의 벤치에서 쉬어갈 수 있음", "해충기피제 분사기
+    # 존재", 야자매트 같은 노면 보강. 줄이거나 고쳐 쓰지 않는다.
+    if seg.note:
+        parts.append(seg.note)
     return " · ".join(parts)
 
 

@@ -95,6 +95,9 @@ class WalkSegment:
     slope_deg: float | None
     #: 구간 안 가장 가파른 창의 경사(도). 평균이 상쇄로 가리는 비탈을 드러낸다.
     slope_max_deg: float | None
+    #: 그 구간에 대해 사람이 적어 둔 말("좌측의 벤치에서 쉬어갈 수 있음", "야자매트").
+    #: 배점표 낱말로는 담기지 않는, 그 자리에 가 본 사람만 아는 것이 여기 들어간다.
+    note: str
 
 
 def _segment_kind(surface: str, rock: str) -> str:
@@ -313,6 +316,7 @@ def _segments_of(routes: list[dict] | None) -> tuple[WalkSegment, ...]:
             out.append(WalkSegment(
                 points=whole, kind=WALK_UNKNOWN, surface="", rock="",
                 metres=_path_metres(whole), slope_deg=None, slope_max_deg=None,
+                note="",
             ))
             continue
 
@@ -335,6 +339,7 @@ def _segments_of(routes: list[dict] | None) -> tuple[WalkSegment, ...]:
                     metres=_path_metres(piece),
                     slope_deg=part.get("slope_deg"),
                     slope_max_deg=part.get("slope_max_deg"),
+                    note=str(part.get("note") or ""),
                 )
             )
     return tuple(out)

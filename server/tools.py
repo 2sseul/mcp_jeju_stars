@@ -431,18 +431,19 @@ def _walk_phrase(s: spots.Spot) -> str:
     """도보 구간을 한 문장으로. 시간은 **보수적** 값으로 말한다.
 
     논문 함수가 낸 중앙값을 그대로 주면 절반은 그보다 늦는다. 밤에 초행으로 걷는
-    사람에게는 늦는 쪽이 위험하므로 오차 폭을 얹은 값을 앞세우고, 잰 값도 함께 적어
-    어디서 온 숫자인지 보이게 한다(`spots.WALK_MARGIN_MIN_PER_KM`).
+    사람에게는 늦는 쪽이 위험하므로 오차 폭을 얹은 값을 쓴다
+    (`spots.WALK_MARGIN_MIN_PER_KM`).
+
+    한때 "(넉넉히 잡은 값 · 잰 값 20분)"을 괄호로 달았는데 뺐다. 어디서 온 숫자인지는
+    문서가 말할 일이고, 화면에서는 **얼마나 걸리나** 하나만 읽히는 편이 낫다.
+    잰 값이 필요하면 응답의 `numbers`·`spots` 에 둘 다 있다.
     """
     minutes = s.walk_minutes_safe or s.walk_minutes
     if minutes is None:
         return "도보 시간은 재지 못했어요"
     if minutes < 1:
         return "주차 후 바로 관측 가능해요"
-    return (
-        f"주차장에서 편도 약 {minutes:.0f}분 걸어요 "
-        f"(넉넉히 잡은 값 · 잰 값 {s.walk_minutes:.0f}분)"
-    )
+    return f"주차장에서 관측지까지 예상 소요시간: 약 {minutes:.0f}분"
 
 
 def _terrain_phrase(s: spots.Spot) -> str | None:
@@ -456,6 +457,8 @@ def _terrain_phrase(s: spots.Spot) -> str | None:
     bits = []
     if s.trail_grade:
         bits.append(f"난이도 {s.trail_grade}")
+    elif s.walk_too_short:
+        bits.append("걸을 것 없음")
     if s.walk_climb_m:
         bits.append(f"오르막 {s.walk_climb_m:.0f}m")
     if s.walk_stair_m:
@@ -604,6 +607,10 @@ def _spot_facts(spot: spots.Spot, route=None) -> tuple[Fact, ...]:
     if spot.trail_grade:
         tone = "hard" if spot.trail_grade in _HARD_GRADES else "plain"
         facts.append(Fact(f"난이도 {spot.trail_grade}", tone))
+    elif spot.walk_too_short:
+        # 등급이 없어도 걱정할 일이 아니다 — 경사를 못 잴 만큼 짧다는 뜻이다.
+        # '난이도 미상'(노랑)으로 두면 차에서 내려 바로인 자리가 경고로 읽힌다.
+        facts.append(Fact("걸을 것 없음", "plain"))
     else:
         facts.append(Fact("난이도 미상", "warn"))
 
@@ -729,12 +736,19 @@ def _spot_map(spot: spots.Spot, route=None) -> str | None:
 
     # 사람이 확인한 것 **말고도** 반경 안에 있는 것을 얹는다. 검증분은 "이 관측지에
     # 쓰는 자리"라 하나뿐인 경우가 많은데, 옆에 다른 주차장·화장실이 있으면 그것도
-    # 선택지다. 이미 찍은 자리와 50m 안이면 같은 곳으로 보고 건너뛴다.
-    placed = [(m.lat, m.lon) for m in markers]
+    # 선택지다.
+    #
+    # 같은 곳인지는 **갈래 안에서만** 따진다. 주차장 20m 옆 화장실은 주차장의 중복이
+    # 아니라 다른 시설이다 — 갈래를 안 가리고 걸렀더니 성판악 주차장에서 500m 안
+    # 화장실 3곳 중 2곳이 지워졌다.
+    placed: dict[str, list[tuple[float, float]]] = {}
+    for m in markers:
+        placed.setdefault(m.kind, []).append((m.lat, m.lon))
     for extra in _amenity_markers(spot.lat, spot.lon, MAP_NEARBY_M):
-        if any(_haversine_m(extra.lat, extra.lon, a, b) < 50.0 for a, b in placed):
+        same = placed.setdefault(extra.kind, [])
+        if any(_haversine_m(extra.lat, extra.lon, a, b) < 50.0 for a, b in same):
             continue
-        placed.append((extra.lat, extra.lon))
+        same.append((extra.lat, extra.lon))
         markers.append(extra)
     caption_parts = []
     if route is not None:

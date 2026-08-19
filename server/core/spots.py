@@ -138,6 +138,10 @@ class Spot:
     #: 국립공원공단 탐방로 등급(매우쉬움~매우어려움). 네 항목 중 하나라도 비면
     #: None — 짐작으로 채우면 밤에 초행으로 걷는 사람이 그 짐작을 읽는다.
     trail_grade: str | None
+    #: 등급이 없는 이유가 **경로가 표고 격자로 잴 수 없을 만큼 짧아서**인가.
+    #: 이게 참이면 등급이 없어도 걱정할 일이 아니다 — 차에서 내려 바로다.
+    #: 거짓인데 등급도 없으면 그건 아직 확인하지 않은 것이라, 둘을 갈라야 한다.
+    walk_too_short: bool
     #: 주차 지점 → 관측 지점 도보 경로를 **구간별로** 쪼갠 것. 지도가 갈래마다 다른
     #: 색으로 긋는다. 값(분·고도차)과 달리 이건 모양이라 요약할 수 없다.
     walk_segments: tuple[WalkSegment, ...]
@@ -205,7 +209,7 @@ def _walk_worst(routes: list[dict] | None) -> dict:
     """
     out: dict = {
         "minutes": None, "minutes_safe": None, "climb_m": None,
-        "terrain": None, "stair_m": None, "grade": None,
+        "terrain": None, "stair_m": None, "grade": None, "too_short": False,
     }
     if not routes:
         return out
@@ -239,6 +243,14 @@ def _walk_worst(routes: list[dict] | None) -> dict:
         if scored is not None and (hardest is None or scored[0] > hardest[0]):
             hardest = scored
     out["grade"] = hardest[1] if hardest else None
+
+    # 등급을 못 낸 이유가 "짧아서"인지 가른다. 경사·길이는 표고 격자가 두 칸보다
+    # 짧으면 못 재는데(`elevation.MIN_M`, 약 62m), 그건 확인이 덜 된 것이 아니라
+    # **걸을 것이 없다**는 뜻이다. 63곳 중 19곳이 이 경우이고 전부 1분 미만·평지다.
+    if out["grade"] is None:
+        out["too_short"] = all(
+            r.get("slope_deg") is None or r.get("over_m") is None for r in routes
+        )
     return out
 
 
@@ -357,6 +369,7 @@ def _to_spot(raw: dict) -> Spot:
         walk_terrain=walk["terrain"],
         walk_stair_m=walk["stair_m"],
         trail_grade=walk["grade"],
+        walk_too_short=bool(walk["too_short"]),
         walk_segments=_segments_of(raw.get("walk_routes")),
         elevation_m=raw.get("elevation_m"),
         slope_deg=raw.get("slope_deg"),

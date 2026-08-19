@@ -61,6 +61,14 @@ _SCOPES = ("moment", "night")
 #: 찍은 좌표가 정확히 같을 리 없고, 주차장과 관측 지점도 이 정도는 떨어져 있다.
 _SAME_SPOT_M = 300.0
 
+#: 미등록 지점에서 "근처의 검증된 관측지"를 찾을 때의 주행 반경(분)과 개수 —
+#: **운영값**. 이미 그 근처까지 온 사람이 밤에 옮겨갈 만한 거리로 잡았다. 개수를 둘로
+#: 묶는 것은 이 자리가 추천 도구가 아니기 때문이다 — 조건 필터도 순위 옵션도 없이,
+#: 미등록이라 답하지 못한 접근성을 메우는 꼬리말로만 둔다. 조건을 걸어 고르는 것은
+#: `recommend_spots` 소관이다.
+_ALT_DRIVE_MINUTES = 20.0
+_ALT_MAX = 2
+
 #: 추천에서 날씨까지 재 볼 후보 수의 상한. 후보 63곳 전부에 예보를 조회하면 외부
 #: 호출이 63번 나간다. 어둡기(정적 데이터, 조회 0회)로 먼저 줄인 뒤 이만큼만 잰다.
 _WEATHER_POOL = 8
@@ -1366,22 +1374,36 @@ def evaluate_place(
             f"자세한 접근성은 spot_details('{known.name}') 로 볼 수 있어요"
         )
         result.setdefault("attribution", []).append(spots.source())
-    elif route is not None:
-        reasons.append(_amenity_reason(amenities, NEARBY_M))
-        reasons.append(
-            "다만 이 위치는 검증된 관측지 목록에 없어요. 하늘 상태(날씨·광공해·박명)와 "
-            "위 주행시간은 좌표만으로 계산되지만, **주차 가능 여부·야간 출입·진입로 "
-            "상태·도보 난이도는 확인되지 않았습니다.** 초행에 밤에 가신다면 "
-            "recommend_spots 로 검증된 곳을 받아 보시는 편이 안전해요"
-        )
     else:
         reasons.append(_amenity_reason(amenities, NEARBY_M))
-        reasons.append(
-            "이 위치는 검증된 관측지 목록에 없어요. 하늘 상태(날씨·광공해·박명)는 "
-            "위와 같이 판정했지만 **주차 가능 여부·야간 출입·진입로 상태·도보 난이도는 "
-            "확인되지 않았습니다.** 초행에 밤에 가신다면 recommend_spots 로 검증된 "
-            "곳을 받아 보시는 편이 안전해요"
+        if route is not None:
+            reasons.append(
+                "다만 이 위치는 검증된 관측지 목록에 없어요. 하늘 상태(날씨·광공해·"
+                "박명)와 위 주행시간은 좌표만으로 계산되지만, **주차 가능 여부·야간 "
+                "출입·진입로 상태·도보 난이도는 확인되지 않았습니다.**"
+            )
+        else:
+            reasons.append(
+                "이 위치는 검증된 관측지 목록에 없어요. 하늘 상태(날씨·광공해·박명)는 "
+                "위와 같이 판정했지만 **주차 가능 여부·야간 출입·진입로 상태·도보 "
+                "난이도는 확인되지 않았습니다.**"
+            )
+
+        # 답하지 못한 접근성을, 답할 수 있는 곳으로 메운다. 어두운 곳이 근처에
+        # 없으면 아무 말도 하지 않는다 — 없는 대안을 지어내는 것보다 낫다.
+        alternatives = _darker_nearby(
+            p_lat, p_lon, result.get("numbers", {}).get("darkness_score")
         )
+        if alternatives:
+            reasons.append(_alternatives_reason(alternatives))
+            attr = result.setdefault("attribution", [])
+            for source in (spots.source(), routing.SOURCE):
+                if source not in attr:
+                    attr.append(source)
+        else:
+            reasons.append(
+                "초행에 밤에 가신다면 검증된 관측지 중에서 고르시는 편이 안전해요"
+            )
 
     if result.get("map_url"):
         reasons.append(f"경로와 주변을 지도로 봤어요 → {result['map_url']}")
@@ -1397,6 +1419,70 @@ def _nearest_known(lat: float, lon: float) -> spots.Spot | None:
         if d <= best_m:
             best, best_m = s, d
     return best
+
+
+def _darker_nearby(
+    lat: float, lon: float, here_score: float | None
+) -> list[tuple[spots.Spot, routing.Route, float | None]]:
+    """미등록 지점 근처에서 **여기보다 어두운** 검증된 관측지 몇 곳.
+
+    미등록 장소에서 답하지 못하는 것은 접근성 하나뿐이고(하늘 상태는 좌표만으로
+    계산된다), 근처의 검증된 관측지는 바로 그 접근성을 갖고 있다. 그래서 못 답한
+    자리에 답할 수 있는 곳을 놓는다.
+
+    거리는 `routing.drive_times` 로 잰다 — 직선거리로 자르면 한라산 반대편이 가깝게
+    나온다. 63곳 전부를 재도 다익스트라는 **한 번**이라 비용은 한 건과 같다.
+
+    `here_score` 보다 **엄격히** 낮은 곳만 남긴다(점수는 낮을수록 어둡다). 같거나
+    높은 곳을 끼워 넣으면 "여기보다 어둡다"가 거짓이 되고, 밝은 곳으로 사람을
+    보내게 된다. 기준값이 없으면(광공해 격자 밖) 비교할 수 없으므로 아무 말도
+    하지 않는다.
+
+    Returns:
+        (관측지, 주행, SQM) 을 **어두운 순**으로 최대 `_ALT_MAX` 개. 가까운 순이
+        아닌 것은, 이미 반경 안으로 자른 뒤라 남은 축이 어둡기뿐이어서다.
+    """
+    if here_score is None:
+        return []
+
+    candidates = spots.all_spots()
+    legs = routing.drive_times(
+        (lat, lon),
+        [s.drive_target() for s in candidates],
+        budget_minutes=_ALT_DRIVE_MINUTES,
+    )
+
+    rows = []
+    for spot, leg in zip(candidates, legs, strict=True):
+        if leg is None:
+            continue
+        site = darkness.assess_site(spot.lat, spot.lon)
+        if site.score is None or site.score >= here_score:
+            continue
+        sqm = site.darkness.sqm if site.darkness is not None else None
+        rows.append((site.score, spot, leg, sqm))
+
+    rows.sort(key=lambda r: r[0])
+    return [(spot, leg, sqm) for _, spot, leg, sqm in rows[:_ALT_MAX]]
+
+
+def _alternatives_reason(
+    rows: list[tuple[spots.Spot, routing.Route, float | None]],
+) -> str:
+    """근처 대안을 한 줄로. 이름·주행시간·어둡기·야간 출입만 — 도보 난이도까지
+    적으면 `spot_details` 를 옮겨 온 것이 된다."""
+    parts = []
+    for spot, leg, sqm in rows:
+        bits = [f"차로 약 {leg.minutes:.0f}분"]
+        if sqm is not None:
+            bits.append(f"SQM {sqm:.2f}")
+        bits.append(f"야간 출입 {spot.night_access or '확인 필요'}")
+        parts.append(f"{spot.name}({' · '.join(bits)})")
+    return (
+        "대신 근처에 **이 지점보다 어둡고 접근성이 확인된** 관측지가 있어요 — "
+        + ", ".join(parts)
+        + ". 자세한 접근성은 그 이름으로 물어보시면 됩니다"
+    )
 
 
 def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:

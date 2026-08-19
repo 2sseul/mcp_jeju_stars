@@ -477,3 +477,53 @@ def test_모든_오류_응답도_고정_스키마를_지킨다():
         assert isinstance(result["numbers"], dict)
         assert isinstance(result["attribution"], list)
         assert result["spots"] is None or isinstance(result["spots"], list)
+
+
+# --- 미등록 지점의 근처 대안 -----------------------------------------------------
+
+# 성산일출봉 — 등록되지 않았고(63곳 밖), 반경 안에 더 어두운 관측지도 더 밝은
+# 관측지도 함께 있어 필터가 실제로 일하는지 보이는 자리다.
+SEONGSAN = (33.4589, 126.9408)
+
+
+def test_근처_대안은_여기보다_밝은_곳을_넣지_않는다():
+    # Given: 성산일출봉의 어둡기 점수를 기준으로
+    from server.core import darkness
+
+    here = darkness.assess_site(*SEONGSAN)
+
+    # When: 근처 대안을 고르면
+    rows = tools._darker_nearby(*SEONGSAN, here.score)
+
+    # Then: 하나하나가 **엄격히 더 어둡다**. 점수는 낮을수록 어두우므로 같거나 높은
+    #       곳이 섞이면 "여기보다 어둡다"는 문장이 거짓이 되고, 밝은 곳으로 사람을
+    #       보내게 된다. 주행 반경 안에는 여기보다 밝은 관측지도 있다(수마포해안).
+    assert rows, "반경 안에 더 어두운 곳이 있는 좌표인데 빈 목록이 나왔다"
+    for spot, _leg, _sqm in rows:
+        assert darkness.assess_site(spot.lat, spot.lon).score < here.score
+
+
+def test_근처_대안은_어두운_순_최대_두_곳이다():
+    # Given: 반경 안에 후보가 둘보다 많은 좌표에서
+    from server.core import darkness
+
+    here = darkness.assess_site(*SEONGSAN)
+
+    # When: 대안을 고르면
+    rows = tools._darker_nearby(*SEONGSAN, here.score)
+
+    # Then: 개수는 상한을 넘지 않고, 어두운 순이다. 가까운 순이 아닌 것은 이미
+    #       주행 반경으로 잘라낸 뒤라 남은 축이 어둡기뿐이어서다.
+    assert len(rows) <= tools._ALT_MAX
+    scores = [darkness.assess_site(s.lat, s.lon).score for s, _, _ in rows]
+    assert scores == sorted(scores)
+
+
+def test_기준_어둡기가_없으면_대안을_말하지_않는다():
+    # Given: 광공해 격자 밖이라 비교 기준이 없을 때
+    # When: 대안을 고르면
+    rows = tools._darker_nearby(*SEONGSAN, None)
+
+    # Then: 아무 말도 하지 않는다. 기준 없이 고른 "근처의 어두운 곳"은 여기보다
+    #       밝을 수 있고, 길찾기까지 헛돈다.
+    assert rows == []

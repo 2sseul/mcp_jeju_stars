@@ -9,31 +9,39 @@
 2. `core`(순수) · `clients`(네트워크) · `engine`(조립) 과 같은 결 — 전송 계층은
    맨 바깥 한 겹에만 둔다.
 
-도구는 **입력 방식**으로만 둘이다:
+도구는 **사용자가 무엇을 묻는가**로 셋이다 (입력 형태가 아니다)
+--------------------------------------------------------------------------
+    recommend_spots  "어디로 갈까"   — 조건에 맞는 관측지를 골라 준다
+    evaluate_place   "여기 별 보여?" — 지목한 장소 하나를 판정한다
+    spot_details     "거기 어때?"    — 검증된 관측지의 접근성·편의를 답한다
 
-    evaluate_spot(좌표)      — 좌표를 직접 받는다.
-    evaluate_place(주소·지명) — geocode 로 좌표화한 뒤 evaluate_spot 과 동일 처리.
+좌표를 받느냐 지명을 받느냐로 가르지 않는다. 그건 **입력 형태**일 뿐이고 사용자의
+질문 목적이 아니다 — `evaluate_place` 하나가 둘 다 받는다(`query` 또는 `lat`·`lon`).
 
-"무엇을 묻나"(한 시각 vs 밤 전체)는 도구가 아니라 **scope 파라미터**로 고른다:
+등록된 곳과 아닌 곳
+--------------------------------------------------------------------------
+`data/jeju_spots.json` 의 63곳은 사람이 로드뷰·위성으로 확인한 자리다. 그 밖의 좌표도
+날씨·광공해·천문 조건은 **똑같이** 판정할 수 있지만 주차·야간 출입·도보 난이도는
+알 수 없다. 그래서 미등록 장소는 관측 가능 여부만 답하고 **접근성은 확인되지 않았음을
+명시한다** — 모르는 것을 아는 척하지 않는다.
+
+"무엇을 묻나"(한 시각 vs 밤 전체)는 여전히 도구가 아니라 **scope 파라미터**다:
 
     scope="moment"(기본) — 한 시각의 관측 등급(astro→weather→judge). time 사용.
     scope="night"        — 박명 포함 밤 전체를 시간별로 판정해 관측 가능 시간 수·
                            등급 분포·연속 창을 집계(graph.run_tonight). time 무시.
-
-("밤이냐"와 "지오코딩이냐"는 직교하는 축이라, 밤을 별도 도구로 빼면 지오코딩 래핑이
-중복된다. scope 로 접어 두 도구가 두 질의를 모두 처리한다.) 밤 집계는 3시간 같은 기준으로
-가능/불가를 매기지 않고 시간 수를 그대로 돌려준다 — 충분한지는 호출자가 정한다.
 
 제주 범위 밖·형식 오류는 프롬프트형 에러. 별 개수 축은 아직 numbers 에 없다.
 """
 
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from server.clients.geocode import geocode
-from server.core import astro
+from server.core import astro, darkness, routing, spots
 from server.engine import graph
 from server.schema import Response
 
@@ -45,9 +53,30 @@ KST = ZoneInfo("Asia/Seoul")
 _LAT_MIN, _LAT_MAX = 33.1908, 33.5639
 _LON_MIN, _LON_MAX = 126.1452, 126.9723
 
+_SCOPES = ("moment", "night")
+
+#: 좌표로 물었을 때 이 거리 안이면 등록된 관측지로 본다. 관측지 좌표와 사용자가
+#: 찍은 좌표가 정확히 같을 리 없고, 주차장과 관측 지점도 이 정도는 떨어져 있다.
+_SAME_SPOT_M = 300.0
+
+#: 추천에서 날씨까지 재 볼 후보 수의 상한. 후보 63곳 전부에 예보를 조회하면 외부
+#: 호출이 63번 나간다. 어둡기(정적 데이터, 조회 0회)로 먼저 줄인 뒤 이만큼만 잰다.
+_WEATHER_POOL = 8
+
+#: 추천이 한 번에 돌려주는 곳의 기본값·상한.
+_LIMIT_DEFAULT = 3
+_LIMIT_MAX = 10
+
 
 def _in_jeju(lat: float, lon: float) -> bool:
     return _LAT_MIN <= lat <= _LAT_MAX and _LON_MIN <= lon <= _LON_MAX
+
+
+def _now_iso() -> str:
+    return datetime.now(KST).isoformat(timespec="minutes")
+
+
+# --- 입력 검증 (모두 프롬프트형 응답으로 환원한다) --------------------------------
 
 
 def _resolve_when(date: str | None, time: str | None) -> datetime:
@@ -68,6 +97,17 @@ def _resolve_when(date: str | None, time: str | None) -> datetime:
     return datetime(y, m, d, hh, mm, tzinfo=KST)
 
 
+def _resolve_night_when(date: str | None) -> datetime:
+    """밤 집계의 기준 시각. date 가 있으면 그날 저녁(20:00), 없으면 현재.
+    어느 쪽이든 night_window 가 '그 밤'을 찾는다. 파싱 실패 시 ValueError.
+    """
+    now = datetime.now(KST)
+    if date is None:
+        return now
+    y, m, d = (int(x) for x in date.split("-"))
+    return datetime(y, m, d, 20, 0, tzinfo=KST)
+
+
 def _invalid_when(date: str | None, time: str | None) -> dict:
     """date/time 형식 오류에 대한 프롬프트형 응답."""
     return Response(
@@ -79,7 +119,7 @@ def _invalid_when(date: str | None, time: str | None) -> dict:
         ],
         numbers={},
         attribution=[],
-        as_of=datetime.now(KST).isoformat(timespec="minutes"),
+        as_of=_now_iso(),
     ).to_dict()
 
 
@@ -99,7 +139,7 @@ def _out_of_ephemeris(when: datetime) -> dict:
         ],
         numbers={},
         attribution=["천체력: JPL DE421 via Skyfield"],
-        as_of=datetime.now(KST).isoformat(timespec="minutes"),
+        as_of=_now_iso(),
     ).to_dict()
 
 
@@ -115,8 +155,51 @@ def _out_of_range(lat: float, lon: float) -> dict:
         ],
         numbers={},
         attribution=[],
-        as_of=datetime.now(KST).isoformat(timespec="minutes"),
+        as_of=_now_iso(),
     ).to_dict()
+
+
+def _invalid_scope(scope) -> dict:
+    """scope 값 오류에 대한 프롬프트형 응답."""
+    return Response(
+        verdict="입력 오류",
+        reasons=[
+            f"scope 값을 이해하지 못했습니다 (scope={scope!r}). "
+            "'moment'(한 시각) 또는 'night'(밤 전체) 중 하나로 주세요."
+        ],
+        numbers={},
+        attribution=[],
+        as_of=_now_iso(),
+    ).to_dict()
+
+
+def _normalize_scope(scope: str | None) -> str | None:
+    """scope 를 정규화한다. 알 수 없는 값이면 None."""
+    s = (scope or "moment").strip().lower()
+    return s if s in _SCOPES else None
+
+
+def _validate_inputs(date: str | None, time: str | None, scope: str) -> dict | None:
+    """좌표와 무관한 입력(scope·날짜·시각)을 검증한다. 문제 없으면 None.
+
+    좌표 경로와 지명 경로가 **같은 판정**을 내리도록 이 하나를 공유한다. 지명 경로는
+    이것을 지오코딩보다 먼저 불러, 잘못된 입력에 외부 호출을 낭비하지 않는다.
+    """
+    s = _normalize_scope(scope)
+    if s is None:
+        return _invalid_scope(scope)
+
+    try:
+        when = _resolve_night_when(date) if s == "night" else _resolve_when(date, time)
+    except (ValueError, AttributeError):
+        return _invalid_when(date, None if s == "night" else time)
+
+    if not astro.supports(when):
+        return _out_of_ephemeris(when)
+    return None
+
+
+# --- 순간(한 시각) 평가 ---------------------------------------------------------
 
 
 def _evaluate_moment(
@@ -125,16 +208,9 @@ def _evaluate_moment(
     date: str | None,
     time: str | None,
     resolved: dict | None = None,
+    spot_rows: list[dict] | None = None,
 ) -> dict:
-    """순간(한 시각) 평가 코어 — scope="moment" 경로.
-
-    resolved 는 지오코딩으로 해석된 위치 메타데이터다. evaluate_place 만 채워 넘기고
-    evaluate_spot 은 None 이다. 어느 쪽이든 Response 가 항상 키를 내보내 응답 '모양'이
-    같게 유지된다(고정 스키마).
-    """
-    if not _in_jeju(lat, lon):
-        return _out_of_range(lat, lon)
-
+    """순간(한 시각) 평가 코어 — scope="moment" 경로."""
     try:
         when = _resolve_when(date, time)
     except (ValueError, AttributeError):
@@ -158,185 +234,19 @@ def _evaluate_moment(
     return Response(
         verdict=final.get("verdict") or "불가",
         reasons=reasons,
-        numbers=final.get("numbers", {}),
+        numbers=nums,
         attribution=final.get("attribution", []),
         as_of=when.isoformat(timespec="minutes"),
         resolved=resolved,
+        spots=spot_rows,
     ).to_dict()
 
 
-_SCOPES = ("moment", "night")
-
-
-def _invalid_scope(scope) -> dict:
-    """scope 값 오류에 대한 프롬프트형 응답."""
-    return Response(
-        verdict="입력 오류",
-        reasons=[
-            f"scope 값을 이해하지 못했습니다 (scope={scope!r}). "
-            "'moment'(한 시각) 또는 'night'(밤 전체) 중 하나로 주세요."
-        ],
-        numbers={},
-        attribution=[],
-        as_of=datetime.now(KST).isoformat(timespec="minutes"),
-    ).to_dict()
-
-
-def _validate_inputs(date: str | None, time: str | None, scope: str) -> dict | None:
-    """좌표와 무관한 입력(scope·날짜·시각)을 검증한다. 문제 없으면 None.
-
-    좌표 경로와 지명 경로가 **같은 판정**을 내리도록 이 하나를 공유한다. 지명 경로는
-    이것을 지오코딩보다 먼저 불러, 잘못된 입력에 외부 호출을 낭비하지 않는다.
-    """
-    s = (scope or "moment").strip().lower()
-    if s not in _SCOPES:
-        return _invalid_scope(scope)
-
-    try:
-        when = _resolve_night_when(date) if s == "night" else _resolve_when(date, time)
-    except (ValueError, AttributeError):
-        return _invalid_when(date, None if s == "night" else time)
-
-    if not astro.supports(when):
-        return _out_of_ephemeris(when)
-    return None
-
-
-def _evaluate(
-    lat: float,
-    lon: float,
-    date: str | None,
-    time: str | None,
-    scope: str,
-    resolved: dict | None = None,
-) -> dict:
-    """좌표 기준 공통 코어 — scope 로 순간/밤 평가를 라우팅한다.
-
-    evaluate_spot 은 좌표를, evaluate_place 는 지오코딩한 좌표를 넘겨 이 하나를 공유한다.
-    (지오코딩과 순간/밤은 직교하므로 도구를 넷으로 쪼개지 않고 여기서 갈래만 나눈다.)
-    """
-    s = (scope or "moment").strip().lower()
-    if s not in _SCOPES:
-        return _invalid_scope(scope)
-    if s == "night":
-        return _evaluate_night(lat, lon, date, resolved)
-    return _evaluate_moment(lat, lon, date, time, resolved)
-
-
-def evaluate_spot(
-    lat: float,
-    lon: float,
-    date: str | None = None,
-    time: str | None = None,
-    scope: str = "moment",
-) -> dict:
-    """제주 특정 좌표의 별 관측 조건을 평가한다.
-
-    scope 로 두 질의를 고른다:
-      - "moment"(기본): 한 시각의 관측 등급(astro→weather→judge). time 사용.
-      - "night": 박명 포함 밤 전체를 시간별로 판정해 **관측 가능 시간 수·등급 분포·
-        연속 창**을 집계(3시간 같은 기준으로 가능/불가를 매기지 않음). time 무시.
-
-    Args:
-        lat: 위도 (제주 범위 내).
-        lon: 경도 (제주 범위 내).
-        date: 평가할 날짜 YYYY-MM-DD. 생략하면 오늘. 미래 날짜도 가능(구름은 예보
-            지평 ~7일 안에서만, 박명·광공해는 예보 지평 없음). 천체력이 덮는 기간
-            밖이면 '입력 오류'.
-        time: 평가할 시각 24시간제 HH:MM(KST). scope="moment" 에서만 쓴다(생략 시 22:00;
-            date·time 모두 생략 시 현재). scope="night" 이면 무시.
-        scope: "moment" | "night". 기본 "moment".
-
-    Returns:
-        verdict/reasons/numbers/attribution/as_of/resolved 스키마(dict).
-        좌표를 직접 받으므로 resolved 는 항상 None.
-    """
-    return _evaluate(lat, lon, date, time, scope)
-
-
-def evaluate_place(
-    query: str,
-    date: str | None = None,
-    time: str | None = None,
-    scope: str = "moment",
-) -> dict:
-    """주소·지명으로 별 관측 조건을 평가한다(제주).
-
-    query 를 좌표로 변환(지오코딩)한 뒤 evaluate_spot 과 동일하게 평가한다.
-    예: '제주시 애월읍', '성산일출봉', '한라산 1100고지'.
-
-    Args:
-        query: 제주 안의 주소 또는 지명.
-        date: YYYY-MM-DD (생략 시 오늘). 미래 날짜 가능.
-        time: HH:MM 24시간 KST. scope="moment" 에서만(생략 시 22:00; date·time 모두
-            생략 시 현재). scope="night" 이면 무시.
-        scope: "moment" | "night". 기본 "moment". (evaluate_spot 참조)
-    """
-    # 입력 검증을 지오코딩보다 **먼저** 한다. 뒤로 미루면 잘못된 입력인데도 외부 호출을
-    # 낭비하고, 지오코딩까지 실패하면 '입력 오류' 여야 할 응답이 '주소 확인 실패' 로
-    # 잘못 분류된다(좌표 경로와 결과가 갈림).
-    invalid = _validate_inputs(date, time, scope)
-    if invalid is not None:
-        return invalid
-
-    try:
-        hit = geocode(query)
-    except Exception:  # noqa: BLE001 — 외부 지오코딩 실패도 스키마로 환원
-        hit = None
-    if hit is None:
-        # 좌표를 못 찾으면 이 서버는 여기까지. 좌표를 알아내는 건 Host 몫이다
-        # (웹검색 등으로 좌표를 구해 evaluate_spot(lat, lon) 을 호출).
-        return Response(
-            verdict="주소 확인 실패",
-            reasons=[
-                f"'{query}'의 위치를 제주에서 찾지 못했습니다. "
-                "좌표(위도·경도)를 알면 evaluate_spot 으로 바로 평가할 수 있어요. "
-                "아니면 더 구체적인 주소·지명으로 다시 시도해 주세요."
-            ],
-            numbers={},
-            attribution=["지오코딩: Photon (OpenStreetMap)"],
-            as_of=datetime.now(KST).isoformat(timespec="minutes"),
-        ).to_dict()
-
-    resolved = {
-        "query": query,
-        "matched_query": hit.matched_query,
-        "display_name": hit.display_name,
-        "lat": hit.lat,
-        "lon": hit.lon,
-    }
-    result = _evaluate(hit.lat, hit.lon, date, time, scope, resolved=resolved)
-    if hit.matched_query and hit.matched_query != query:
-        note = (
-            f"'{query}'를 정확히 못 찾아 '{hit.matched_query}'로 검색했어요 → "
-            f"{hit.display_name} ({hit.lat:.4f}, {hit.lon:.4f})"
-        )
-    else:
-        note = f"'{query}' → {hit.display_name} ({hit.lat:.4f}, {hit.lon:.4f})로 해석했어요"
-    result.setdefault("reasons", []).insert(0, note)
-    result.setdefault("attribution", []).append("지오코딩: Photon (OpenStreetMap)")
-    return result
-
-
-# --- 밤 단위 평가 코어 (scope="night") ---------------------------------------
-
-def _resolve_night_when(date: str | None) -> datetime:
-    """밤 집계의 기준 시각을 만든다. date 가 주어지면 그날 저녁(20:00)을, 없으면
-    현재 시각을 쓴다 — 어느 쪽이든 night_window 가 '그 밤'을 찾는다.
-    파싱 실패 시 ValueError.
-    """
-    now = datetime.now(KST)
-    if date is None:
-        return now
-    y, m, d = (int(x) for x in date.split("-"))
-    return datetime(y, m, d, 20, 0, tzinfo=KST)
+# --- 밤 단위 평가 (scope="night") -----------------------------------------------
 
 
 def _night_label(when: datetime) -> str:
-    """밤 집계 문구의 날짜 라벨. 오늘이면 '오늘 밤', 아니면 'M월 D일 밤'.
-
-    미래 계획(예: '내일 밤')을 '오늘 밤'으로 잘못 부르지 않도록 date 로 구분한다.
-    """
+    """밤 집계 문구의 날짜 라벨. 오늘이면 '오늘 밤', 아니면 'M월 D일 밤'."""
     if when.date() == datetime.now(KST).date():
         return "오늘 밤"
     return f"{when.month}월 {when.day}일 밤"
@@ -351,7 +261,8 @@ def _night_verdict(summary: dict | None, window: dict | None, label: str) -> str
         return "밤 기상 정보를 가져오지 못했어요"
     n = summary["observable_hours"]
     if n == 0:
-        if summary["unknown_hours"] and not summary["total_hours"] - summary["unknown_hours"]:
+        known = summary["total_hours"] - summary["unknown_hours"]
+        if summary["unknown_hours"] and not known:
             return "밤 기상 정보를 가져오지 못했어요"
         return f"{label}은 구름으로 별 볼 만한 시간이 거의 없어요"
     return f"{label} 약 {n}시간 관측 가능"
@@ -383,18 +294,20 @@ def _night_reasons(summary: dict | None, window: dict | None, label: str) -> lis
     )
 
     if summary["unknown_hours"]:
-        reasons.append(f"구름 정보를 못 받은 시간이 {summary['unknown_hours']}시간 있어요")
+        unknown = summary["unknown_hours"]
+        reasons.append(f"구름 정보를 못 받은 시간이 {unknown}시간 있어요")
 
     return reasons
 
 
 def _evaluate_night(
-    lat: float, lon: float, date: str | None, resolved: dict | None = None
+    lat: float,
+    lon: float,
+    date: str | None,
+    resolved: dict | None = None,
+    spot_rows: list[dict] | None = None,
 ) -> dict:
-    """밤 집계 코어 — scope="night" 경로(_evaluate 가 라우팅)."""
-    if not _in_jeju(lat, lon):
-        return _out_of_range(lat, lon)
-
+    """밤 집계 코어 — scope="night" 경로."""
     try:
         when = _resolve_night_when(date)
     except (ValueError, AttributeError):
@@ -411,7 +324,8 @@ def _evaluate_night(
     numbers: dict = {"night_window": window}
     if summary is not None:
         numbers["tonight"] = summary
-    # 광공해(정적 장소 속성)는 순간 평가와 같은 필드로 밤 응답에도 노출한다(도구 일관성).
+    # 광공해(정적 장소 속성)는 순간 평가와 같은 필드로 밤 응답에도 노출한다
+    # (도구 일관성).
     darkness = result.get("darkness")
     if darkness is not None:
         numbers.update(darkness)
@@ -430,4 +344,628 @@ def _evaluate_night(
         attribution=result.get("attribution", []),
         as_of=when.isoformat(timespec="minutes"),
         resolved=resolved,
+        spots=spot_rows,
+    ).to_dict()
+
+
+def _evaluate(
+    lat: float,
+    lon: float,
+    date: str | None,
+    time: str | None,
+    scope: str,
+    resolved: dict | None = None,
+    spot_rows: list[dict] | None = None,
+) -> dict:
+    """좌표 기준 공통 코어 — scope 로 순간/밤 평가를 라우팅한다."""
+    s = _normalize_scope(scope)
+    if s is None:
+        return _invalid_scope(scope)
+    if not _in_jeju(lat, lon):
+        return _out_of_range(lat, lon)
+    if s == "night":
+        return _evaluate_night(lat, lon, date, resolved, spot_rows)
+    return _evaluate_moment(lat, lon, date, time, resolved, spot_rows)
+
+
+# --- 관측지를 응답에 싣는 모양 ----------------------------------------------------
+
+
+def _spot_row(s: spots.Spot, *, detail: bool = False, route=None) -> dict:
+    """관측지 하나를 응답용 dict 로. 값은 원문 그대로 싣는다.
+
+    detail=False 는 추천 목록용 요약, True 는 상세조회용 전체다. 목록에 전부 실으면
+    63곳 중 몇 곳만 돌려줘도 응답이 장문이 되어 호출한 LLM 이 요점을 놓친다.
+    """
+    row: dict = {
+        "name": s.name,
+        "region": s.region,
+        "type": s.kind,
+        "lat": s.lat,
+        "lon": s.lon,
+        "why": s.why,
+        "walk_type": s.walk_type,
+        "walk_minutes": (
+            round(s.walk_minutes, 1) if s.walk_minutes is not None else None
+        ),
+        "night_access": s.night_access,
+        "parking": len(s.parking),
+    }
+    if route is not None:
+        row["drive"] = route.to_dict()
+    if not detail:
+        return row
+
+    row.update(
+        {
+            "name_en": s.name_en,
+            "notes": s.notes,
+            "access": s.access,
+            "walk_climb_m": s.walk_climb_m,
+            "walk_terrain": s.walk_terrain,
+            "elevation_m": s.elevation_m,
+            "slope_deg": s.slope_deg,
+            "parking_places": s.parking,
+            "toilet": s.toilet,
+            "pets": s.pets,
+            "fee": s.fee,
+            "hours": s.hours,
+            "cautions": s.cautions,
+            "campsite": s.campsite,
+            "store": s.store,
+            "sources": s.sources,
+        }
+    )
+    return row
+
+
+def _walk_phrase(s: spots.Spot) -> str:
+    """도보 구간을 한 문장으로. 실측값이 있으면 분 단위로 말한다."""
+    if s.walk_minutes is None:
+        return f"도보: {s.walk_type or '정보 없음'}"
+    if s.walk_minutes < 1:
+        return f"주차 후 바로 관측 가능해요 ({s.walk_type or '평지'})"
+    return (
+        f"주차장에서 편도 약 {s.walk_minutes:.0f}분 걸어요 "
+        f"({s.walk_type or '정보 없음'}"
+        + (f", 고도차 {s.walk_climb_m:.0f}m" if s.walk_climb_m else "")
+        + ")"
+    )
+
+
+# --- 출발지 해석 ----------------------------------------------------------------
+
+
+def _locate(query: str | None, lat: float | None, lon: float | None):
+    """질의 또는 좌표를 (lat, lon, resolved) 로 만든다. 못 찾으면 None.
+
+    등록된 관측지 이름이 먼저다 — "새별오름"을 지오코딩에 보내기 전에 우리 목록에서
+    찾는다. 우리가 검증한 좌표가 외부 지오코더의 것보다 정확하고, 외부 호출도 아낀다.
+    """
+    if lat is not None and lon is not None:
+        return float(lat), float(lon), None
+
+    if not query or not query.strip():
+        return None
+
+    hit = spots.find(query)
+    if hit is not None:
+        return hit.lat, hit.lon, {
+            "query": query,
+            "matched_query": hit.name,
+            "display_name": f"{hit.name} (검증된 관측지)",
+            "lat": hit.lat,
+            "lon": hit.lon,
+        }
+
+    try:
+        geo = geocode(query)
+    except Exception:  # noqa: BLE001 — 외부 지오코딩 실패도 스키마로 환원
+        geo = None
+    if geo is None:
+        return None
+    return geo.lat, geo.lon, {
+        "query": query,
+        "matched_query": geo.matched_query,
+        "display_name": geo.display_name,
+        "lat": geo.lat,
+        "lon": geo.lon,
+    }
+
+
+def _not_found(query: str) -> dict:
+    """좌표를 못 찾았을 때의 프롬프트형 응답."""
+    return Response(
+        verdict="주소 확인 실패",
+        reasons=[
+            f"'{query}'의 위치를 제주에서 찾지 못했습니다. "
+            "좌표(위도·경도)를 알면 lat·lon 으로 바로 평가할 수 있어요. "
+            "아니면 더 구체적인 주소·지명으로 다시 시도해 주세요."
+        ],
+        numbers={},
+        attribution=["지오코딩: Photon (OpenStreetMap)"],
+        as_of=_now_iso(),
+    ).to_dict()
+
+
+# ==============================================================================
+# 도구 1 — 관측지 추천
+# ==============================================================================
+
+
+def recommend_spots(
+    origin: str | None = None,
+    origin_lat: float | None = None,
+    origin_lon: float | None = None,
+    max_drive_minutes: float | None = None,
+    region: str | None = None,
+    no_climb: bool = False,
+    max_walk_minutes: float | None = None,
+    parking_required: bool = False,
+    pets: bool = False,
+    date: str | None = None,
+    time: str | None = None,
+    limit: int = 3,
+) -> dict:
+    """조건에 맞는 제주 별 관측지를 추천한다 (검증된 63곳 중에서).
+
+    "지금 근처에서 별 보기 좋은 곳", "제주 동쪽에서 추천", "30분 안에 갈 수 있는 곳",
+    "주차장에서 바로 보는 곳", "등산 없는 곳" 같은 질의를 처리한다.
+
+    출발지를 주면 **실제 도로를 따라간 주행시간**으로 자르고 순위에 반영한다
+    (직선거리가 아니다 — 제주는 가운데가 한라산이라 직선거리로 자르면 산 반대편을
+    추천하게 된다). 정체는 반영하지 않는 야간 자유주행 기준이다.
+
+    Args:
+        origin: 출발지 지명·주소 (예: '제주공항', '애월읍'). origin_lat/lon 과 택일.
+        origin_lat: 출발지 위도. origin_lon 과 함께 줄 때만 쓴다(현재 위치 등).
+        origin_lon: 출발지 경도.
+        max_drive_minutes: 이 시간 안에 갈 수 있는 곳만. 출발지가 있어야 동작한다.
+        region: '동'·'서'·'남'·'북'·'중산간' 중 하나로 지역을 좁힌다.
+        no_climb: True 면 오르막 산행이 필요한 곳을 뺀다("등산 없는 곳").
+        max_walk_minutes: 주차 지점에서 관측 지점까지 편도 도보가 이 시간 이하인 곳만.
+            0 을 주면 "주차하고 바로 보는 곳"에 가깝다.
+        parking_required: True 면 주차장이 확인된 곳만.
+        pets: True 면 반려동물 동반이 가능한 곳만.
+        date: 판정 기준 날짜 YYYY-MM-DD (생략 시 오늘).
+        time: 판정 기준 시각 HH:MM 24시간 KST (생략 시 22:00).
+        limit: 돌려줄 곳 수. 기본 3, 최대 10.
+
+    Returns:
+        고정 스키마 dict. 추천 목록은 `spots` 배열에 있고 각 항목에 주행시간(`drive`)·
+        도보(`walk_minutes`)·야간 출입(`night_access`)이 들어 있다.
+    """
+    invalid = _validate_inputs(date, time, "moment")
+    if invalid is not None:
+        return invalid
+
+    try:
+        n = max(1, min(int(limit), _LIMIT_MAX))
+    except (TypeError, ValueError):
+        n = _LIMIT_DEFAULT
+
+    if region is not None and region.strip() and region.strip() not in spots.REGIONS:
+        return Response(
+            verdict="입력 오류",
+            reasons=[
+                f"region 값을 이해하지 못했습니다 (region={region!r}). "
+                f"{' · '.join(spots.REGIONS)} 중 하나로 주세요."
+            ],
+            numbers={},
+            attribution=[],
+            as_of=_now_iso(),
+        ).to_dict()
+
+    # 1) 정적 조건으로 후보를 좁힌다 (외부 호출 0회).
+    candidates = spots.filter_spots(
+        region=(region or "").strip() or None,
+        no_climb=no_climb,
+        max_walk_minutes=max_walk_minutes,
+        parking_required=parking_required,
+        pets=pets,
+    )
+    attribution = [spots.source()]
+
+    # 2) 출발지가 있으면 주행시간으로 자르고, 없으면 거리 축을 빼고 간다.
+    origin_resolved = None
+    routes: dict[str, object] = {}
+    if origin or (origin_lat is not None and origin_lon is not None):
+        found = _locate(origin, origin_lat, origin_lon)
+        if found is None:
+            return _not_found(origin or "")
+        o_lat, o_lon, origin_resolved = found
+        if not _in_jeju(o_lat, o_lon):
+            return _out_of_range(o_lat, o_lon)
+
+        legs = routing.drive_times(
+            (o_lat, o_lon),
+            [s.drive_target() for s in candidates],
+            budget_minutes=max_drive_minutes,
+        )
+        attribution.append(routing.SOURCE)
+        kept = []
+        for s, leg in zip(candidates, legs, strict=True):
+            if leg is None:
+                continue
+            routes[s.name] = leg
+            kept.append(s)
+        candidates = kept
+
+    if not candidates:
+        return Response(
+            verdict="조건에 맞는 관측지를 찾지 못했어요",
+            reasons=[_no_candidate_reason(max_drive_minutes, region, no_climb)],
+            numbers={"candidates": 0},
+            attribution=attribution,
+            as_of=_now_iso(),
+            resolved=origin_resolved,
+            spots=[],
+        ).to_dict()
+
+    # 3) 어둡기(정적)로 먼저 줄인다 — 여기까지 외부 호출이 없다.
+    #    점수는 0=완전 암흑 ~ 1=도심이라 작을수록 좋다.
+    scored = []
+    for s in candidates:
+        site = darkness.assess_site(s.lat, s.lon)
+        # 점수를 못 낸 곳(SQM 격자 밖)은 뒤로 보내되 버리지는 않는다.
+        scored.append((site.score if site.score is not None else 1.0, s))
+    scored.sort(key=lambda t: t[0])
+    pool = [s for _, s in scored[: max(n, _WEATHER_POOL)]]
+
+    # 4) 남은 후보만 날씨까지 실제로 판정한다 (외부 호출 = len(pool)).
+    when = _resolve_when(date, time)
+    judged = []
+    for s in pool:
+        final = graph.run(s.lat, s.lon, when)
+        judged.append((s, final))
+        for a in final.get("attribution", []):
+            if a not in attribution:
+                attribution.append(a)
+
+    # 5) 관측 가능한 곳 먼저, 그다음 어두운 순, 그다음 가까운 순.
+    def rank(item):
+        s, final = item
+        nums = final.get("numbers", {})
+        score = nums.get("darkness_score")
+        leg = routes.get(s.name)
+        return (
+            0 if final.get("possible") else 1,
+            score if score is not None else 1.0,
+            leg.minutes if leg is not None else 0.0,
+        )
+
+    judged.sort(key=rank)
+    top = judged[:n]
+
+    rows = []
+    for s, final in top:
+        row = _spot_row(s, route=routes.get(s.name))
+        row["verdict"] = final.get("verdict") or "불가"
+        row["cloud_cover"] = final.get("numbers", {}).get("cloud_cover")
+        row["darkness_score"] = final.get("numbers", {}).get("darkness_score")
+        row["bortle"] = final.get("numbers", {}).get("bortle")
+        rows.append(row)
+
+    return Response(
+        verdict=_recommend_verdict(rows, origin_resolved),
+        reasons=_recommend_reasons(top, routes),
+        numbers={
+            "candidates": len(candidates),
+            "evaluated": len(pool),
+            "returned": len(rows),
+            "when": when.isoformat(timespec="minutes"),
+        },
+        attribution=attribution,
+        as_of=when.isoformat(timespec="minutes"),
+        resolved=origin_resolved,
+        spots=rows,
+    ).to_dict()
+
+
+def _no_candidate_reason(
+    max_drive_minutes: float | None, region: str | None, no_climb: bool
+) -> str:
+    """왜 후보가 없는지 — 조건을 되짚어 준다. 어느 조건을 풀지 사용자가 정하게."""
+    conds = []
+    if max_drive_minutes is not None:
+        conds.append(f"주행 {max_drive_minutes:.0f}분 이내")
+    if region:
+        conds.append(f"{region} 지역")
+    if no_climb:
+        conds.append("등산 없는 곳")
+    if not conds:
+        return "조건에 맞는 관측지가 없습니다."
+    return (
+        f"{' · '.join(conds)} 조건을 모두 만족하는 관측지가 없어요. "
+        "조건을 하나 풀어서 다시 물어봐 주세요."
+    )
+
+
+def _recommend_verdict(rows: list[dict], origin_resolved: dict | None) -> str:
+    if not rows:
+        return "조건에 맞는 관측지를 찾지 못했어요"
+    best = rows[0]
+    head = f"'{best['name']}'을 추천해요"
+    if "drive" in best:
+        head += f" (차로 약 {best['drive']['minutes']:.0f}분)"
+    if len(rows) > 1:
+        head += f" — 조건에 맞는 곳 {len(rows)}곳을 골랐어요"
+    return head
+
+
+def _recommend_reasons(judged: list, routes: dict) -> list[str]:
+    """추천 목록을 사람이 읽는 줄들로. 곳마다 왜 골랐는지 한 덩어리씩."""
+    lines: list[str] = []
+    for i, (s, final) in enumerate(judged, start=1):
+        leg = routes.get(s.name)
+        head = f"{i}. {s.name} ({s.region}·{s.kind})"
+        if leg is not None:
+            head += f" — 차로 약 {leg.minutes:.0f}분 / {leg.km:.0f}km"
+        lines.append(head)
+        lines.append(f"   판정: {final.get('verdict') or '불가'} · {s.why}")
+        lines.append("   " + _walk_phrase(s))
+        if s.night_access:
+            lines.append(f"   야간 출입: {s.night_access}")
+    return lines
+
+
+# ==============================================================================
+# 도구 2 — 특정 장소 관측 가능 여부
+# ==============================================================================
+
+
+def evaluate_place(
+    query: str | None = None,
+    lat: float | None = None,
+    lon: float | None = None,
+    origin: str | None = None,
+    origin_lat: float | None = None,
+    origin_lon: float | None = None,
+    date: str | None = None,
+    time: str | None = None,
+    scope: str = "moment",
+) -> dict:
+    """지목한 제주 장소에서 별이 보이는지 판정한다.
+
+    "오늘 1100고지에서 별 보여?", "지금 새별오름 가면 별 잘 보일까?" 같은 질의.
+    장소는 이름(`query`)으로 주거나 좌표(`lat`·`lon`)로 준다 — 둘 중 하나면 된다.
+
+    **등록되지 않은 장소도 판정한다.** 좌표만 알면 날씨·광공해·천문 조건은 똑같이
+    계산된다. 다만 주차·야간 출입·도보 난이도는 검증된 관측지 63곳에만 있으므로,
+    미등록 장소는 그 정보가 **확인되지 않았음을 응답에 명시**한다. 접근성까지 알고
+    싶으면 `recommend_spots` 로 등록된 곳을 받거나 `spot_details` 로 조회한다.
+
+    **출발지(현재 위치)를 주면 거기서 몇 분 걸리는지 함께 답한다.** 등록 여부와
+    무관하다 — 주행시간은 좌표만 있으면 도로 그래프로 계산되기 때문이다. 미등록
+    장소에서 답할 수 있는 접근성은 이 주행시간까지이고, 주차·야간 출입은 여전히
+    모른다. 실제 도로 기준이며 정체는 반영하지 않는다(야간 자유주행).
+
+    Args:
+        query: 장소 이름·주소 (예: '1100고지', '새별오름', '제주시 애월읍').
+        lat: 위도. lon 과 함께 줄 때만 쓴다. query 대신 좌표로 물을 때.
+        lon: 경도.
+        origin: 출발지 지명·주소 (예: '제주공항'). 주행시간을 함께 받고 싶을 때.
+        origin_lat: 출발지 위도. origin_lon 과 함께 줄 때만 쓴다(현재 위치 등).
+        origin_lon: 출발지 경도.
+        date: YYYY-MM-DD (생략 시 오늘). 미래 날짜 가능(구름은 예보 지평 ~7일 안).
+        time: HH:MM 24시간 KST. scope="moment" 에서만(생략 시 22:00; date·time 모두
+            생략 시 현재). scope="night" 이면 무시.
+        scope: "moment"(한 시각) | "night"(밤 전체 시간 수·등급 분포). 기본 "moment".
+
+    Returns:
+        고정 스키마 dict. 등록된 관측지면 `spots` 에 그 곳의 접근성 요약이 실리고,
+        출발지를 줬으면 `numbers.drive` 에 주행시간·거리가 실린다.
+    """
+    invalid = _validate_inputs(date, time, scope)
+    if invalid is not None:
+        return invalid
+
+    if (lat is None or lon is None) and not (query or "").strip():
+        return Response(
+            verdict="입력 오류",
+            reasons=[
+                "평가할 장소를 알려주세요. 이름(query='새별오름')이나 "
+                "좌표(lat=33.36, lon=126.36) 중 하나면 됩니다."
+            ],
+            numbers={},
+            attribution=[],
+            as_of=_now_iso(),
+        ).to_dict()
+
+    found = _locate(query, lat, lon)
+    if found is None:
+        return _not_found(query or "")
+    p_lat, p_lon, resolved = found
+
+    # 등록된 관측지인지 본다 — 이름으로 찾았거나, 좌표가 등록된 곳 바로 옆이거나.
+    known = spots.find(query) if query else None
+    if known is None:
+        known = _nearest_known(p_lat, p_lon)
+
+    # 출발지가 있으면 주행시간을 잰다. 등록 여부와 무관하다 — 도로 그래프는 좌표만
+    # 있으면 답한다(architecture §0 의 2×2: 출발지가 있으면 목적지를 지정했든 아니든
+    # 경로를 함께 답한다).
+    # 차로 향할 지점은 등록된 곳이면 주차장, 아니면 그 좌표 자체다.
+    route = None
+    if origin or (origin_lat is not None and origin_lon is not None):
+        o = _locate(origin, origin_lat, origin_lon)
+        if o is not None and _in_jeju(o[0], o[1]):
+            target = known.drive_target() if known is not None else (p_lat, p_lon)
+            route = routing.drive_time((o[0], o[1]), target)
+
+    spot_rows = [_spot_row(known, route=route)] if known is not None else None
+    result = _evaluate(p_lat, p_lon, date, time, scope, resolved, spot_rows)
+
+    # 실패 응답(범위 밖 등)에는 안내를 덧붙이지 않는다 — 이미 할 말이 정해져 있다.
+    if result["verdict"] in ("지원 범위 밖", "입력 오류"):
+        return result
+
+    if route is not None:
+        result["numbers"]["drive"] = route.to_dict()
+        result.setdefault("attribution", []).append(routing.SOURCE)
+
+    reasons = result.setdefault("reasons", [])
+    if resolved is not None:
+        matched = resolved.get("matched_query")
+        if matched and matched != query:
+            where = f"({resolved['lat']:.4f}, {resolved['lon']:.4f})"
+            note = (
+                f"'{query}'를 정확히 못 찾아 '{matched}'로 검색했어요 → "
+                f"{resolved['display_name']} {where}"
+            )
+        else:
+            note = (
+                f"'{query}' → {resolved['display_name']} "
+                f"({resolved['lat']:.4f}, {resolved['lon']:.4f})로 해석했어요"
+            )
+        reasons.insert(0, note)
+        if known is None:
+            attr = result.setdefault("attribution", [])
+            attr.append("지오코딩: Photon (OpenStreetMap)")
+
+    # 주행시간은 등록 여부와 무관하게 먼저 말한다 — 사용자가 가장 먼저 궁금해하는
+    # 것이고, 미등록 장소에서 답할 수 있는 접근성이 이것 하나뿐이다.
+    if route is not None:
+        reasons.append(
+            f"지금 위치에서 차로 약 {route.minutes:.0f}분 / {route.km:.0f}km 거리예요 "
+            "(실제 도로 기준, 정체는 반영하지 않은 야간 자유주행)"
+        )
+
+    if known is not None:
+        reasons.append(
+            f"이곳은 검증된 관측지예요 — {_walk_phrase(known)}. "
+            f"야간 출입: {known.night_access or '확인 필요'}. "
+            f"자세한 접근성은 spot_details('{known.name}') 로 볼 수 있어요"
+        )
+        result.setdefault("attribution", []).append(spots.source())
+    elif route is not None:
+        reasons.append(
+            "다만 이 위치는 검증된 관측지 목록에 없어요. 하늘 상태(날씨·광공해·박명)와 "
+            "위 주행시간은 좌표만으로 계산되지만, **주차 가능 여부·야간 출입·진입로 "
+            "상태·도보 난이도는 확인되지 않았습니다.** 초행에 밤에 가신다면 "
+            "recommend_spots 로 검증된 곳을 받아 보시는 편이 안전해요"
+        )
+    else:
+        reasons.append(
+            "이 위치는 검증된 관측지 목록에 없어요. 하늘 상태(날씨·광공해·박명)는 "
+            "위와 같이 판정했지만 **주차 가능 여부·야간 출입·진입로 상태·도보 난이도는 "
+            "확인되지 않았습니다.** 초행에 밤에 가신다면 recommend_spots 로 검증된 "
+            "곳을 받아 보시는 편이 안전해요"
+        )
+
+    return result
+
+
+def _nearest_known(lat: float, lon: float) -> spots.Spot | None:
+    """좌표가 등록된 관측지 바로 옆인지 본다. 아니면 None."""
+    best, best_m = None, _SAME_SPOT_M
+    for s in spots.all_spots():
+        d = _haversine_m(lat, lon, s.lat, s.lon)
+        if d <= best_m:
+            best, best_m = s, d
+    return best
+
+
+def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = p2 - p1
+    dl = math.radians(lon2 - lon1)
+    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * 6_371_000.0 * math.asin(math.sqrt(a))
+
+
+# ==============================================================================
+# 도구 3 — 관측지 상세정보
+# ==============================================================================
+
+
+def spot_details(name: str, origin: str | None = None,
+                 origin_lat: float | None = None,
+                 origin_lon: float | None = None) -> dict:
+    """검증된 관측지의 주차·도보·야간 출입·반려동물·화장실·주의사항을 조회한다.
+
+    "매오름 많이 걸어야 해?", "강아지랑 갈 수 있어?", "새별오름 밤에 들어갈 수 있어?",
+    "천아계곡까지 가기 어려워?" 같은 질의를 처리한다. 하늘 상태는 답하지 않는다 —
+    그건 `evaluate_place` 소관이다.
+
+    출발지를 주면 그곳까지의 주행시간도 함께 답한다.
+
+    Args:
+        name: 관측지 이름 (예: '새별오름', '매오름'). 띄어쓰기는 달라도 된다.
+        origin: 출발지 지명·주소. 주행시간을 함께 받고 싶을 때.
+        origin_lat: 출발지 위도 (origin_lon 과 함께).
+        origin_lon: 출발지 경도.
+
+    Returns:
+        고정 스키마 dict. 상세는 `spots` 배열의 한 항목에 전부 들어 있다.
+    """
+    hit = spots.find(name or "")
+    if hit is None:
+        return Response(
+            verdict="등록된 관측지가 아니에요",
+            reasons=[
+                f"'{name}'은 검증된 관측지 목록(63곳)에 없어요. "
+                "이름을 다르게 불러 보시거나, recommend_spots 로 조건에 맞는 곳을 "
+                "받아 보세요. 하늘 상태만 알고 싶으면 evaluate_place 로 물어보시면 "
+                "미등록 장소도 판정합니다."
+            ],
+            numbers={},
+            attribution=[spots.source()],
+            as_of=_now_iso(),
+            spots=[],
+        ).to_dict()
+
+    attribution = [spots.source()]
+    route = None
+    origin_resolved = None
+    if origin or (origin_lat is not None and origin_lon is not None):
+        found = _locate(origin, origin_lat, origin_lon)
+        if found is not None:
+            o_lat, o_lon, origin_resolved = found
+            if _in_jeju(o_lat, o_lon):
+                route = routing.drive_time((o_lat, o_lon), hit.drive_target())
+                attribution.append(routing.SOURCE)
+
+    row = _spot_row(hit, detail=True, route=route)
+
+    reasons = [f"{hit.name} ({hit.region}·{hit.kind}) — {hit.why}"]
+    if route is not None:
+        reasons.append(f"차로 약 {route.minutes:.0f}분 / {route.km:.0f}km 거리예요")
+    if hit.parking:
+        names = ", ".join(p.get("name", "주차장") for p in hit.parking)
+        fee = hit.parking[0].get("fee")
+        reasons.append(f"주차: {names}" + (f" ({fee})" if fee else ""))
+    else:
+        reasons.append("주차: 확인된 주차장이 없어요")
+    reasons.append(_walk_phrase(hit))
+    if hit.access:
+        reasons.append(f"진입: {hit.access}")
+    reasons.append(f"야간 출입: {hit.night_access or '확인 필요'}")
+    if hit.pets:
+        reasons.append(f"반려동물: {hit.pets}")
+    reasons.append(
+        f"화장실: {', '.join(t.get('name', '화장실') for t in hit.toilet)}"
+        if hit.toilet
+        else "화장실: 확인된 곳이 없어요"
+    )
+    if hit.fee:
+        reasons.append(f"요금: {hit.fee}")
+    for c in hit.cautions:
+        reasons.append(f"주의: {c}")
+
+    return Response(
+        verdict=f"{hit.name} 접근성 정보예요",
+        reasons=reasons,
+        numbers={
+            "elevation_m": hit.elevation_m,
+            "slope_deg": hit.slope_deg,
+            "walk_minutes": row["walk_minutes"],
+            "parking_count": len(hit.parking),
+            "toilet_count": len(hit.toilet),
+            **({"drive": route.to_dict()} if route is not None else {}),
+        },
+        attribution=attribution,
+        as_of=_now_iso(),
+        resolved=origin_resolved,
+        spots=[row],
     ).to_dict()

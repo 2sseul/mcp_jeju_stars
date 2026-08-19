@@ -1,6 +1,6 @@
 """schema — 응답 계약.
 
-값이 부분적이어도 응답 '모양'은 고정이다. 특히 `resolved` 는 값이 없어도
+값이 부분적이어도 응답 '모양'은 고정이다. 특히 `resolved`·`spots` 는 값이 없어도
 **키가 항상 존재**해야 한다(`docs/plan.md` 고정 2).
 """
 
@@ -9,7 +9,9 @@ from __future__ import annotations
 from server.clients.open_meteo import _clean
 from server.schema import Response
 
-EXPECTED_KEYS = {"verdict", "reasons", "numbers", "attribution", "as_of", "resolved"}
+EXPECTED_KEYS = {
+    "verdict", "reasons", "numbers", "attribution", "as_of", "resolved", "spots",
+}
 
 
 def _make(**overrides) -> Response:
@@ -28,9 +30,30 @@ def test_resolved가_없어도_키는_항상_존재한다():
     response = _make()
     # When: dict 로 변환하면
     result = response.to_dict()
-    # Then: resolved 키가 None 값으로라도 반드시 들어 있다
+    # Then: resolved·spots 키가 None 값으로라도 반드시 들어 있다
     assert set(result) == EXPECTED_KEYS
     assert result["resolved"] is None
+    assert result["spots"] is None
+
+
+def test_spots가_있으면_그대로_실린다():
+    # Given: 관측지를 말하는 응답에서 (추천·상세조회)
+    rows = [{"name": "새별오름", "region": "서"}]
+    # When: dict 로 변환하면
+    result = _make(spots=rows).to_dict()
+    # Then: 같은 키 집합을 유지하면서 목록이 실린다
+    assert set(result) == EXPECTED_KEYS
+    assert result["spots"] == rows
+
+
+def test_spots도_내부_상태를_유출하지_않는다():
+    # Given: 관측지 dict 를 담은 응답에서
+    rows = [{"name": "새별오름"}]
+    result = _make(spots=rows).to_dict()
+    # When: 호출자가 돌려받은 항목을 수정해도
+    result["spots"][0]["name"] = "끼워넣기"
+    # Then: 원본은 그대로다 (항목마다 복사한다)
+    assert rows == [{"name": "새별오름"}]
 
 
 def test_resolved가_있으면_그대로_실린다():

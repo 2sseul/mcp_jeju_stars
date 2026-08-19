@@ -40,6 +40,11 @@ ROAD_DARKNESS  = DATA / "road" / "jeju_road_darkness.npz"
 # `scripts/build_road_tags.py` 가 잰 값만 작은 배열로 줄여 둔 것.
 ROAD_TAGS      = DATA / "road" / "jeju_road_tags.npz"
 
+# 주행 가능 도로만 이어 붙인 **연결 그래프**(CSR). 위 두 파일은 세그먼트를 흩어 놓은
+# 것이라 "어디서 어디까지 몇 분"을 답하지 못한다 — 이어짐을 담는 것은 이 파일뿐이다.
+# `scripts/build_road_graph.py` 가 만든다.
+ROAD_GRAPH     = DATA / "road" / "jeju_road_graph.npz"
+
 # 카카오 로컬 API 로 긁어 둔 장소(공원·휴게소 등).
 # `scripts/fetch_kakao_places.py` 로 재수집한다.
 KAKAO_PLACES = DATA / "kakao_places"

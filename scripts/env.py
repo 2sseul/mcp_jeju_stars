@@ -1,37 +1,11 @@
-"""`.env` 에서 키 하나 읽기 — 배치 스크립트 전용.
+"""`.env` 읽기 — 서버와 같은 구현을 쓴다.
 
-python-dotenv 를 끌어오지 않는다. 배포 의존을 이 열 줄 때문에 늘리지 않는 것이
-`build_viirs_grid.py` 가 tifffile 을 scripts 그룹에만 두는 것과 같은 규율이다.
-
-환경변수가 먼저다 — CI·셸에서 넘긴 값이 파일보다 우선한다.
+예전에는 여기에 같은 열 줄이 따로 있었다. 두 벌이면 언젠가 한쪽만 고쳐져,
+스크립트는 키를 찾는데 서버는 못 찾는 식으로 갈린다. `server/env.py` 하나만 둔다.
 """
 
 from __future__ import annotations
 
-import os
+from server.env import read
 
-from server import path
-
-
-def read(name: str) -> str:
-    """환경변수 또는 저장소 루트 `.env` 에서 값을 읽는다. 없으면 빈 문자열."""
-    value = os.environ.get(name, "").strip()
-    if value:
-        return value
-    env_file = path.ROOT / ".env"
-    if not env_file.exists():
-        return ""
-    for line in env_file.read_text(encoding="utf-8").splitlines():
-        key, sep, raw = line.partition("=")
-        if sep and key.strip() == name:
-            return raw.strip().strip("\"'")
-    return ""
-
-
-def require(name: str, hint: str = "") -> str:
-    """값이 없으면 `SystemExit` — 스크립트가 절반쯤 돌다 실패하지 않게 앞에서 막는다."""
-    value = read(name)
-    if not value:
-        tail = f"\n  {hint}" if hint else ""
-        raise SystemExit(f"{name} 가 없습니다(.env 또는 환경변수).{tail}")
-    return value
+__all__ = ["read"]

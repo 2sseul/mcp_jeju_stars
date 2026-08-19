@@ -71,8 +71,10 @@ spot_details(name, origin=None, origin_lat=None, origin_lon=None)
 등급). 도보선은 **갈래마다 색이 다르다** — 포장·흙길·돌길·암반·계단이 갈려 보여서
 어디서 계단이 시작되는지 알 수 있다.
 
-배경은 **위성사진**이 기본이고(Esri World Imagery, 제주 실사진 z18까지) 일반 지도는
-토글이다. 서버가 `/maps/{name}` 으로 직접 서빙하며, 겉 주소는 `MAP_BASE_URL` 로 바꾼다 —
+배경은 **위성사진**이 기본이고 일반 지도는 토글이다. `VWORLD_API_KEY` 가 있으면
+브이월드(국토지리정보원 항공사진, 제주 z19)를, 없으면 Esri World Imagery(z18)로
+떨어진다 — 키 없이도 지도는 뜬다. 키는 지도 HTML 에 실려 나가므로(클라이언트 WMTS)
+브이월드 콘솔의 도메인 등록이 실질적인 접근 통제다. 서버가 `/maps/{name}` 으로 직접 서빙하며, 겉 주소는 `MAP_BASE_URL` 로 바꾼다 —
 같은 Wi-Fi 의 폰에서 열려면 `MCP_HOST=0.0.0.0` 과 함께 LAN 주소를 넣는다.
 `numbers`는 구조화 수치를 문장과 분리해 **LLM이 숫자를 지어내지 못하게** 한다.
 

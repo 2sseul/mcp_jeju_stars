@@ -22,8 +22,14 @@ import hashlib
 import os
 import re
 
-from server import path
-from server.core.mapview import Item, Marker, render
+from server import env, path
+from server.core.mapview import (
+    DEFAULT_SATELLITE,
+    Item,
+    Marker,
+    Tiles,
+    render,
+)
 
 #: 지도 파일이 쌓이는 자리. `outputs/` 아래라 커밋되지 않는다.
 MAPS_DIR = path.OUTPUTS / "maps"
@@ -44,6 +50,38 @@ def base_url() -> str:
     return f"http://127.0.0.1:{os.getenv('MCP_PORT', '8000')}"
 
 
+def satellite() -> Tiles:
+    """배경 위성 타일 — VWorld 키가 있으면 그것을, 없으면 기본 공급자를.
+
+    VWorld(국토지리정보원 항공사진)는 제주 **z19 까지 실사진**이다 — 네 지점에서
+    z19 네 장의 해시가 모두 달랐다(같으면 '자료 없음' 타일이다). 기본 공급자는 대부분
+    z18 까지라, 키가 있으면 주차 구획과 탐방로가 눈에 띄게 선명해진다.
+
+    **키는 지도 HTML 에 그대로 실린다.** 클라이언트가 직접 타일을 받는 방식이라
+    피할 수 없다(카카오 JS 키와 같은 성격). 그래서 지도를 여는 사람에게는 키가 보인다 —
+    VWorld 콘솔에서 도메인을 등록해 접근을 제한하는 것이 실질적인 통제다.
+
+    `MAP_TILE_URL` 을 주면 그것이 최우선이다. 공급자를 바꿔 볼 때 코드를 안 고치려는
+    구멍이고, `{z}`·`{x}`·`{y}` 자리표시자를 그대로 두면 된다.
+    """
+    explicit = env.read("MAP_TILE_URL")
+    if explicit:
+        return Tiles(
+            url=explicit,
+            attribution=env.read("MAP_TILE_CREDIT") or "위성사진 제공: 설정된 공급자",
+            max_native_zoom=int(env.read("MAP_TILE_MAX_ZOOM") or 19),
+        )
+
+    key = env.read("VWORLD_API_KEY")
+    if key:
+        return Tiles(
+            url=f"https://api.vworld.kr/req/wmts/1.0.0/{key}/Satellite/{{z}}/{{y}}/{{x}}.jpeg",
+            attribution="항공사진 &copy; 국토지리정보원 · 브이월드(국토교통부)",
+            max_native_zoom=19,
+        )
+    return DEFAULT_SATELLITE
+
+
 def write(
     title: str,
     markers: list[Marker],
@@ -58,6 +96,7 @@ def write(
     """
     document = render(
         title=title,
+        satellite=satellite(),
         markers=markers,
         walk_segments=walk_segments,
         caption=caption,

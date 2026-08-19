@@ -148,11 +148,28 @@ def test_배경은_위성사진이_기본이다():
 
 
 def test_위성_최대_실사진_줌을_넘겨_당기지_않는다():
-    # Given: 제주 상공 실사진은 z18 까지다(z19 부터 빈 타일이 온다)
+    # Given: 실사진이 있는 줌은 공급자마다 다르다(Esri 는 제주 z18, VWorld 는 z19)
     document = mapview.render("줌", [SPOT])
+    data = _payload(document)
     # When: 위성 레이어 설정을 보면
-    # Then: maxNativeZoom 이 18 이다 — 없으면 더 당겼을 때 화면이 회색으로 빈다
-    assert "maxNativeZoom: 18" in document
+    # Then: 실사진 줌이 최대 줌보다 작다 — 같거나 크면 없는 줌을 그대로 요청해
+    #       화면이 회색으로 빈다. 늘려 보여주는 쪽이 비어 보이는 것보다 낫다
+    assert data["sat"]["maxNative"] < data["sat"]["maxZoom"]
+    assert "maxNativeZoom: D.sat.maxNative" in document
+
+
+def test_위성_공급자를_밖에서_갈아끼울_수_있다():
+    # Given: 키가 필요한 공급자가 있어 `core` 가 환경을 읽을 수 없다
+    custom = mapview.Tiles(
+        url="https://example.test/{z}/{y}/{x}.jpeg",
+        attribution="시험용",
+        max_native_zoom=19,
+    )
+    # When: 밖에서 배경을 넘기면
+    data = _payload(mapview.render("갈아끼우기", [SPOT], satellite=custom))
+    # Then: 그것이 쓰인다 — 공급자 선택은 `server/maps.py` 가 한다
+    assert data["sat"]["url"] == custom.url
+    assert data["sat"]["maxNative"] == 19
 
 
 def test_두_배경_모두_출처를_밝힌다():

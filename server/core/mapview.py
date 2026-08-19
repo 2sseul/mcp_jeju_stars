@@ -21,11 +21,14 @@
 배경은 위성사진이 기본이다
 --------------------------------------------------------------------------
 주차 자리가 포장인지 흙바닥인지, 탐방로가 어디로 나 있는지는 **선 지도로는 안 보인다**.
-그래서 Esri World Imagery 를 기본 배경으로 깔고 일반 지도를 토글로 둔다.
+그래서 위성사진을 기본 배경으로 깔고 일반 지도를 토글로 둔다.
 
-제주 상공의 실제 사진은 **z18 까지**다(그 위 줌은 빈 타일이 온다 — 새별오름·성판악·
-해안 세 곳에서 z19 부터 2KB 짜리가 왔다). 그래서 `maxNativeZoom` 을 18 로 두어 더
-당기면 z18 타일을 늘려 보여준다. 빈 타일을 그대로 받으면 화면이 회색으로 비어 버린다.
+**어느 위성을 쓸지는 이 모듈이 정하지 않는다.** 키가 필요한 공급자가 있어(VWorld)
+환경을 읽어야 하는데 `core` 는 그런 일을 하지 않는다. `server/maps.py` 가 골라
+`satellite` 인자로 넘긴다.
+
+실사진이 있는 최대 줌은 공급자마다 다르다(`Tiles.max_native_zoom`). 그보다 더 당기면
+마지막 타일을 늘려 보여준다 — 없는 줌을 그대로 요청하면 화면이 회색으로 비어 버린다.
 
 타일과 Leaflet 만 인터넷에서 받는다. 나머지 데이터는 전부 파일 안에 들어 있어서,
 지도를 띄우는 데 이 서버가 살아 있을 필요가 없다.
@@ -61,6 +64,7 @@ _WALK_COLORS: dict[str, str] = {
 _WALK_FALLBACK = "#94a3b8"
 
 
+
 #: 조각의 결 → (바탕색, 글자색). 조각이 전부 같은 회색이면 줄이 길어질수록 눈이
 #: 미끄러져 아무것도 안 읽힌다. 축마다 색을 줘 **훑어서 견주게** 한다.
 #:   drive 차로 가는 시간 · walk 걷는 시간·거리 · hard 각오해야 하는 것(계단·어려움)
@@ -72,6 +76,33 @@ _TONES: dict[str, tuple[str, str]] = {
     "warn": ("#fef9c3", "#854d0e"),
     "plain": ("#eef2f7", "#334155"),
 }
+
+
+@dataclass(frozen=True)
+class Tiles:
+    """배경 타일 한 겹 — 주소·귀속·실사진 최대 줌.
+
+    `max_native_zoom` 은 **실제 사진이 있는 가장 큰 줌**이다. 그보다 더 당기면
+    Leaflet 이 마지막 타일을 늘려 보여준다. 없는 줌을 그대로 요청하면 공급자가
+    빈 타일이나 오류를 주고, 화면은 회색으로 빈다.
+    """
+
+    url: str
+    attribution: str
+    max_native_zoom: int = 18
+    max_zoom: int = 21
+
+
+#: 키가 없을 때 쓰는 위성 배경. 전 세계를 덮고 키가 필요 없지만, 제주는 대부분
+#: z18 까지다(z19 를 요청하면 네 장이 바이트까지 같은 '자료 없음' 타일이 온다).
+DEFAULT_SATELLITE = Tiles(
+    url=(
+        "https://server.arcgisonline.com/ArcGIS/rest/services/"
+        "World_Imagery/MapServer/tile/{z}/{y}/{x}"
+    ),
+    attribution="위성사진 &copy; Esri · Maxar · Earthstar Geographics",
+    max_native_zoom=18,
+)
 
 
 @dataclass(frozen=True)
@@ -122,6 +153,7 @@ def _points(path: list[tuple[float, float]] | None) -> list[list[float]]:
 def render(
     title: str,
     markers: list[Marker],
+    satellite: Tiles | None = None,
     walk_segments: list[tuple[list[tuple[float, float]], str]] | None = None,
     caption: str = "",
     items: list[Item] | None = None,
@@ -131,6 +163,7 @@ def render(
     Args:
         title: 문서 제목이자 화면 왼쪽 위 제목.
         markers: 찍을 점들. 하나도 없으면 지도를 만들지 않는다(빈 문자열).
+        satellite: 위성 배경. 생략하면 키가 필요 없는 기본 공급자를 쓴다.
         walk_segments: (점렬, 갈래) 짝들. 갈래는 `계단`·`돌길`·`흙길`·`포장` 처럼
             무엇을 밟는가이며, 색이 거기서 갈린다.
         caption: 제목 아래 한 줄 설명(소요시간 등).
@@ -144,7 +177,14 @@ def render(
     if not markers:
         return ""
 
+    sat = satellite or DEFAULT_SATELLITE
     data = {
+        "sat": {
+            "url": sat.url,
+            "credit": sat.attribution,
+            "maxNative": sat.max_native_zoom,
+            "maxZoom": sat.max_zoom,
+        },
         "markers": [
             {
                 "lat": m.lat,
@@ -290,15 +330,12 @@ _TEMPLATE = """<!doctype html>
 const D = {data};
 
 const map = L.map('map', {{ zoomControl: true }});
-// 위성사진 — 기본 배경. 제주 실사진은 z18 까지라 그 위는 늘려 보여준다.
-const SAT = L.tileLayer(
-  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/' +
-  'MapServer/tile/{{z}}/{{y}}/{{x}}',
-  {{
-    maxZoom: 20, maxNativeZoom: 18,
-    attribution: '위성사진 &copy; Esri · Maxar · Earthstar Geographics'
-  }}
-);
+// 위성사진 — 기본 배경. 실사진이 있는 줌보다 더 당기면 마지막 타일을 늘린다.
+const SAT = L.tileLayer(D.sat.url, {{
+  maxZoom: D.sat.maxZoom,
+  maxNativeZoom: D.sat.maxNative,
+  attribution: D.sat.credit
+}});
 // 일반 지도 — 지명·도로 이름을 읽어야 할 때. 위성 위에서는 글자가 잘 안 읽힌다.
 const PLAIN = L.tileLayer(
   'https://{{s}}.basemaps.cartocdn.com/rastertiles/voyager/{{z}}/{{x}}/{{y}}{{r}}.png',

@@ -70,12 +70,17 @@ COPY data/road/jeju_road_graph.npz ./data/road/
 #   docker run -p 8000:8000 -v jeju-star-cache:/app/.cache jeju-star
 #
 # VOLUME 을 선언해 두면 -v 를 잊어도 익명 볼륨이 붙어 컨테이너 수명 동안은 남는다.
-RUN mkdir -p /app/.cache
+#
+# **소유권을 먼저 넘기고 VOLUME 을 선언한다.** Docker 는 VOLUME 선언 뒤에 그 경로에
+# 가한 변경을 버리고, 실행 시 볼륨을 **선언 시점의 이미지 내용**으로 초기화한다.
+# chown 이 뒤에 오면 볼륨이 root 소유로 만들어져 비루트 프로세스가 쓰지 못하고,
+# 캐시가 조용히 죽어 매 호출이 그대로 나간다 — 볼륨을 넣은 목적과 정반대가 된다.
+RUN useradd --create-home --uid 10001 app \
+ && mkdir -p /app/.cache \
+ && chown -R app:app /app
 VOLUME ["/app/.cache"]
 
-# 비루트로 돌린다. /app 소유권을 넘기는 것은 위 캐시 디렉터리에 써야 하기 때문이다 —
-# 못 쓰면 매 호출이 캐시 없이 나간다.
-RUN useradd --create-home --uid 10001 app && chown -R app:app /app
+# 비루트로 돌린다.
 USER app
 
 EXPOSE 8000

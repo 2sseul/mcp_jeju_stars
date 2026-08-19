@@ -1,0 +1,77 @@
+# 제주 밤하늘 관측 MCP — 컨테이너 이미지
+#
+# 2단계로 나눈다: 빌더에서 uv 로 .venv 를 만들고, 런타임에는 그 .venv 와
+# 서버 코드·데이터만 옮긴다(uv·빌드 캐시·컴파일러가 이미지에 남지 않는다).
+#
+#   docker build -t jeju-star .
+#   docker run --rm -p 8000:8000 jeju-star     → http://127.0.0.1:8000/mcp
+
+# --- 빌더 ---------------------------------------------------------------------
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS builder
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never
+
+WORKDIR /app
+
+# 의존성만 먼저 설치한다 — 코드가 바뀌어도 이 레이어는 캐시에서 재사용된다.
+# --frozen: uv.lock 을 그대로 쓴다(빌드 중에 락을 갱신하지 않는다 = 재현 가능).
+# --no-dev: pytest·ruff 는 이미지에 넣지 않는다. scripts 그룹(tifffile 등)은
+#           기본 그룹이 아니라 애초에 들어오지 않는다 — 배치 전용이다.
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-install-project --no-dev
+
+# 프로젝트 자체 설치. README 는 pyproject 의 readme 필드가 가리키므로 빌드에 필요하다.
+COPY README.md ./
+COPY server ./server
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
+
+# --- 런타임 -------------------------------------------------------------------
+FROM python:3.13-slim-bookworm
+
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    MCP_HOST=0.0.0.0 \
+    MCP_PORT=8000
+
+WORKDIR /app
+
+COPY --from=builder /app/.venv /app/.venv
+COPY server ./server
+
+# 서버가 **실제로 읽는** 데이터만 넣는다(`server/path.py` 기준, 약 32MB).
+# 저장소의 data/ 는 449MB 지만 대부분은 scripts 전용이다 — 토지대장·표고 격자·
+# 도로망 원본(30MB JSON)은 배치가 쓰고 판정 경로는 건드리지 않는다.
+#   ephem            → core/astro.py       (박명·천체력 DE421)
+#   darkness         → core/darkness.py    (SQM 격자)
+#   light_pollution  → core/nightlight.py  (VIIRS 야간광 격자)
+#   streetlight      → core/lamps.py       (가로등)
+#   jeju_spots.json  → core/spots.py       (검증된 관측지 63곳)
+#   road_graph.npz   → core/routing.py     (주행시간 — 도로 그래프 CSR)
+# core 모듈을 새로 붙이면 여기도 같이 늘려야 한다. 빠뜨리면 모듈이 import 시점에
+# FileNotFoundError 로 죽으므로 컨테이너가 뜨자마자 드러난다.
+COPY data/ephem/de421.bsp ./data/ephem/
+COPY data/darkness/jeju_sb_grid.npz ./data/darkness/
+COPY data/light_pollution/jeju_viirs_grid.npz ./data/light_pollution/
+COPY data/streetlight ./data/streetlight
+COPY data/jeju_spots.json ./data/
+COPY data/road/jeju_road_graph.npz ./data/road/
+
+# 비루트로 돌린다. /app 소유권을 넘기는 것은 Open-Meteo 클라이언트가 작업
+# 디렉터리에 `.cache.sqlite`(requests-cache)를 만들기 때문이다 — 못 쓰면 매 호출이
+# 캐시 없이 나간다.
+RUN useradd --create-home --uid 10001 app && chown -R app:app /app
+USER app
+
+EXPOSE 8000
+
+# /mcp 는 MCP 헤더 없이 부르면 4xx 라 상태코드로 살아있음을 못 가린다.
+# 포트가 열렸는지만 본다.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
+    CMD python -c "import os,socket; socket.create_connection(('127.0.0.1', int(os.environ['MCP_PORT'])), 2).close()"
+
+CMD ["python", "-m", "server.app"]

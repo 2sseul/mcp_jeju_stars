@@ -144,6 +144,10 @@ class Marker:
     name: str
     #: 팝업 둘째 줄(거리·요금·개방시간 등). 없으면 이름만 뜬다.
     note: str = ""
+    #: 점 위에 찍을 글자. 비우면 갈래의 기본 문자(★·P·화)를 쓴다.
+    #: 여러 곳을 한 장에 그릴 때 **목록의 번호**를 여기 넣는다 — 전부 같은 ★ 이면
+    #: 지도만 보고는 어느 점이 목록 몇 번인지 알 수 없다.
+    glyph: str = ""
 
 
 def _points(path: list[tuple[float, float]] | None) -> list[list[float]]:
@@ -167,7 +171,9 @@ def render(
         walk_segments: (점렬, 갈래, 설명) 짝들. 갈래는 `계단`·`돌길`·`흙길`·`포장`
             처럼 무엇을 밟는가이며 색이 거기서 갈린다. 설명은 구간을 눌렀을 때 뜨는
             한 줄(길이·노면·경사)이다.
-        caption: 제목 아래 한 줄 설명(소요시간 등).
+        caption: 제목 아래 설명. 줄바꿈(`
+`)으로 나누면 화면에서도 줄이 갈린다 —
+            "차로 25분"과 "걸어서 1분"은 다른 이야기라 한 줄에 붙이면 뭉쳐 읽힌다.
         items: 옆에 펼 목록. 여러 곳을 그릴 때 어디가 어디인지와 각 곳의 난이도·
             계단·도보를 한눈에 견주게 한다. 비면 목록 박스를 만들지 않는다.
 
@@ -191,7 +197,7 @@ def render(
                 "lat": m.lat,
                 "lon": m.lon,
                 "color": _KINDS.get(m.kind, _FALLBACK)[0],
-                "glyph": _KINDS.get(m.kind, _FALLBACK)[1],
+                "glyph": m.glyph or _KINDS.get(m.kind, _FALLBACK)[1],
                 "kindLabel": _KINDS.get(m.kind, _FALLBACK)[2],
                 "name": m.name,
                 "note": m.note,
@@ -240,9 +246,15 @@ def render(
             color, glyph, label = _KINDS[kind]
             legend.append(f'<i class="pin" style="--c:{color}">{glyph}</i>{label}')
 
+    # 줄마다 따로 이스케이프하고 <br> 로 잇는다. 통째로 이스케이프한 뒤 태그를 끼워
+    # 넣으면 순서가 뒤집혀 주입 구멍이 된다.
+    caption_html = "<br>".join(
+        html.escape(line) for line in caption.splitlines() or [""]
+    )
+
     return _TEMPLATE.format(
         title=html.escape(title),
-        caption=html.escape(caption),
+        caption=caption_html,
         legend="".join(f"<span>{item}</span>" for item in legend),
         data=json.dumps(data, ensure_ascii=False),
     )
@@ -283,7 +295,11 @@ _TEMPLATE = """<!doctype html>
   }}
   .ln {{ width:18px; height:0; border-top:3px solid var(--c); display:inline-block; }}
   .ln.dash {{ border-top-style:dashed; }}
-  .leaflet-popup-content {{ margin:10px 12px; font-size:12px; line-height:1.6; }}
+  /* 닫기 버튼이 절대위치라 제목 위에 올라탄다. 오른쪽을 비워 자리를 내준다. */
+  .leaflet-popup-content {{
+    margin:10px 12px; padding-right:16px; font-size:12px; line-height:1.6;
+  }}
+  .leaflet-popup-close-button {{ padding:6px 6px 0 0 !important; }}
   .leaflet-popup-content b {{ display:block; font-size:13px; margin-bottom:2px; }}
   .leaflet-popup-content .k {{ color:#64748b; font-size:11px; }}
   /* 목록 박스 — 여러 곳을 한눈에 견주는 표. 좁은 화면에서는 지도 아래로 내린다. */
@@ -372,8 +388,9 @@ D.walks.forEach(w => {{
 D.markers.forEach(m => {{
   const icon = L.divIcon({{
     className: '',
-    html: '<div style="width:22px;height:22px;border-radius:50%;background:' + m.color +
-          ';color:#fff;font:700 10px/22px system-ui;text-align:center;' +
+    html: '<div style="min-width:22px;height:22px;padding:0 3px;' +
+          'border-radius:11px;background:' + m.color +
+          ';color:#fff;font:700 11px/22px system-ui;text-align:center;' +
           'box-shadow:0 0 0 2px #fff,0 1px 4px rgba(15,23,42,.4)">' +
           m.glyph + '</div>',
     iconSize: [22, 22], iconAnchor: [11, 11], popupAnchor: [0, -12]

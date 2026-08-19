@@ -421,6 +421,41 @@ def test_충족_불가한_조건은_빈_목록과_이유를_돌려준다():
     assert any("조건" in r for r in result["reasons"])
 
 
+def test_추천은_낮에_물어도_밤_기준으로_판정한다(_no_weather):
+    # Given: 오후에 날짜·시각 없이 추천을 요청했을 때
+    result = recommend_spots(region="동", limit=1)
+    # When: 판정 기준 시각을 보면
+    hour = int(result["as_of"][11:13])
+    # Then: 지금이 아니라 밤이다. "어디로 갈까"는 낮에도 묻는 질문이라, 지금 시각으로
+    #       판정하면 오후 네 시에 물었을 때 전부 '불가'가 나온다 — 그건 하늘이 아니라
+    #       질문을 잘못 읽은 것이다
+    assert hour == 22
+
+
+def test_추천_문구에_요청한_조건이_들어간다(_no_weather):
+    # Given: 여러 조건을 걸어 추천을 요청했을 때
+    result = recommend_spots(
+        region="동", no_climb=True, pets=True, date="2026-08-20", limit=2
+    )
+    verdict = result["verdict"]
+    # When: 한 줄 결론을 보면
+    # Then: 무엇으로 골랐는지가 결과와 함께 있다 — 조건을 안 적으면 왜 이 곳들인지
+    #       알 수 없고, 조건을 잘못 읽었을 때도 드러나지 않는다
+    assert "동쪽 지역" in verdict
+    assert "등산 없는 곳" in verdict
+    assert "반려동물" in verdict
+    assert "추천드립니다" in verdict
+
+
+def test_조건이_없으면_시각만_적는다(_no_weather):
+    # Given: 조건 없이 추천을 요청했을 때
+    verdict = recommend_spots(date="2026-08-20", limit=1)["verdict"]
+    # When: 결론을 보면
+    # Then: 없는 조건을 지어내지 않고 기준 시각만 말한다
+    assert "8월 20일 밤 22시 기준" in verdict
+    assert "지역" not in verdict
+
+
 # --- 응답 계약 ------------------------------------------------------------------
 
 

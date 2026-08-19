@@ -99,6 +99,24 @@ def _resolve_when(date: str | None, time: str | None) -> datetime:
     return datetime(y, m, d, hh, mm, tzinfo=KST)
 
 
+def _resolve_plan_when(date: str | None, time: str | None) -> datetime:
+    """추천이 쓰는 기준 시각. date 생략 → 오늘, time 생략 → 22:00.
+
+    `_resolve_when` 과 **한 군데가 다르다**: 둘 다 생략해도 '지금'으로 떨어지지 않는다.
+    추천은 "어디로 갈까"를 묻는 도구라 낮에도 부른다. 지금 시각으로 판정하면 오후
+    네 시에 물었을 때 전부 '불가'가 나오는데, 그건 하늘이 아니라 질문을 잘못 읽은
+    것이다. (평가는 다르다 — "지금 별 보여?"는 지금이 맞다.)
+
+    파싱 실패 시 ValueError.
+    """
+    now = datetime.now(KST)
+    y, m, d = (now.year, now.month, now.day) if date is None else (
+        int(x) for x in date.split("-")
+    )
+    hh, mm = (22, 0) if time is None else (int(x) for x in time.split(":"))
+    return datetime(y, m, d, hh, mm, tzinfo=KST)
+
+
 def _resolve_night_when(date: str | None) -> datetime:
     """밤 집계의 기준 시각. date 가 있으면 그날 저녁(20:00), 없으면 현재.
     어느 쪽이든 night_window 가 '그 밤'을 찾는다. 파싱 실패 시 ValueError.
@@ -717,7 +735,7 @@ def _spot_map(spot: spots.Spot, route=None) -> str | None:
     편의시설은 **사람이 확인한 것**을 쓴다(반경 검색이 아니라 `jeju_spots.json`).
     확인된 자리가 그 관측지에 실제로 쓰는 자리이기 때문이다.
     """
-    markers = [Marker(spot.lat, spot.lon, "spot", spot.name, spot.kind)]
+    markers = [Marker(spot.lat, spot.lon, "spot", spot.name, _where(spot))]
     walk_segments = _walk_layers(spot)
 
     for lot in spot.parking:
@@ -759,7 +777,7 @@ def _spot_map(spot: spots.Spot, route=None) -> str | None:
         title=f"{spot.name} 도착 이후",
         markers=markers,
         walk_segments=walk_segments,
-        caption=" · ".join(caption_parts),
+        caption="\n".join(caption_parts),
         items=[_spot_item(spot, spot.name, route)],
     )
 
@@ -780,7 +798,7 @@ def _place_map(
 
     caption = f"반경 {NEARBY_M:.0f}m 안 편의시설"
     if route is not None:
-        caption = f"차로 약 {route.minutes:.0f}분 / {route.km:.0f}km · " + caption
+        caption = f"차로 약 {route.minutes:.0f}분 / {route.km:.0f}km\n" + caption
 
     return maps.write(
         title=f"{name} 주변",
@@ -948,8 +966,13 @@ def recommend_spots(
         candidates = kept
 
     if not candidates:
+        empty_conditions = _conditions_phrase(
+            origin_resolved, max_drive_minutes, region, no_climb,
+            max_walk_minutes, parking_required, pets,
+            _resolve_plan_when(date, time),
+        )
         return Response(
-            verdict="조건에 맞는 관측지를 찾지 못했어요",
+            verdict=_recommend_verdict([], empty_conditions),
             reasons=[_no_candidate_reason(max_drive_minutes, region, no_climb)],
             numbers={"candidates": 0},
             attribution=attribution,
@@ -969,7 +992,7 @@ def recommend_spots(
     pool = [s for _, s in scored[: max(n, _WEATHER_POOL)]]
 
     # 4) 남은 후보만 날씨까지 실제로 판정한다 (외부 호출 = len(pool)).
-    when = _resolve_when(date, time)
+    when = _resolve_plan_when(date, time)
     judged = []
     for s in pool:
         final = graph.run(s.lat, s.lon, when)
@@ -1004,19 +1027,25 @@ def recommend_spots(
 
     # 지도 — 고른 곳들을 한 장에. 주행 경로는 긋지 않는다(섬 전체로 줌아웃된다).
     # 주행시간은 목록 박스의 `차 N분` 조각과 응답의 `drive` 로 답한다.
+    # 번호를 점 위에 찍는다. 전부 같은 ★ 이면 지도만 보고는 어느 점이 목록 몇 번인지
+    # 알 수 없다. 부제도 목록과 같은 말(`_where`)을 써야 둘을 오가며 읽힌다.
     markers = [
-        Marker(s.lat, s.lon, "spot", f"{i}. {s.name}", f"{s.region}·{s.kind}")
+        Marker(s.lat, s.lon, "spot", f"{i}. {s.name}", _where(s), glyph=str(i))
         for i, (s, _) in enumerate(top, start=1)
     ]
     items = [
         _spot_item(s, f"{i}. {s.name}", routes.get(s.name))
         for i, (s, _) in enumerate(top, start=1)
     ]
+    conditions = _conditions_phrase(
+        origin_resolved, max_drive_minutes, region, no_climb,
+        max_walk_minutes, parking_required, pets, when,
+    )
     map_url = maps.write(
         title=f"관측지 추천 {len(rows)}곳",
         markers=markers,
         walk_segments=[layer for s, _ in top for layer in _walk_layers(s)],
-        caption=_recommend_verdict(rows, origin_resolved),
+        caption=conditions + f"\n조건에 맞는 관측지 {len(rows)}곳을 추천드립니다",
         items=items,
     )
 
@@ -1025,7 +1054,7 @@ def recommend_spots(
         reasons.append(f"고른 곳들을 지도로 봤어요 → {map_url}")
 
     return Response(
-        verdict=_recommend_verdict(rows, origin_resolved),
+        verdict=_recommend_verdict(rows, conditions),
         reasons=reasons,
         numbers={
             "candidates": len(candidates),
@@ -1060,16 +1089,57 @@ def _no_candidate_reason(
     )
 
 
-def _recommend_verdict(rows: list[dict], origin_resolved: dict | None) -> str:
+def _conditions_phrase(
+    origin_resolved: dict | None,
+    max_drive_minutes: float | None,
+    region: str | None,
+    no_climb: bool,
+    max_walk_minutes: float | None,
+    parking_required: bool,
+    pets: bool,
+    when: datetime,
+) -> str:
+    """사용자가 건 조건을 사람이 읽는 한 줄로. 조건이 없으면 시각만.
+
+    무엇으로 골랐는지를 결과와 함께 보여 준다 — 조건을 안 적으면 왜 이 네 곳인지
+    알 수 없고, 조건을 잘못 넘겼을 때(지역을 잘못 읽었다든지) 그것도 드러나지 않는다.
+    """
+    parts: list[str] = []
+    if origin_resolved:
+        where = origin_resolved.get("matched_query") or origin_resolved.get("query")
+        if where:
+            parts.append(f"{where} 출발")
+    if max_drive_minutes is not None:
+        parts.append(f"차로 {max_drive_minutes:.0f}분 이내")
+    if region:
+        # 중산간은 방위가 아니라 높이라 '중산간쪽'이 되면 이상하다.
+        parts.append("중산간" if region == "중산간" else f"{region}쪽 지역")
+    if no_climb:
+        parts.append("등산 없는 곳")
+    if max_walk_minutes is not None:
+        if max_walk_minutes < 1:
+            parts.append("주차 후 바로 관측")
+        else:
+            parts.append(f"도보 {max_walk_minutes:.0f}분 이내")
+    if parking_required:
+        parts.append("주차 가능한 곳")
+    if pets:
+        parts.append("반려동물 동반 가능")
+
+    label = _night_label(when)
+    parts.append(f"{label} {when:%H시} 기준")
+    return " · ".join(parts)
+
+
+def _recommend_verdict(rows: list[dict], conditions: str) -> str:
+    """추천 결과의 한 줄 결론 — **조건이 먼저, 결과가 뒤**다.
+
+    한때 "'따라비오름'을 추천해요 (차로 약 48분)" 처럼 1등을 앞세웠는데, 목록이 이미
+    순서대로 있어서 같은 말을 두 번 하는 셈이었다. 대신 무엇으로 골랐는지를 적는다.
+    """
     if not rows:
-        return "조건에 맞는 관측지를 찾지 못했어요"
-    best = rows[0]
-    head = f"'{best['name']}'을 추천해요"
-    if "drive" in best:
-        head += f" (차로 약 {best['drive']['minutes']:.0f}분)"
-    if len(rows) > 1:
-        head += f" — 조건에 맞는 곳 {len(rows)}곳을 골랐어요"
-    return head
+        return f"{conditions} — 조건에 맞는 관측지를 찾지 못했어요"
+    return f"{conditions} — 조건에 맞는 관측지 {len(rows)}곳을 추천드립니다"
 
 
 def _recommend_reasons(judged: list, routes: dict) -> list[str]:

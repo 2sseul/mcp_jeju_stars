@@ -192,6 +192,7 @@ def render(
             {
                 "lat": m.lat,
                 "lon": m.lon,
+                "kind": m.kind,
                 "color": _KINDS.get(m.kind, _FALLBACK)[0],
                 "glyph": m.glyph or _KINDS.get(m.kind, _FALLBACK)[1],
                 "kindLabel": _KINDS.get(m.kind, _FALLBACK)[2],
@@ -236,7 +237,7 @@ def render(
     for kind in _WALK_COLORS:
         if kind in drawn:
             color = _WALK_COLORS[kind]
-            legend.append(f'<i class="ln dash" style="--c:{color}"></i>{kind}')
+            legend.append(f'<i class="ln" style="--c:{color}"></i>{kind}')
     for kind in ("spot", "parking", "toilet"):
         if any(m.kind == kind for m in markers):
             color, glyph, label = _KINDS[kind]
@@ -276,7 +277,6 @@ _TEMPLATE = """<!doctype html>
     justify-content:center; font-style:normal;
   }}
   .ln {{ width:18px; height:0; border-top:3px solid var(--c); display:inline-block; }}
-  .ln.dash {{ border-top-style:dashed; }}
   /* 닫기 버튼이 절대위치라 제목 위에 올라탄다. 오른쪽을 비워 자리를 내준다. */
   .leaflet-popup-content {{
     margin:10px 12px; padding-right:16px; font-size:12px; line-height:1.6;
@@ -359,10 +359,14 @@ const bounds = [];
 
 // 도보 경로 — 갈래별 색. 계단이 어디서 시작되는지가 보여야 한다.
 // 흰 테두리를 깔아 위성 타일 위에서 선이 묻히지 않게 한다.
+//
+// 실선이다. 한때 파선이었는데 그건 주행선(실선)과 갈라 보이려던 것이고, 주행선을
+// 지도에서 뺀 뒤로는 갈라야 할 상대가 없다. 파선은 짧은 구간에서 점 몇 개로 흩어져
+// 오히려 안 보인다 — 1100고지의 10m 계단이 그랬다.
 D.walks.forEach(w => {{
   L.polyline(w.points, {{ color:'#ffffff', weight:8, opacity:.9 }}).addTo(map);
   L.polyline(w.points, {{
-    color:w.color, weight:4, opacity:.95, dashArray:'7 6'
+    color:w.color, weight:4, opacity:.95
   }}).bindPopup(
     '<b>' + w.kind + '</b><span class="k">걷는 구간</span>' +
     (w.note ? '<br>' + w.note : '')
@@ -379,6 +383,11 @@ const SPREAD_M = 7;
 const seen = new Map();
 const pins = new Map();
 const drawn = [];
+
+// 편의시설(주차·화장실)은 따로 담는다. 전체가 보이는 화면에서는 관측지 넷만 보여야
+// 어디가 어디인지 읽히고, 핀 열두 개가 뭉쳐 있으면 그게 안 된다. 한 곳을 들여다볼
+// 만큼 당겼을 때 켠다.
+const facilities = L.layerGroup();
 D.markers.forEach(m => {{
   const key = m.lat.toFixed(5) + ',' + m.lon.toFixed(5);
   const n = seen.get(key) || 0;
@@ -409,11 +418,17 @@ D.markers.forEach(m => {{
   const note = m.note ? '<span class="k">' + m.note + '</span>' : '';
   const pin = L.marker([m.drawLat, m.drawLon], {{ icon }})
     .bindPopup('<b>' + m.name + '</b><span class="k">' + m.kindLabel + '</span>' +
-               (note ? '<br>' + note : ''))
-    .addTo(map);
+               (note ? '<br>' + note : ''));
+  if (m.kind === 'spot') {{
+    pin.addTo(map);
+    // 화면 범위는 관측지로만 잡는다. 편의시설까지 넣으면 처음 화면이 넓어져
+    // 정작 봐야 할 점들이 더 작아진다.
+    bounds.push([m.lat, m.lon]);
+  }} else {{
+    facilities.addLayer(pin);
+  }}
   pins.set(m.lat.toFixed(5) + ',' + m.lon.toFixed(5), pin);
   drawn.push(pin);
-  bounds.push([m.lat, m.lon]);
 }});
 
 // 실사진이 있는 줌보다 더 당기지 않는다. 도보 경로가 짧은 곳(1100고지는 25m·26m·
@@ -441,6 +456,20 @@ if (bounds.length > 1) {{
 // 한 곳만 그린 지도가 이미 그보다 깊게 열렸다면 그대로 둔다.
 const OVERVIEW_ZOOM = map.getZoom();
 const FOCUS_ZOOM = Math.max(D.sat.maxNative, OVERVIEW_ZOOM);
+
+// 이만큼 당기면 편의시설을 켠다. z16 이면 타일 하나가 600m 쯤이라 주차장과 화장실이
+// 서로 갈려 보이기 시작한다. 그보다 얕으면 점이 겹쳐 무엇이 무엇인지 알 수 없다.
+// 한 곳만 그린 지도는 이미 그보다 깊게 열리므로 처음부터 켜져 있다.
+const DETAIL_ZOOM = Math.min(16, D.sat.maxNative);
+function syncFacilities() {{
+  if (map.getZoom() >= DETAIL_ZOOM) {{
+    if (!map.hasLayer(facilities)) facilities.addTo(map);
+  }} else if (map.hasLayer(facilities)) {{
+    map.removeLayer(facilities);
+  }}
+}}
+map.on('zoomend', syncFacilities);
+syncFacilities();
 
 // 점을 눌러도 목록 줄을 누른 것과 같이 움직인다. 전체가 보이는 화면에서 점 하나를
 // 겨우 눌렀는데 팝업만 뜨고 화면이 그대로면, 결국 손으로 다시 확대하게 된다.

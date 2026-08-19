@@ -540,29 +540,15 @@ _STAIR_HARD_M: float = 100.0
 _HARD_GRADES: tuple[str, ...] = ("어려움", "매우어려움")
 
 
-def _copula(word: str) -> str:
-    """이름 뒤에 붙는 서술격 조사 — 받침이 있으면 '이에요', 없으면 '예요'.
-
-    한글 음절은 (초성 19 · 중성 21 · 종성 28) 순서로 배열돼 있어, 코드포인트에서
-    종성 자리를 나머지 연산으로 꺼낼 수 있다. 0이면 받침이 없다.
-    """
-    if not word:
-        return "예요"
-    last = word[-1]
-    if "가" <= last <= "힣":
-        return "예요" if (ord(last) - 0xAC00) % 28 == 0 else "이에요"
-    # 숫자·영문으로 끝나면 읽는 소리를 알 수 없으므로 조사를 붙이지 않는다.
-    return ""
-
-
 def _toilet_status(spot: spots.Spot) -> tuple[str, str, str]:
     """화장실 상황 — (조각 글자, 결, 문장).
 
     **없으면 없다고 적는다.** 조용히 빼면 "안 적혀 있으니 있겠지"로 읽히는데, 밤에
     한참 걸어 올라간 뒤에 알게 되는 종류의 정보다.
 
-    없을 때는 **얼마나 먼지**까지 말한다 — "없음"과 "3.3km 밖에 있음"은 계획이 다르다
-    (`core.toilet.nearest` 가 반경과 무관하게 가장 가까운 곳을 준다).
+    `MAP_NEARBY_M`(500m) 밖은 **없는 것으로 친다.** 한때 가장 가까운 곳까지의 거리를
+    적었는데("3.3km 떨어진 표선충혼묘지"), 밤에 관측하다 3km 를 되돌아 나가지는 않는다 —
+    쓸 수 없는 거리를 숫자로 적으면 있는 것처럼 읽히기만 한다.
     """
     if spot.toilet:
         names = ", ".join(t.get("name", "화장실") for t in spot.toilet)
@@ -576,14 +562,9 @@ def _toilet_status(spot: spots.Spot) -> tuple[str, str, str]:
             f"화장실: {hit.toilet.name} ({hit.distance_m:.0f}m · {hit.toilet.hours})",
         )
 
-    nearest = toilet.nearest(spot.lat, spot.lon)
-    if nearest is None:
-        return "화장실 없음", "warn", "화장실: 확인된 곳이 없어요"
-    km = nearest.distance_m / 1000.0
     return (
-        f"화장실 {km:.1f}km", "warn",
-        f"화장실: 근처에 없어요 — 가장 가까운 곳이 {km:.1f}km 떨어진 "
-        f"{nearest.toilet.name}{_copula(nearest.toilet.name)}",
+        "화장실 없음", "warn",
+        f"화장실: {MAP_NEARBY_M:.0f}m 안에 없어요",
     )
 
 

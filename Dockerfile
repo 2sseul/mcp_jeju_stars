@@ -53,6 +53,13 @@ COPY server ./server
 #   streetlight      → core/lamps.py       (가로등)
 #   jeju_spots.json  → core/spots.py       (검증된 관측지 63곳)
 #   road_graph.npz   → core/routing.py     (주행시간 — 도로 그래프 CSR)
+#   car_parking      → core/parking.py     (공영주차장 — 없으면 import 에서 죽는다)
+#   kakao_places     → core/places.py      (오름·해변 주차장. 공영이 안 담는 것들)
+#   toilet           → core/toilet.py      (공중화장실)
+#
+# **표고 격자(data/elevation)는 넣지 않는다.** 라이선스(CC BY-NC-SA)상 재배포하지
+# 않고, 도보 시간·경사는 배치가 미리 재어 jeju_spots.json 에 박아 두므로 서버가
+# 값을 읽을 일이 없다(`core/elevation.py` 가 격자 없이도 import 된다).
 # core 모듈을 새로 붙이면 여기도 같이 늘려야 한다. 빠뜨리면 모듈이 import 시점에
 # FileNotFoundError 로 죽으므로 컨테이너가 뜨자마자 드러난다.
 COPY data/ephem/de421.bsp ./data/ephem/
@@ -61,6 +68,9 @@ COPY data/light_pollution/jeju_viirs_grid.npz ./data/light_pollution/
 COPY data/streetlight ./data/streetlight
 COPY data/jeju_spots.json ./data/
 COPY data/road/jeju_road_graph.npz ./data/road/
+COPY data/car_parking ./data/car_parking
+COPY data/kakao_places ./data/kakao_places
+COPY data/toilet ./data/toilet
 
 # 예보 캐시(requests-cache) 자리. `server/path.py` 의 CACHE_DIR 과 같은 자리다.
 #

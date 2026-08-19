@@ -35,9 +35,6 @@ data/elevation
 data/cctv
 data/wifi
 data/speed_bumps
-data/kakao_places
-data/car_parking
-data/toilet
 data/candidates
 data/light_pollution/*.tif
 # 도로망 원본 30MB · 세그먼트 파일들. 서버는 jeju_road_graph.npz 만 읽는다.

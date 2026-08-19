@@ -6,7 +6,21 @@ fastmcp v2 + LangGraph · uv · Python 3.13 · 온프레미스.
 
 ## 무엇을 답하나
 
-두 가지 질의를 지원한다.
+사용자의 **질문 목적**으로 도구가 셋이다 (좌표냐 지명이냐는 입력 형태일 뿐이라
+도구를 가르지 않는다).
+
+| 도구 | 답하는 질문 | 예 |
+|---|---|---|
+| `recommend_spots` | "어디로 갈까" | "지금 근처에서 별 보기 좋은 곳", "30분 안에 갈 수 있는 곳", "등산 없는 곳" |
+| `evaluate_place` | "여기 별 보여?" | "오늘 1100고지에서 별 보여?", "지금 새별오름 가면?" |
+| `spot_details` | "거기 어때?" | "매오름 많이 걸어야 해?", "강아지랑 갈 수 있어?", "밤에 들어갈 수 있어?" |
+
+`evaluate_place` 는 **등록되지 않은 장소도 판정한다** — 좌표만 알면 날씨·광공해·박명은
+똑같이 계산된다. 출발지(현재 위치)를 주면 **주행시간도 등록 여부와 무관하게** 답한다
+(도로 그래프는 좌표만 있으면 되기 때문). 다만 주차·야간 출입·도보 난이도는 검증된
+63곳에만 있으므로, 미등록 장소는 그 정보가 **확인되지 않았음을 응답에 명시**한다.
+
+하늘 판정은 두 가지 질의를 지원한다.
 
 | 질의 | 방법 | 답 |
 |---|---|---|
@@ -30,14 +44,21 @@ fastmcp v2 + LangGraph · uv · Python 3.13 · 온프레미스.
 
 ## 도구
 
-도구는 **입력 방식으로만** 둘로 나뉜다. "한 시각이냐 밤 전체냐"는 파라미터다.
-
 ```python
-evaluate_spot(lat, lon, date=None, time=None, scope="moment")   # 좌표
-evaluate_place(query, date=None, time=None, scope="moment")     # 지명 → 지오코딩 후 동일 코어
+recommend_spots(origin=None, origin_lat=None, origin_lon=None, max_drive_minutes=None,
+                region=None, no_climb=False, max_walk_minutes=None,
+                parking_required=False, pets=False, date=None, time=None, limit=3)
+evaluate_place(query=None, lat=None, lon=None, origin=None, origin_lat=None,
+               origin_lon=None, date=None, time=None, scope="moment")
+spot_details(name, origin=None, origin_lat=None, origin_lon=None)
 ```
 
-응답은 언제나 같은 모양이다 — `verdict` / `reasons` / `numbers` / `attribution` / `as_of` / `resolved`.
+**거리는 직선거리가 아니라 실제 도로 주행시간이다.** 제주는 가운데가 한라산이라
+직선으로 25km 인 곳도 차로는 산을 넘거나 돌아가야 한다. `data/road/jeju_road_graph.npz`
+(주행 가능 도로 22.6만 노드) 위에서 다익스트라로 최단 시간을 푼다 — 정체를 따지지
+않는 야간 자유주행 기준이라 외부 교통 API 없이 온프레미스로 돈다.
+
+응답은 언제나 같은 모양이다 — `verdict` / `reasons` / `numbers` / `attribution` / `as_of` / `resolved` / `spots`.
 `numbers`는 구조화 수치를 문장과 분리해 **LLM이 숫자를 지어내지 못하게** 한다.
 
 ## 실행
@@ -45,6 +66,13 @@ evaluate_place(query, date=None, time=None, scope="moment")     # 지명 → 지
 ```bash
 uv sync
 uv run python -m server.app            # → http://127.0.0.1:8000/mcp
+```
+
+컨테이너로도 뜬다. 이미지에는 서버가 실제로 읽는 데이터만 들어간다(약 26MB).
+
+```bash
+docker build -t jeju-star .
+docker run --rm -p 8000:8000 jeju-star  # → http://127.0.0.1:8000/mcp
 ```
 
 서버는 키가 없어도 뜬다 — 판정에 쓰는 데이터가 전부 로컬 파일이거나 무인증 API 이기

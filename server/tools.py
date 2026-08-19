@@ -725,55 +725,67 @@ def _walk_layers(spot: spots.Spot) -> list[tuple[list[tuple[float, float]], str,
     ]
 
 
-def _spot_map(spot: spots.Spot, route=None) -> str | None:
-    """검증된 관측지 한 곳의 지도 — 도보 경로 + 주차·화장실.
+def _facility_markers(
+    spot: spots.Spot,
+    placed: dict[str, list[tuple[float, float]]],
+) -> list[Marker]:
+    """관측지 하나에 딸린 주차·화장실 마커. `placed` 에 찍은 자리를 쌓아 간다.
 
-    **주행 경로는 그리지 않는다.** 제주를 가로지르는 선이 들어오면 지도가 섬 전체로
-    줌아웃되어, 정작 봐야 할 도보 경로와 계단 구간이 점으로 뭉개진다. 주행시간은
-    숫자와 문장으로 답하고(`numbers.drive`·설명 줄), 지도는 도착한 다음을 맡는다.
+    검증분(`jeju_spots.json`)이 먼저다 — 사람이 "이 관측지에 쓰는 자리"로 확인한
+    것이라 이름·요금이 정확하다. 그다음 반경 안에 있는 것을 얹는다. 검증분은 하나뿐인
+    경우가 많은데 옆에 다른 주차장·화장실이 있으면 그것도 선택지이기 때문이다.
 
-    편의시설은 **사람이 확인한 것**을 쓴다(반경 검색이 아니라 `jeju_spots.json`).
-    확인된 자리가 그 관측지에 실제로 쓰는 자리이기 때문이다.
+    같은 곳인지는 **갈래 안에서만** 따진다. 주차장 20m 옆 화장실은 주차장의 중복이
+    아니라 다른 시설이다 — 갈래를 안 가리고 걸렀더니 성판악 주차장에서 500m 안
+    화장실 3곳 중 2곳이 지워졌다.
+
+    `placed` 를 밖에서 받는 것은 **여러 곳을 한 장에 그릴 때** 필요해서다. 가까운
+    관측지 둘이 같은 화장실을 공유하면 핀이 두 번 찍힌다.
     """
-    markers = [Marker(spot.lat, spot.lon, "spot", spot.name, _where(spot))]
-    walk_segments = _walk_layers(spot)
+    out: list[Marker] = []
+
+    def _put(marker: Marker) -> None:
+        same = placed.setdefault(marker.kind, [])
+        if any(_haversine_m(marker.lat, marker.lon, a, b) < 50.0 for a, b in same):
+            return
+        same.append((marker.lat, marker.lon))
+        out.append(marker)
 
     for lot in spot.parking:
         if lot.get("lat") is None or lot.get("lon") is None:
             continue
-        markers.append(Marker(
+        _put(Marker(
             float(lot["lat"]), float(lot["lon"]), "parking",
             lot.get("name", "주차장"), lot.get("fee", ""),
         ))
     for wc in spot.toilet:
         if wc.get("lat") is None or wc.get("lon") is None:
             continue
-        markers.append(Marker(
+        _put(Marker(
             float(wc["lat"]), float(wc["lon"]), "toilet", wc.get("name", "화장실"),
         ))
-
-    # 사람이 확인한 것 **말고도** 반경 안에 있는 것을 얹는다. 검증분은 "이 관측지에
-    # 쓰는 자리"라 하나뿐인 경우가 많은데, 옆에 다른 주차장·화장실이 있으면 그것도
-    # 선택지다.
-    #
-    # 같은 곳인지는 **갈래 안에서만** 따진다. 주차장 20m 옆 화장실은 주차장의 중복이
-    # 아니라 다른 시설이다 — 갈래를 안 가리고 걸렀더니 성판악 주차장에서 500m 안
-    # 화장실 3곳 중 2곳이 지워졌다.
-    placed: dict[str, list[tuple[float, float]]] = {}
-    for m in markers:
-        placed.setdefault(m.kind, []).append((m.lat, m.lon))
     for extra in _amenity_markers(spot.lat, spot.lon, MAP_NEARBY_M):
-        same = placed.setdefault(extra.kind, [])
-        if any(_haversine_m(extra.lat, extra.lon, a, b) < 50.0 for a, b in same):
-            continue
-        same.append((extra.lat, extra.lon))
-        markers.append(extra)
+        _put(extra)
+    return out
+
+
+def _spot_map(spot: spots.Spot, route=None) -> str | None:
+    """검증된 관측지 한 곳의 지도 — 도보 경로 + 주차·화장실.
+
+    **주행 경로는 그리지 않는다.** 제주를 가로지르는 선이 들어오면 지도가 섬 전체로
+    줌아웃되어, 정작 봐야 할 도보 경로와 계단 구간이 점으로 뭉개진다. 주행시간은
+    숫자와 문장으로 답하고(`numbers.drive`·설명 줄), 지도는 도착한 다음을 맡는다.
+    """
+    markers = [Marker(spot.lat, spot.lon, "spot", spot.name, _where(spot))]
+    placed = {"spot": [(spot.lat, spot.lon)]}
+    markers.extend(_facility_markers(spot, placed))
+
     # 설명 문단을 따로 두지 않는다 — 목록 한 줄의 조각(차 N분·도보 N분·계단…)이
     # 같은 내용을 이미 말한다. 두 번 적으면 패널만 길어진다.
     return maps.write(
         title=f"{spot.name} 도착 이후",
         markers=markers,
-        walk_segments=walk_segments,
+        walk_segments=_walk_layers(spot),
         items=[_spot_item(spot, spot.name, route)],
     )
 
@@ -1031,6 +1043,12 @@ def recommend_spots(
         Marker(s.lat, s.lon, "spot", f"{i}. {s.name}", _where(s), glyph=str(i))
         for i, (s, _) in enumerate(top, start=1)
     ]
+    # 곳마다 주차·화장실도 함께 찍는다. 눌러서 들여다볼 때 "여기 어디에 세우나"가
+    # 바로 보여야 고를 수 있다. `placed` 를 하나로 돌려, 가까운 두 곳이 같은 화장실을
+    # 공유해도 핀이 두 번 찍히지 않게 한다.
+    placed = {"spot": [(s.lat, s.lon) for s, _ in top]}
+    for s, _ in top:
+        markers.extend(_facility_markers(s, placed))
     items = [
         _spot_item(s, f"{i}. {s.name}", routes.get(s.name))
         for i, (s, _) in enumerate(top, start=1)

@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 
 from server import path
-from server.core import trail
+from server.core import elevation, trail
 
 #: `walk_type` 이 이 말로 시작하면 오르막 산행이 필요한 곳으로 본다.
 #: 63곳 중 "평지" 45 · "등반" 14 · 나머지 3곳은 "평지 + 계단" 류의 서술이라
@@ -36,6 +36,23 @@ _CLIMB_PREFIX = "등반"
 #: `night_access` 가 이 값이면 야간에 언제든 들어갈 수 있다. 63곳 중 55곳이 여기고,
 #: 나머지 8곳은 전부 조건이 붙은 자유 문장이라 "확인 필요"로 남긴다.
 _ALWAYS_OPEN = "상시 개방"
+
+#: 방위를 재는 기준점 — 제주 행정구역 범위(`tools._LAT_MIN` 등)의 한가운데.
+#: 한라산 정상을 쓰지 않는 것은, 정상이 섬 중심에서 남쪽으로 치우쳐 있어 북쪽
+#: 관측지가 실제보다 더 북쪽으로 읽히기 때문이다.
+_CENTER_LAT = (33.1908 + 33.5639) / 2
+_CENTER_LON = (126.1452 + 126.9723) / 2
+
+#: 8방위. 데이터의 `region` 은 동·서·남·북·중산간 다섯뿐이라 "남"이 실제로는 남서인
+#: 곳이 많다 — 63곳 중 24곳이 그렇다(송악산·용머리해안·알뜨르비행장 등이 '남'인데
+#: 남서다). 어디쯤인지를 말할 때는 좌표에서 잰 이 값을 쓴다.
+_BEARINGS = ("북", "북동", "동", "남동", "남", "남서", "서", "북서")
+
+#: 도보 시간에 얹는 여유(분/km). Márquez-Pérez(2017)가 밝힌 오차의 **위쪽 끝**을
+#: 그대로 쓴다(`elevation.WALK_ERROR_MIN_PER_KM[1]`). 중앙값을 그대로 내보내면
+#: 절반은 늦는다 — 밤에 초행으로 걷는 사람에게는 늦는 쪽이 위험하다.
+#: 없는 계수를 지어내지 않고, 논문이 스스로 밝힌 폭을 쓴다.
+WALK_MARGIN_MIN_PER_KM: float = elevation.WALK_ERROR_MIN_PER_KM[1]
 
 #: 도보 구간의 갈래. 지도에서 색으로 가르는 축이라 **밟는 것** 순으로 본다 —
 #: 같은 흙길이라도 계단이 놓였으면 밟는 것은 계단이다.
@@ -94,13 +111,20 @@ class Spot:
     access: str | None
     walk_type: str | None
     #: 주차 지점에서 관측 지점까지 **편도** 도보 시간(분). 경로가 여럿이면
-    #: 가장 오래 걸리는 것 — 아래 세 항목과 함께 '가장 힘든 경로 기준'이다.
+    #: 가장 오래 걸리는 것 — 아래 항목들과 함께 '가장 힘든 경로 기준'이다.
+    #: 이건 논문 함수가 낸 **중앙값**이라 절반은 이보다 늦는다.
     walk_minutes: float | None
+    #: 위 값에 논문의 오차 폭(2.3분/km)을 얹은 **보수적** 시간. 계획은 이 값으로
+    #: 세운다 — 밤에 초행으로 걷는 사람에게는 늦는 쪽이 위험하다.
+    walk_minutes_safe: float | None
     walk_climb_m: float | None
     walk_terrain: str | None
     #: 대표 경로에 깔린 목재계단 길이(m). 0 이면 계단이 없다는 **확인된 사실**이고,
     #: None 이면 재지 않았다는 뜻이다 — 둘을 같게 보이면 안 된다.
     walk_stair_m: float | None
+    #: 좌표에서 잰 8방위(북·북동·동·남동·남·남서·서·북서). 데이터의 `region` 이
+    #: 네 방위뿐이라 "남"이 실제로는 남서인 곳이 많아, 어디쯤인지는 이 값으로 말한다.
+    bearing: str
     #: 국립공원공단 탐방로 등급(매우쉬움~매우어려움). 네 항목 중 하나라도 비면
     #: None — 짐작으로 채우면 밤에 초행으로 걷는 사람이 그 짐작을 읽는다.
     trail_grade: str | None
@@ -170,8 +194,8 @@ def _walk_worst(routes: list[dict] | None) -> dict:
         {"minutes", "climb_m", "terrain", "stair_m", "grade"} — 못 재면 그 항목은 None.
     """
     out: dict = {
-        "minutes": None, "climb_m": None, "terrain": None,
-        "stair_m": None, "grade": None,
+        "minutes": None, "minutes_safe": None, "climb_m": None,
+        "terrain": None, "stair_m": None, "grade": None,
     }
     if not routes:
         return out
@@ -183,6 +207,16 @@ def _walk_worst(routes: list[dict] | None) -> dict:
     out["minutes"] = _max("minutes")
     out["climb_m"] = _max("climb_m")
     out["stair_m"] = _max("stair_m")
+
+    # 보수적 시간 — 가장 오래 걸리는 경로의 시간에 그 경로 길이만큼 여유를 얹는다.
+    longest_by_time = max(routes, key=lambda r: r.get("minutes") or 0.0)
+    base = longest_by_time.get("minutes")
+    over_m = longest_by_time.get("over_m")
+    if base is not None:
+        margin = 0.0
+        if over_m is not None:
+            margin = WALK_MARGIN_MIN_PER_KM * float(over_m) / 1000.0
+        out["minutes_safe"] = round(float(base) + margin, 1)
 
     # 지형은 값이 아니라 이름이라 최댓값이 없다. 가장 오래 걸리는 경로의 것을 쓴다.
     longest = max(routes, key=lambda r: r.get("minutes") or 0.0)
@@ -263,8 +297,17 @@ def _segments_of(routes: list[dict] | None) -> tuple[WalkSegment, ...]:
     return tuple(out)
 
 
+def _bearing_of(lat: float, lon: float) -> str:
+    """섬 한가운데에서 본 8방위. 북이 0도이고 시계방향으로 잰다."""
+    dy = lat - _CENTER_LAT
+    dx = (lon - _CENTER_LON) * math.cos(math.radians(_CENTER_LAT))
+    angle = (math.degrees(math.atan2(dx, dy)) + 360.0) % 360.0
+    return _BEARINGS[int((angle + 22.5) % 360.0 // 45)]
+
+
 def _to_spot(raw: dict) -> Spot:
     walk = _walk_worst(raw.get("walk_routes"))
+    lat, lon = float(raw["lat"]), float(raw["lon"])
     return Spot(
         name=raw["name_ko"],
         name_en=raw.get("name_en"),
@@ -276,7 +319,9 @@ def _to_spot(raw: dict) -> Spot:
         notes=raw.get("notes", ""),
         access=raw.get("access"),
         walk_type=raw.get("walk_type"),
+        bearing=_bearing_of(lat, lon),
         walk_minutes=walk["minutes"],
+        walk_minutes_safe=walk["minutes_safe"],
         walk_climb_m=walk["climb_m"],
         walk_terrain=walk["terrain"],
         walk_stair_m=walk["stair_m"],

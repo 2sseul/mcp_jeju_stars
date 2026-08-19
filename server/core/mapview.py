@@ -61,6 +61,27 @@ _WALK_COLORS: dict[str, str] = {
 _WALK_FALLBACK = "#94a3b8"
 
 
+#: 조각의 결 → (바탕색, 글자색). 조각이 전부 같은 회색이면 줄이 길어질수록 눈이
+#: 미끄러져 아무것도 안 읽힌다. 축마다 색을 줘 **훑어서 견주게** 한다.
+#:   drive 차로 가는 시간 · walk 걷는 시간·거리 · hard 각오해야 하는 것(계단·어려움)
+#:   warn 확인되지 않은 것(난이도 미상·주차 미확인) · plain 나머지
+_TONES: dict[str, tuple[str, str]] = {
+    "drive": ("#dbeafe", "#1d4ed8"),
+    "walk": ("#ffedd5", "#9a3412"),
+    "hard": ("#fee2e2", "#b91c1c"),
+    "warn": ("#fef9c3", "#854d0e"),
+    "plain": ("#eef2f7", "#334155"),
+}
+
+
+@dataclass(frozen=True)
+class Fact:
+    """목록 한 줄의 조각 하나 — 짧은 말과 그 결."""
+
+    text: str
+    tone: str = "plain"
+
+
 @dataclass(frozen=True)
 class Item:
     """목록 박스의 한 줄 — 어느 점이 무엇인지, 무엇을 각오해야 하는지.
@@ -79,7 +100,7 @@ class Item:
     #: 이름 아래 회색 한 줄(지역·유형 등).
     sub: str = ""
     #: 한눈에 견줄 짧은 조각들.
-    facts: tuple[str, ...] = ()
+    facts: tuple[Fact, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -151,7 +172,14 @@ def render(
                 "lat": it.lat,
                 "lon": it.lon,
                 "sub": it.sub,
-                "facts": list(it.facts),
+                "facts": [
+                    {
+                        "text": f.text,
+                        "bg": _TONES.get(f.tone, _TONES["plain"])[0],
+                        "fg": _TONES.get(f.tone, _TONES["plain"])[1],
+                    }
+                    for f in it.facts
+                ],
             }
             for it in (items or [])
         ],
@@ -233,8 +261,8 @@ _TEMPLATE = """<!doctype html>
   .row .sb {{ font-size:11px; color:var(--ink-2); margin-top:1px; }}
   .row .fx {{ display:flex; flex-wrap:wrap; gap:3px 5px; margin-top:5px; }}
   .row .fx b {{
-    font-weight:600; font-size:10.5px; background:#eef2f7; color:#334155;
-    border-radius:4px; padding:2px 5px;
+    font-weight:650; font-size:10.5px; border-radius:4px; padding:2px 6px;
+    white-space:nowrap;
   }}
   @media (max-width: 640px) {{
     .list {{
@@ -330,7 +358,9 @@ if (D.items.length) {{
     const fx = row.querySelector('.fx');
     it.facts.forEach(f => {{
       const tag = document.createElement('b');
-      tag.textContent = f;
+      tag.textContent = f.text;
+      tag.style.background = f.bg;
+      tag.style.color = f.fg;
       fx.appendChild(tag);
     }});
     row.addEventListener('click', () => map.setView([it.lat, it.lon], 16));

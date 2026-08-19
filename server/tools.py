@@ -43,7 +43,7 @@ from zoneinfo import ZoneInfo
 from server import maps
 from server.clients.geocode import geocode
 from server.core import astro, darkness, parking, places, routing, spots, toilet
-from server.core.mapview import Item, Marker
+from server.core.mapview import Fact, Item, Marker
 from server.engine import graph
 from server.schema import Response
 
@@ -390,8 +390,12 @@ def _spot_row(s: spots.Spot, *, detail: bool = False, route=None) -> dict:
         "walk_minutes": (
             round(s.walk_minutes, 1) if s.walk_minutes is not None else None
         ),
+        "walk_minutes_safe": (
+            round(s.walk_minutes_safe, 1) if s.walk_minutes_safe is not None else None
+        ),
         "walk_stair_m": s.walk_stair_m,
         "trail_grade": s.trail_grade,
+        "bearing": s.bearing,
         "night_access": s.night_access,
         "parking": len(s.parking),
     }
@@ -424,16 +428,28 @@ def _spot_row(s: spots.Spot, *, detail: bool = False, route=None) -> dict:
 
 
 def _walk_phrase(s: spots.Spot) -> str:
-    """도보 구간을 한 문장으로. 실측값이 있으면 분 단위로 말한다."""
-    if s.walk_minutes is None:
+    """도보 구간을 한 문장으로. 시간은 **보수적** 값으로 말한다.
+
+    논문 함수가 낸 중앙값을 그대로 주면 절반은 그보다 늦는다. 밤에 초행으로 걷는
+    사람에게는 늦는 쪽이 위험하므로 오차 폭을 얹은 값을 앞세우고, 잰 값도 함께 적어
+    어디서 온 숫자인지 보이게 한다(`spots.WALK_MARGIN_MIN_PER_KM`).
+    """
+    minutes = s.walk_minutes_safe or s.walk_minutes
+    if minutes is None:
         return f"도보: {s.walk_type or '정보 없음'}"
-    if s.walk_minutes < 1:
+    if minutes < 1:
         return f"주차 후 바로 관측 가능해요 ({s.walk_type or '평지'})"
+
+    detail = [s.walk_type or "정보 없음"]
+    if s.walk_climb_m:
+        detail.append(f"오르막 {s.walk_climb_m:.0f}m")
+    if s.walk_stair_m:
+        detail.append(f"계단 {s.walk_stair_m:.0f}m")
+    if s.trail_grade:
+        detail.append(f"난이도 {s.trail_grade}")
     return (
-        f"주차장에서 편도 약 {s.walk_minutes:.0f}분 걸어요 "
-        f"({s.walk_type or '정보 없음'}"
-        + (f", 고도차 {s.walk_climb_m:.0f}m" if s.walk_climb_m else "")
-        + ")"
+        f"주차장에서 편도 약 {minutes:.0f}분 걸어요 "
+        f"(넉넉히 잡은 값 · 잰 값 {s.walk_minutes:.0f}분, " + ", ".join(detail) + ")"
     )
 
 
@@ -443,8 +459,15 @@ def _walk_phrase(s: spots.Spot) -> str:
 # 것은 "어느 길로, 어디에 세우고, 거기서 얼마나 걷나"이고 그건 선으로 보여야 한다.
 
 #: 등록되지 않은 자리에서 편의시설을 훑는 반경(m). `toilet.WALK_M` 과 같은 값이다 —
-#: 차를 두고 다녀올 수 있고 밤에 손전등 하나로 오갈 만한 거리.
+#: 차를 두고 다녀올 수 있고 밤에 손전등 하나로 오갈 만한 거리. **"있어요"라고 말하는
+#: 기준**이라 넉넉히 잡지 않는다.
 NEARBY_M: float = toilet.WALK_M
+
+#: 지도에 **대안으로 찍어 두는** 반경(m). 말로 "있어요"라고 하는 것과 지도에 점을
+#: 찍어 두는 것은 다르다 — 점은 "차를 옮기면 여기도 있다"까지 포함해도 오해가 없다.
+#: 200m 로는 63곳 중 5곳에만 대안이 뜨고, 500m 면 22곳에 뜬다(1km 는 주차장만 129개라
+#: 지도가 점으로 덮인다).
+MAP_NEARBY_M: float = 500.0
 
 
 def _amenity_markers(lat: float, lon: float, radius_m: float) -> list[Marker]:
@@ -497,33 +520,73 @@ def _amenity_reason(markers: list[Marker], radius_m: float) -> str:
     return f"반경 {radius_m:.0f}m 안에 " + " · ".join(parts) + "이 있어요"
 
 
-def _spot_facts(spot: spots.Spot, route=None) -> tuple[str, ...]:
+#: 각오해야 하는 쪽으로 넘어가는 문턱. 이보다 길면 계단을 붉게 표시한다.
+#: 100m 는 아파트 30층 계단에 해당한다 — 밤에 짐을 들고 오르면 준비가 달라진다.
+_STAIR_HARD_M: float = 100.0
+
+#: 이 등급부터는 '각오해야 하는 것'으로 본다(국립공원공단 5등급 중 위 둘).
+_HARD_GRADES: tuple[str, ...] = ("어려움", "매우어려움")
+
+
+def _spot_facts(spot: spots.Spot, route=None) -> tuple[Fact, ...]:
     """관측지 한 곳을 한눈에 견줄 짧은 조각들로.
 
-    문장이 아니라 조각인 것은 **여러 곳을 나란히 놓고 고르기 위해서**다. "차 24분 ·
-    도보 31분 · 계단 261m · 난이도 어려움"이 줄 맞춰 보여야 어디가 덜 힘든지 보인다.
+    문장이 아니라 조각인 것은 **여러 곳을 나란히 놓고 고르기 위해서**다. 조각마다
+    결(색)을 주는 것도 같은 이유다 — 전부 같은 회색이면 줄이 길어질수록 눈이 미끄러져
+    아무것도 안 읽힌다. 파랑은 차, 주황은 걷기, 빨강은 각오해야 하는 것, 노랑은
+    확인되지 않은 것이다.
 
     **모르는 것은 빼지 않고 '미상'으로 적는다.** 등급을 못 낸 곳(63곳 중 22곳)을 그냥
     비우면 "쉬운가 보다"로 읽힌다. 계단은 0m 도 적는다 — '없음'은 확인된 사실이다.
+
+    도보는 논문 오차를 얹은 **보수적** 값을 쓴다(`spots.WALK_MARGIN_MIN_PER_KM`).
+    중앙값을 그대로 내보내면 절반은 그보다 늦는다.
     """
-    facts: list[str] = []
+    facts: list[Fact] = []
     if route is not None:
-        facts.append(f"차 {route.minutes:.0f}분")
-    if spot.walk_minutes is not None:
-        facts.append(f"도보 {spot.walk_minutes:.0f}분")
+        facts.append(Fact(f"차 {route.minutes:.0f}분", "drive"))
+
+    minutes = spot.walk_minutes_safe or spot.walk_minutes
+    if minutes is not None:
+        facts.append(Fact(f"도보 {minutes:.0f}분", "walk"))
     if spot.walk_climb_m:
-        facts.append(f"오름 {spot.walk_climb_m:.0f}m")
+        facts.append(Fact(f"오르막 {spot.walk_climb_m:.0f}m", "walk"))
+
     if spot.walk_stair_m is not None:
-        facts.append(
-            "계단 없음" if spot.walk_stair_m == 0
-            else f"계단 {spot.walk_stair_m:.0f}m"
-        )
-    facts.append(f"난이도 {spot.trail_grade}" if spot.trail_grade else "난이도 미상")
+        if spot.walk_stair_m == 0:
+            facts.append(Fact("계단 없음", "plain"))
+        else:
+            tone = "hard" if spot.walk_stair_m >= _STAIR_HARD_M else "walk"
+            facts.append(Fact(f"계단 {spot.walk_stair_m:.0f}m", tone))
+    else:
+        facts.append(Fact("계단 미상", "warn"))
+
+    if spot.trail_grade:
+        tone = "hard" if spot.trail_grade in _HARD_GRADES else "plain"
+        facts.append(Fact(f"난이도 {spot.trail_grade}", tone))
+    else:
+        facts.append(Fact("난이도 미상", "warn"))
+
     if not spot.always_open:
-        facts.append("야간출입 확인필요")
+        facts.append(Fact("야간출입 확인필요", "warn"))
     if not spot.has_parking:
-        facts.append("주차 미확인")
+        facts.append(Fact("주차 미확인", "warn"))
     return tuple(facts)
+
+
+def _where(spot: spots.Spot) -> str:
+    """어디쯤인지 한 줄. 좌표에서 잰 8방위를 쓴다.
+
+    데이터의 `region` 을 그대로 쓰면 "남·오름"처럼 붙어 읽히고, 그보다 나쁜 것은
+    **틀린다**는 점이다 — 63곳 중 24곳에서 네 방위 표기가 실제 방위와 다르다.
+    송악산·용머리해안은 '남'으로 적혀 있지만 남서쪽이다.
+
+    `중산간` 은 방위가 아니라 높이라, 있으면 방위와 함께 적는다.
+    """
+    where = f"{spot.bearing}쪽"
+    if spot.region == "중산간":
+        where += " 중산간"
+    return f"{where} · {spot.kind}"
 
 
 def _spot_item(spot: spots.Spot, label: str, route=None) -> Item:
@@ -532,7 +595,7 @@ def _spot_item(spot: spots.Spot, label: str, route=None) -> Item:
         label=label,
         lat=spot.lat,
         lon=spot.lon,
-        sub=f"{spot.region}·{spot.kind}",
+        sub=_where(spot),
         facts=_spot_facts(spot, route),
     )
 
@@ -563,6 +626,16 @@ def _spot_map(spot: spots.Spot, route=None) -> str | None:
         markers.append(Marker(
             float(wc["lat"]), float(wc["lon"]), "toilet", wc.get("name", "화장실"),
         ))
+
+    # 사람이 확인한 것 **말고도** 반경 안에 있는 것을 얹는다. 검증분은 "이 관측지에
+    # 쓰는 자리"라 하나뿐인 경우가 많은데, 옆에 다른 주차장·화장실이 있으면 그것도
+    # 선택지다. 이미 찍은 자리와 50m 안이면 같은 곳으로 보고 건너뛴다.
+    placed = [(m.lat, m.lon) for m in markers]
+    for extra in _amenity_markers(spot.lat, spot.lon, MAP_NEARBY_M):
+        if any(_haversine_m(extra.lat, extra.lon, a, b) < 50.0 for a, b in placed):
+            continue
+        placed.append((extra.lat, extra.lon))
+        markers.append(extra)
     caption_parts = []
     if route is not None:
         caption_parts.append(f"차로 약 {route.minutes:.0f}분 / {route.km:.0f}km")

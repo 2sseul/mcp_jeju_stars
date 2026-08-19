@@ -528,6 +528,53 @@ _STAIR_HARD_M: float = 100.0
 _HARD_GRADES: tuple[str, ...] = ("어려움", "매우어려움")
 
 
+def _copula(word: str) -> str:
+    """이름 뒤에 붙는 서술격 조사 — 받침이 있으면 '이에요', 없으면 '예요'.
+
+    한글 음절은 (초성 19 · 중성 21 · 종성 28) 순서로 배열돼 있어, 코드포인트에서
+    종성 자리를 나머지 연산으로 꺼낼 수 있다. 0이면 받침이 없다.
+    """
+    if not word:
+        return "예요"
+    last = word[-1]
+    if "가" <= last <= "힣":
+        return "예요" if (ord(last) - 0xAC00) % 28 == 0 else "이에요"
+    # 숫자·영문으로 끝나면 읽는 소리를 알 수 없으므로 조사를 붙이지 않는다.
+    return ""
+
+
+def _toilet_status(spot: spots.Spot) -> tuple[str, str, str]:
+    """화장실 상황 — (조각 글자, 결, 문장).
+
+    **없으면 없다고 적는다.** 조용히 빼면 "안 적혀 있으니 있겠지"로 읽히는데, 밤에
+    한참 걸어 올라간 뒤에 알게 되는 종류의 정보다.
+
+    없을 때는 **얼마나 먼지**까지 말한다 — "없음"과 "3.3km 밖에 있음"은 계획이 다르다
+    (`core.toilet.nearest` 가 반경과 무관하게 가장 가까운 곳을 준다).
+    """
+    if spot.toilet:
+        names = ", ".join(t.get("name", "화장실") for t in spot.toilet)
+        return "화장실 있음", "plain", f"화장실: {names}"
+
+    near = toilet.near(spot.lat, spot.lon, MAP_NEARBY_M)
+    if near:
+        hit = near[0]
+        return (
+            f"화장실 {hit.distance_m:.0f}m", "plain",
+            f"화장실: {hit.toilet.name} ({hit.distance_m:.0f}m · {hit.toilet.hours})",
+        )
+
+    nearest = toilet.nearest(spot.lat, spot.lon)
+    if nearest is None:
+        return "화장실 없음", "warn", "화장실: 확인된 곳이 없어요"
+    km = nearest.distance_m / 1000.0
+    return (
+        f"화장실 {km:.1f}km", "warn",
+        f"화장실: 근처에 없어요 — 가장 가까운 곳이 {km:.1f}km 떨어진 "
+        f"{nearest.toilet.name}{_copula(nearest.toilet.name)}",
+    )
+
+
 def _spot_facts(spot: spots.Spot, route=None) -> tuple[Fact, ...]:
     """관측지 한 곳을 한눈에 견줄 짧은 조각들로.
 
@@ -567,6 +614,9 @@ def _spot_facts(spot: spots.Spot, route=None) -> tuple[Fact, ...]:
     else:
         facts.append(Fact("난이도 미상", "warn"))
 
+    text, tone, _ = _toilet_status(spot)
+    facts.append(Fact(text, tone))
+
     if not spot.always_open:
         facts.append(Fact("야간출입 확인필요", "warn"))
     if not spot.has_parking:
@@ -600,6 +650,29 @@ def _spot_item(spot: spots.Spot, label: str, route=None) -> Item:
     )
 
 
+def _segment_note(seg: spots.WalkSegment) -> str:
+    """구간을 눌렀을 때 뜨는 한 줄 — 길이가 먼저다.
+
+    "계단"만 떠서는 각오할 양을 모른다. 10m 계단과 260m 계단은 다른 이야기다.
+    노면·경사는 원본이 잰 구간만 붙는다(짐작으로 채우지 않는다).
+    """
+    parts = [f"{seg.metres:.0f}m"]
+    if seg.surface:
+        parts.append(f"노면 {seg.surface}")
+    if seg.rock and seg.rock != "없음":
+        parts.append(seg.rock)
+    if seg.slope_deg is not None:
+        parts.append(f"경사 {seg.slope_deg:.0f}°")
+    return " · ".join(parts)
+
+
+def _walk_layers(spot: spots.Spot) -> list[tuple[list[tuple[float, float]], str, str]]:
+    """도보 구간을 지도가 받는 모양으로."""
+    return [
+        (list(g.points), g.kind, _segment_note(g)) for g in spot.walk_segments
+    ]
+
+
 def _spot_map(spot: spots.Spot, route=None) -> str | None:
     """검증된 관측지 한 곳의 지도 — 도보 경로 + 주차·화장실.
 
@@ -611,7 +684,7 @@ def _spot_map(spot: spots.Spot, route=None) -> str | None:
     확인된 자리가 그 관측지에 실제로 쓰는 자리이기 때문이다.
     """
     markers = [Marker(spot.lat, spot.lon, "spot", spot.name, spot.kind)]
-    walk_segments = [(list(g.points), g.kind) for g in spot.walk_segments]
+    walk_segments = _walk_layers(spot)
 
     for lot in spot.parking:
         if lot.get("lat") is None or lot.get("lon") is None:
@@ -901,9 +974,7 @@ def recommend_spots(
     map_url = maps.write(
         title=f"관측지 추천 {len(rows)}곳",
         markers=markers,
-        walk_segments=[
-            (list(g.points), g.kind) for s, _ in top for g in s.walk_segments
-        ],
+        walk_segments=[layer for s, _ in top for layer in _walk_layers(s)],
         caption=_recommend_verdict(rows, origin_resolved),
         items=items,
     )
@@ -1232,11 +1303,7 @@ def spot_details(name: str, origin: str | None = None,
     reasons.append(f"야간 출입: {hit.night_access or '확인 필요'}")
     if hit.pets:
         reasons.append(f"반려동물: {hit.pets}")
-    reasons.append(
-        f"화장실: {', '.join(t.get('name', '화장실') for t in hit.toilet)}"
-        if hit.toilet
-        else "화장실: 확인된 곳이 없어요"
-    )
+    reasons.append(_toilet_status(hit)[2])
     if hit.fee:
         reasons.append(f"요금: {hit.fee}")
     for c in hit.cautions:

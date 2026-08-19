@@ -154,7 +154,7 @@ def render(
     title: str,
     markers: list[Marker],
     satellite: Tiles | None = None,
-    walk_segments: list[tuple[list[tuple[float, float]], str]] | None = None,
+    walk_segments: list[tuple[list[tuple[float, float]], str, str]] | None = None,
     caption: str = "",
     items: list[Item] | None = None,
 ) -> str:
@@ -164,8 +164,9 @@ def render(
         title: 문서 제목이자 화면 왼쪽 위 제목.
         markers: 찍을 점들. 하나도 없으면 지도를 만들지 않는다(빈 문자열).
         satellite: 위성 배경. 생략하면 키가 필요 없는 기본 공급자를 쓴다.
-        walk_segments: (점렬, 갈래) 짝들. 갈래는 `계단`·`돌길`·`흙길`·`포장` 처럼
-            무엇을 밟는가이며, 색이 거기서 갈린다.
+        walk_segments: (점렬, 갈래, 설명) 짝들. 갈래는 `계단`·`돌길`·`흙길`·`포장`
+            처럼 무엇을 밟는가이며 색이 거기서 갈린다. 설명은 구간을 눌렀을 때 뜨는
+            한 줄(길이·노면·경사)이다.
         caption: 제목 아래 한 줄 설명(소요시간 등).
         items: 옆에 펼 목록. 여러 곳을 그릴 때 어디가 어디인지와 각 곳의 난이도·
             계단·도보를 한눈에 견주게 한다. 비면 목록 박스를 만들지 않는다.
@@ -201,9 +202,10 @@ def render(
             {
                 "points": _points(pts),
                 "kind": kind,
+                "note": note,
                 "color": _WALK_COLORS.get(kind, _WALK_FALLBACK),
             }
-            for pts, kind in (walk_segments or [])
+            for pts, kind, note in (walk_segments or [])
             if len(pts or []) > 1
         ],
         "items": [
@@ -359,7 +361,10 @@ D.walks.forEach(w => {{
   L.polyline(w.points, {{ color:'#ffffff', weight:8, opacity:.9 }}).addTo(map);
   L.polyline(w.points, {{
     color:w.color, weight:4, opacity:.95, dashArray:'7 6'
-  }}).bindPopup('걷는 구간: <b>' + w.kind + '</b>').addTo(map);
+  }}).bindPopup(
+    '<b>' + w.kind + '</b><span class="k">걷는 구간</span>' +
+    (w.note ? '<br>' + w.note : '')
+  ).addTo(map);
   w.points.forEach(p => bounds.push(p));
 }});
 

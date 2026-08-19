@@ -85,7 +85,7 @@ def satellite() -> Tiles:
 def write(
     title: str,
     markers: list[Marker],
-    walk_segments: list[tuple[list[tuple[float, float]], str]] | None = None,
+    walk_segments: list[tuple[list[tuple[float, float]], str, str]] | None = None,
     caption: str = "",
     items: list[Item] | None = None,
 ) -> str | None:

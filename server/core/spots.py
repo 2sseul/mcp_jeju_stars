@@ -24,6 +24,7 @@ import json
 import math
 from dataclasses import dataclass
 from functools import lru_cache
+from itertools import pairwise
 
 from server import path
 from server.core import elevation, trail
@@ -79,12 +80,19 @@ class WalkSegment:
 
     경로 전체를 한 색으로 그으면 "20분 걷는다"까지만 보이고 **어디서 계단이 시작되는지**
     가 안 보인다. 밤에 초행으로 오르는 사람에게는 그게 준비를 가르는 정보다.
+
+    길이는 원본의 `over_m` 이 아니라 **그려지는 점렬에서 직접 잰다**. 지도에 보이는
+    선과 팝업의 숫자가 어긋나면 어느 쪽을 믿어야 할지 알 수 없다.
     """
 
     points: tuple[tuple[float, float], ...]
     kind: str
     surface: str
     rock: str
+    #: 이 구간의 길이(m). 점렬을 따라 잰 값.
+    metres: float
+    #: 구간 평균 경사(도). 원본이 안 잰 구간은 None.
+    slope_deg: float | None
 
 
 def _segment_kind(surface: str, rock: str) -> str:
@@ -253,6 +261,21 @@ def _grade_of(route: dict) -> tuple[float, str] | None:
     return None if result is None else (result.score, result.grade)
 
 
+_EARTH_M = 6_371_000.0
+
+
+def _path_metres(points: tuple[tuple[float, float], ...]) -> float:
+    """점렬을 따라 잰 길이(m)."""
+    total = 0.0
+    for (a_lat, a_lon), (b_lat, b_lon) in pairwise(points):
+        p1, p2 = math.radians(a_lat), math.radians(b_lat)
+        dp = p2 - p1
+        dl = math.radians(b_lon - a_lon)
+        h = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+        total += 2 * _EARTH_M * math.asin(math.sqrt(h))
+    return total
+
+
 def _segments_of(routes: list[dict] | None) -> tuple[WalkSegment, ...]:
     """도보 경로들을 구간 단위로 편다. 점이 둘 미만인 조각은 선이 안 되므로 버린다.
 
@@ -272,9 +295,11 @@ def _segments_of(routes: list[dict] | None) -> tuple[WalkSegment, ...]:
 
         parts = route.get("segments") or []
         if not parts:
-            out.append(
-                WalkSegment(tuple(pts), WALK_UNKNOWN, surface="", rock="")
-            )
+            whole = tuple(pts)
+            out.append(WalkSegment(
+                points=whole, kind=WALK_UNKNOWN, surface="", rock="",
+                metres=_path_metres(whole), slope_deg=None,
+            ))
             continue
 
         for part in parts:
@@ -286,12 +311,15 @@ def _segments_of(routes: list[dict] | None) -> tuple[WalkSegment, ...]:
             if hi - lo < 1:
                 continue
             surface, rock = part.get("surface") or "", part.get("rock") or ""
+            piece = tuple(pts[lo : hi + 1])
             out.append(
                 WalkSegment(
-                    points=tuple(pts[lo : hi + 1]),
+                    points=piece,
                     kind=_segment_kind(surface, rock),
                     surface=surface,
                     rock=rock,
+                    metres=_path_metres(piece),
+                    slope_deg=part.get("slope_deg"),
                 )
             )
     return tuple(out)

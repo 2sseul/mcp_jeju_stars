@@ -46,9 +46,43 @@ _KINDS: dict[str, tuple[str, str, str]] = {
 }
 _FALLBACK = ("#94a3b8", "·", "지점")
 
-#: 선 색. 주행은 파랑 실선, 도보는 주황 파선 — 준비가 다른 구간이라 눈에 갈려야 한다.
+#: 주행선 색. 도보와 준비가 다른 구간이라 눈에 갈려야 한다(실선 대 파선).
 _DRIVE_COLOR = "#3b82f6"
-_WALK_COLOR = "#f59e0b"
+
+#: 도보 구간 갈래 → 색. "20분 걷는다"까지만 보이면 **어디서 계단이 시작되는지**를
+#: 모른다. 밤에 초행으로 오르는 사람에게는 그게 준비를 가르는 정보다.
+#: 밟기 힘든 순으로 색이 진해진다 — 포장(하늘) → 흙(주황) → 돌(황토) → 암반(갈색)
+#: → 계단(빨강). 모르는 구간은 회색으로, 쉬운 쪽으로 오해되지 않게 둔다.
+_WALK_COLORS: dict[str, str] = {
+    "포장": "#38bdf8",
+    "흙길": "#f59e0b",
+    "돌길": "#a16207",
+    "암반": "#b45309",
+    "계단": "#ef4444",
+    "모름": "#94a3b8",
+}
+_WALK_FALLBACK = "#94a3b8"
+
+
+@dataclass(frozen=True)
+class Item:
+    """목록 박스의 한 줄 — 어느 점이 무엇인지, 무엇을 각오해야 하는지.
+
+    여러 곳을 한 장에 그리면 마커만으로는 어디가 어디인지 모른다. 팝업은 하나씩
+    눌러야 보이므로 **한눈에 견주지 못한다** — "어디가 더 가깝고 덜 힘든가"가
+    고르는 기준인데 그게 안 보인다. 그래서 옆에 표로 편다.
+
+    facts 는 짧은 조각들이다(예: "차 24분", "도보 31분", "계단 261m", "난이도 어려움").
+    문장으로 이으면 줄이 길어져 견주기가 다시 어려워진다.
+    """
+
+    label: str
+    lat: float
+    lon: float
+    #: 이름 아래 회색 한 줄(지역·유형 등).
+    sub: str = ""
+    #: 한눈에 견줄 짧은 조각들.
+    facts: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -71,8 +105,9 @@ def render(
     title: str,
     markers: list[Marker],
     drive_path: list[tuple[float, float]] | None = None,
-    walk_paths: list[list[tuple[float, float]]] | None = None,
+    walk_segments: list[tuple[list[tuple[float, float]], str]] | None = None,
     caption: str = "",
+    items: list[Item] | None = None,
 ) -> str:
     """지도 HTML 한 장. 열기만 하면 되는 자립형 문서다.
 
@@ -80,8 +115,11 @@ def render(
         title: 문서 제목이자 화면 왼쪽 위 제목.
         markers: 찍을 점들. 하나도 없으면 지도를 만들지 않는다(빈 문자열).
         drive_path: 주행 경로 점렬. 없으면 선을 안 그린다(출발지를 안 준 경우).
-        walk_paths: 도보 경로 점렬들. 관측지에 경로가 여럿일 수 있다.
+        walk_segments: (점렬, 갈래) 짝들. 갈래는 `계단`·`돌길`·`흙길`·`포장` 처럼
+            무엇을 밟는가이며, 색이 거기서 갈린다.
         caption: 제목 아래 한 줄 설명(소요시간 등).
+        items: 옆에 펼 목록. 여러 곳을 그릴 때 어디가 어디인지와 각 곳의 난이도·
+            계단·도보를 한눈에 견주게 한다. 비면 목록 박스를 만들지 않는다.
 
     Returns:
         완결된 HTML 문자열. 마커가 하나도 없으면 빈 문자열 — 그릴 것이 없는데
@@ -104,17 +142,38 @@ def render(
             for m in markers
         ],
         "drive": _points(drive_path),
-        "walks": [_points(w) for w in (walk_paths or [])],
+        "walks": [
+            {
+                "points": _points(pts),
+                "kind": kind,
+                "color": _WALK_COLORS.get(kind, _WALK_FALLBACK),
+            }
+            for pts, kind in (walk_segments or [])
+            if len(pts or []) > 1
+        ],
+        "items": [
+            {
+                "label": it.label,
+                "lat": it.lat,
+                "lon": it.lon,
+                "sub": it.sub,
+                "facts": list(it.facts),
+            }
+            for it in (items or [])
+        ],
         "driveColor": _DRIVE_COLOR,
-        "walkColor": _WALK_COLOR,
     }
 
     # 범례는 실제로 그린 것만 싣는다. 없는 것을 범례에만 두면 "왜 안 보이지"가 된다.
     legend = []
     if data["drive"]:
         legend.append(f'<i class="ln" style="--c:{_DRIVE_COLOR}"></i>차로 가는 길')
-    if any(data["walks"]):
-        legend.append(f'<i class="ln dash" style="--c:{_WALK_COLOR}"></i>걸어 가는 길')
+    # 도보는 갈래마다 한 칸씩. 실제로 그린 갈래만, 밟기 힘든 순으로 싣는다.
+    drawn = {w["kind"] for w in data["walks"]}
+    for kind in _WALK_COLORS:
+        if kind in drawn:
+            color = _WALK_COLORS[kind]
+            legend.append(f'<i class="ln dash" style="--c:{color}"></i>{kind}')
     for kind in ("origin", "spot", "parking", "toilet"):
         if any(m.kind == kind for m in markers):
             color, glyph, label = _KINDS[kind]
@@ -166,6 +225,34 @@ _TEMPLATE = """<!doctype html>
   .leaflet-popup-content {{ margin:10px 12px; font-size:12px; line-height:1.6; }}
   .leaflet-popup-content b {{ display:block; font-size:13px; margin-bottom:2px; }}
   .leaflet-popup-content .k {{ color:#64748b; font-size:11px; }}
+  /* 목록 박스 — 여러 곳을 한눈에 견주는 표. 좁은 화면에서는 지도 아래로 내린다. */
+  .list {{
+    position:absolute; z-index:1000; top:12px; right:12px; width:290px;
+    max-height:calc(100% - 24px); overflow-y:auto;
+    background:var(--card); border-radius:10px; padding:8px;
+    box-shadow:0 2px 12px rgba(15,23,42,.16); color:var(--ink);
+  }}
+  .row {{
+    display:block; width:100%; text-align:left; border:0; background:none;
+    padding:8px 9px; border-radius:7px; cursor:pointer; font:inherit;
+  }}
+  .row:hover {{ background:#f1f5f9; }}
+  .row + .row {{ border-top:1px solid #e2e8f0; }}
+  .row .nm {{ font-size:13px; font-weight:650; }}
+  .row .sb {{ font-size:11px; color:var(--ink-2); margin-top:1px; }}
+  .row .fx {{ display:flex; flex-wrap:wrap; gap:3px 5px; margin-top:5px; }}
+  .row .fx b {{
+    font-weight:600; font-size:10.5px; background:#eef2f7; color:#334155;
+    border-radius:4px; padding:2px 5px;
+  }}
+  @media (max-width: 640px) {{
+    .list {{
+      position:static; width:auto; max-height:45%; margin:0;
+      border-radius:0; box-shadow:none; border-top:1px solid #e2e8f0;
+    }}
+    #map {{ position:absolute; inset:0 0 45% 0; }}
+    body {{ display:flex; flex-direction:column; }}
+  }}
   /* 위성 배경 위에서는 글자·컨트롤이 묻히므로 바탕을 확실히 준다. */
   .leaflet-control-layers {{ font-size:12px; }}
   .leaflet-control-attribution {{ font-size:10px; }}
@@ -178,6 +265,7 @@ _TEMPLATE = """<!doctype html>
   <p>{caption}</p>
   <div class="legend">{legend}</div>
 </div>
+<div class="list" id="list" hidden></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const D = {data};
@@ -216,15 +304,14 @@ if (D.drive.length > 1) {{
   D.drive.forEach(p => bounds.push(p));
 }}
 
-// 도보 경로 — 파선. 차로 가는 구간과 눈에 갈려야 한다.
+// 도보 경로 — 파선에 갈래별 색. 차로 가는 구간과 눈에 갈려야 하고(파선),
+// 계단이 어디서 시작되는지도 보여야 한다(색).
 D.walks.forEach(w => {{
-  if (w.length > 1) {{
-    L.polyline(w, {{ color:'#ffffff', weight:8, opacity:.9 }}).addTo(map);
-    L.polyline(w, {{
-      color:D.walkColor, weight:4, opacity:.95, dashArray:'7 6'
-    }}).addTo(map);
-    w.forEach(p => bounds.push(p));
-  }}
+  L.polyline(w.points, {{ color:'#ffffff', weight:8, opacity:.9 }}).addTo(map);
+  L.polyline(w.points, {{
+    color:w.color, weight:4, opacity:.95, dashArray:'7 6'
+  }}).bindPopup('걷는 구간: <b>' + w.kind + '</b>').addTo(map);
+  w.points.forEach(p => bounds.push(p));
 }});
 
 // 마커 — 갈래마다 색과 글자를 함께 준다(색만으로 나누지 않는다).
@@ -244,6 +331,28 @@ D.markers.forEach(m => {{
     .addTo(map);
   bounds.push([m.lat, m.lon]);
 }});
+
+// 목록 박스 — 마커만으로는 어디가 어디인지 모른다. 눌러서 그 자리로 이동한다.
+if (D.items.length) {{
+  const box = document.getElementById('list');
+  box.hidden = false;
+  D.items.forEach(it => {{
+    const row = document.createElement('button');
+    row.className = 'row';
+    row.innerHTML =
+      '<span class="nm"></span><div class="sb"></div><div class="fx"></div>';
+    row.querySelector('.nm').textContent = it.label;
+    row.querySelector('.sb').textContent = it.sub;
+    const fx = row.querySelector('.fx');
+    it.facts.forEach(f => {{
+      const tag = document.createElement('b');
+      tag.textContent = f;
+      fx.appendChild(tag);
+    }});
+    row.addEventListener('click', () => map.setView([it.lat, it.lon], 16));
+    box.appendChild(row);
+  }});
+}}
 
 if (bounds.length > 1) map.fitBounds(bounds, {{ padding:[48, 48] }});
 else map.setView(bounds[0], 15);

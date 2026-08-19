@@ -23,7 +23,7 @@ import os
 import re
 
 from server import path
-from server.core.mapview import Marker, render
+from server.core.mapview import Item, Marker, render
 
 #: 지도 파일이 쌓이는 자리. `outputs/` 아래라 커밋되지 않는다.
 MAPS_DIR = path.OUTPUTS / "maps"
@@ -48,8 +48,9 @@ def write(
     title: str,
     markers: list[Marker],
     drive_path: list[tuple[float, float]] | None = None,
-    walk_paths: list[list[tuple[float, float]]] | None = None,
+    walk_segments: list[tuple[list[tuple[float, float]], str]] | None = None,
     caption: str = "",
+    items: list[Item] | None = None,
 ) -> str | None:
     """지도를 파일로 떨어뜨리고 주소를 돌려준다. 그릴 것이 없으면 None.
 
@@ -60,8 +61,9 @@ def write(
         title=title,
         markers=markers,
         drive_path=drive_path,
-        walk_paths=walk_paths,
+        walk_segments=walk_segments,
         caption=caption,
+        items=items,
     )
     if not document:
         return None

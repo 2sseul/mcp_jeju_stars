@@ -315,7 +315,8 @@ def test_출발지가_없으면_주행선을_긋지_않는다():
 def test_등록된_곳은_사람이_확인한_주차_화장실을_쓴다():
     # Given: 주차·화장실이 확인된 관측지에서
     spot = next(
-        s for s in tools.spots.all_spots() if s.parking and s.toilet and s.walk_paths
+        s for s in tools.spots.all_spots()
+        if s.parking and s.toilet and s.walk_segments
     )
     result = spot_details(spot.name)
     document = tools.maps.read(result["map_url"].rsplit("/", 1)[-1]) or ""
@@ -323,7 +324,7 @@ def test_등록된_곳은_사람이_확인한_주차_화장실을_쓴다():
     # Then: 그 곳의 확인된 자리와 도보 경로가 실린다. 반경 검색이 아니라 검증분을
     #       쓰는 것은, 확인된 자리가 그 관측지에 실제로 쓰는 자리이기 때문이다
     assert spot.parking[0]["name"] in document
-    assert '"walks": [[' in document
+    assert '"points":' in document
 
 
 def test_미등록_장소는_반경_안_편의시설만_표기한다(_no_weather):

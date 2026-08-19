@@ -43,7 +43,7 @@ from zoneinfo import ZoneInfo
 from server import maps
 from server.clients.geocode import geocode
 from server.core import astro, darkness, parking, places, routing, spots, toilet
-from server.core.mapview import Marker
+from server.core.mapview import Item, Marker
 from server.engine import graph
 from server.schema import Response
 
@@ -390,6 +390,8 @@ def _spot_row(s: spots.Spot, *, detail: bool = False, route=None) -> dict:
         "walk_minutes": (
             round(s.walk_minutes, 1) if s.walk_minutes is not None else None
         ),
+        "walk_stair_m": s.walk_stair_m,
+        "trail_grade": s.trail_grade,
         "night_access": s.night_access,
         "parking": len(s.parking),
     }
@@ -495,6 +497,46 @@ def _amenity_reason(markers: list[Marker], radius_m: float) -> str:
     return f"반경 {radius_m:.0f}m 안에 " + " · ".join(parts) + "이 있어요"
 
 
+def _spot_facts(spot: spots.Spot, route=None) -> tuple[str, ...]:
+    """관측지 한 곳을 한눈에 견줄 짧은 조각들로.
+
+    문장이 아니라 조각인 것은 **여러 곳을 나란히 놓고 고르기 위해서**다. "차 24분 ·
+    도보 31분 · 계단 261m · 난이도 어려움"이 줄 맞춰 보여야 어디가 덜 힘든지 보인다.
+
+    **모르는 것은 빼지 않고 '미상'으로 적는다.** 등급을 못 낸 곳(63곳 중 22곳)을 그냥
+    비우면 "쉬운가 보다"로 읽힌다. 계단은 0m 도 적는다 — '없음'은 확인된 사실이다.
+    """
+    facts: list[str] = []
+    if route is not None:
+        facts.append(f"차 {route.minutes:.0f}분")
+    if spot.walk_minutes is not None:
+        facts.append(f"도보 {spot.walk_minutes:.0f}분")
+    if spot.walk_climb_m:
+        facts.append(f"오름 {spot.walk_climb_m:.0f}m")
+    if spot.walk_stair_m is not None:
+        facts.append(
+            "계단 없음" if spot.walk_stair_m == 0
+            else f"계단 {spot.walk_stair_m:.0f}m"
+        )
+    facts.append(f"난이도 {spot.trail_grade}" if spot.trail_grade else "난이도 미상")
+    if not spot.always_open:
+        facts.append("야간출입 확인필요")
+    if not spot.has_parking:
+        facts.append("주차 미확인")
+    return tuple(facts)
+
+
+def _spot_item(spot: spots.Spot, label: str, route=None) -> Item:
+    """관측지를 목록 박스 한 줄로."""
+    return Item(
+        label=label,
+        lat=spot.lat,
+        lon=spot.lon,
+        sub=f"{spot.region}·{spot.kind}",
+        facts=_spot_facts(spot, route),
+    )
+
+
 def _origin_marker(resolved: dict | None, lat: float, lon: float) -> Marker:
     name = (resolved or {}).get("display_name") or "출발지"
     return Marker(lat, lon, "origin", str(name))
@@ -512,7 +554,7 @@ def _spot_map(
     확인된 자리가 그 관측지에 실제로 쓰는 자리이기 때문이다.
     """
     markers = [Marker(spot.lat, spot.lon, "spot", spot.name, spot.kind)]
-    walk_paths: list[list[tuple[float, float]]] = []
+    walk_segments = [(list(g.points), g.kind) for g in spot.walk_segments]
 
     for lot in spot.parking:
         if lot.get("lat") is None or lot.get("lon") is None:
@@ -527,8 +569,6 @@ def _spot_map(
         markers.append(Marker(
             float(wc["lat"]), float(wc["lon"]), "toilet", wc.get("name", "화장실"),
         ))
-    walk_paths.extend(list(pts) for pts in spot.walk_paths)
-
     drive_path = None
     caption_parts = []
     if origin is not None:
@@ -542,8 +582,9 @@ def _spot_map(
         title=f"{spot.name} 가는 길",
         markers=markers,
         drive_path=drive_path,
-        walk_paths=walk_paths,
+        walk_segments=walk_segments,
         caption=" · ".join(caption_parts),
+        items=[_spot_item(spot, spot.name, route)],
     )
 
 
@@ -798,6 +839,10 @@ def recommend_spots(
         Marker(s.lat, s.lon, "spot", f"{i}. {s.name}", f"{s.region}·{s.kind}")
         for i, (s, _) in enumerate(top, start=1)
     ]
+    items = [
+        _spot_item(s, f"{i}. {s.name}", routes.get(s.name))
+        for i, (s, _) in enumerate(top, start=1)
+    ]
     drive_path = None
     if origin_resolved is not None and top:
         o = (float(origin_resolved["lat"]), float(origin_resolved["lon"]))
@@ -807,8 +852,11 @@ def recommend_spots(
         title=f"관측지 추천 {len(rows)}곳",
         markers=markers,
         drive_path=drive_path,
-        walk_paths=[list(p) for s, _ in top for p in s.walk_paths],
+        walk_segments=[
+            (list(g.points), g.kind) for s, _ in top for g in s.walk_segments
+        ],
         caption=_recommend_verdict(rows, origin_resolved),
+        items=items,
     )
 
     reasons = _recommend_reasons(top, routes)

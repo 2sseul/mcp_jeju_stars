@@ -20,6 +20,9 @@ from server.core.mapview import Marker
 SPOT = Marker(33.3663, 126.3576, "spot", "새별오름", "오름")
 PARK = Marker(33.3651, 126.3611, "parking", "새별오름 주차장", "무료")
 WALK = [(33.3651, 126.3611), (33.3658, 126.3595), (33.3663, 126.3576)]
+#: (점렬, 갈래) — 지도는 갈래로 색을 가른다.
+WALK_DIRT = [(WALK, "흙길")]
+WALK_MIXED = [(WALK, "흙길"), (WALK[:2], "계단")]
 DRIVE = [(33.5070, 126.4930), (33.4500, 126.4200), (33.3651, 126.3611)]
 
 
@@ -49,23 +52,26 @@ def test_경로가_없으면_선을_긋지_않는다():
     assert data["walks"] == []
 
 
-def test_범례는_실제로_그린_것만_싣는다():
-    # Given: 도보 경로만 있고 주행 경로는 없을 때
-    document = mapview.render("도보만", [SPOT, PARK], walk_paths=[WALK])
+def test_범례는_실제로_그린_갈래만_싣는다():
+    # Given: 흙길과 계단이 섞인 도보 경로만 있을 때(주행 경로는 없다)
+    document = mapview.render("도보만", [SPOT, PARK], walk_segments=WALK_MIXED)
     # When: 범례를 보면
-    # Then: "걸어 가는 길"은 있고 "차로 가는 길"은 없다.
+    # Then: 그린 갈래는 있고, 안 그린 갈래와 주행선은 없다.
     #       없는 것을 범례에만 두면 "왜 안 보이지"가 된다
-    assert "걸어 가는 길" in document
+    assert "흙길" in document
+    assert "계단" in document
+    assert "포장" not in document
     assert "차로 가는 길" not in document
 
 
-def test_점이_둘_미만인_경로는_선이_되지_않는다():
-    # Given: 점이 하나뿐인 경로가 주어졌을 때
-    data = _payload(mapview.render("한 점", [SPOT], walk_paths=[[(33.36, 126.35)]]))
+def test_점이_둘_미만인_구간은_아예_빠진다():
+    # Given: 점이 하나뿐인 구간이 주어졌을 때
+    data = _payload(
+        mapview.render("한 점", [SPOT], walk_segments=[([(33.36, 126.35)], "흙길")])
+    )
     # When: 데이터를 보면
-    # Then: 자료로는 실리되 그리기는 길이 검사에서 걸러진다(자바스크립트 쪽 w.length>1).
-    #       여기서는 자료가 그대로 넘어가는 것만 확인한다
-    assert data["walks"] == [[[33.36, 126.35]]]
+    # Then: 선이 될 수 없으므로 담지 않는다 — 담아 두면 범례에만 갈래가 뜬다
+    assert data["walks"] == []
 
 
 # --- 두 축을 눈으로 갈라 놓는다 ----------------------------------------------------
@@ -74,13 +80,34 @@ def test_점이_둘_미만인_경로는_선이_되지_않는다():
 def test_주행선과_도보선은_다른_색이다():
     # Given: 주행과 도보가 모두 있는 지도에서
     data = _payload(
-        mapview.render("둘 다", [SPOT, PARK], drive_path=DRIVE, walk_paths=[WALK])
+        mapview.render("둘 다", [SPOT, PARK], drive_path=DRIVE,
+                       walk_segments=WALK_DIRT)
     )
     # When: 두 선의 색을 보면
     # Then: 다르다. 주행 20분 + 도보 20분인 곳을 한 색으로 그으면 "40분 거리"로 뭉개진다
-    assert data["driveColor"] != data["walkColor"]
+    assert data["driveColor"] != data["walks"][0]["color"]
     assert len(data["drive"]) == 3
-    assert len(data["walks"][0]) == 3
+    assert len(data["walks"][0]["points"]) == 3
+
+
+def test_도보_갈래마다_색이_다르다():
+    # Given: 흙길과 계단이 섞인 경로에서
+    data = _payload(mapview.render("갈래", [SPOT], walk_segments=WALK_MIXED))
+    colors = {w["kind"]: w["color"] for w in data["walks"]}
+    # When: 색을 견주면
+    # Then: 다르다. 한 색으로 그으면 "20분 걷는다"까지만 보이고 **어디서 계단이
+    #       시작되는지**가 안 보인다 — 밤에 초행으로 오르는 사람에게 그게 준비를 가른다
+    assert colors["흙길"] != colors["계단"]
+
+
+def test_모르는_갈래는_쉬운_색으로_칠하지_않는다():
+    # Given: 구간 정보가 없어 갈래를 못 정한 경로에서
+    data = _payload(mapview.render("모름", [SPOT], walk_segments=[(WALK, "모름")]))
+    known = _payload(mapview.render("포장", [SPOT], walk_segments=[(WALK, "포장")]))
+    # When: 색을 보면
+    # Then: 가장 쉬운 갈래(포장)와 다른 색이다 — 모르는 길을 쉬운 색으로 칠하면
+    #       확인되지 않은 것이 확인된 것처럼 읽힌다
+    assert data["walks"][0]["color"] != known["walks"][0]["color"]
 
 
 def test_마커는_색뿐_아니라_글자로도_갈린다():
@@ -146,8 +173,8 @@ def test_두_배경_모두_출처를_밝힌다():
 
 def test_같은_내용은_같은_주소가_된다():
     # Given: 같은 지도를 두 번 만들면
-    a = maps.write("같은 것", [SPOT], walk_paths=[WALK])
-    b = maps.write("같은 것", [SPOT], walk_paths=[WALK])
+    a = maps.write("같은 것", [SPOT], walk_segments=WALK_DIRT)
+    b = maps.write("같은 것", [SPOT], walk_segments=WALK_DIRT)
     # When: 주소를 견주면
     # Then: 같다. 이름이 내용 해시라 요청마다 파일이 쌓이지 않고 세션 상태도 안 생긴다
     assert a == b is not None

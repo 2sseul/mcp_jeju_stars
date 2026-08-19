@@ -21,10 +21,12 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass
 from functools import lru_cache
 
 from server import path
+from server.core import trail
 
 #: `walk_type` 이 이 말로 시작하면 오르막 산행이 필요한 곳으로 본다.
 #: 63곳 중 "평지" 45 · "등반" 14 · 나머지 3곳은 "평지 + 계단" 류의 서술이라
@@ -34,6 +36,47 @@ _CLIMB_PREFIX = "등반"
 #: `night_access` 가 이 값이면 야간에 언제든 들어갈 수 있다. 63곳 중 55곳이 여기고,
 #: 나머지 8곳은 전부 조건이 붙은 자유 문장이라 "확인 필요"로 남긴다.
 _ALWAYS_OPEN = "상시 개방"
+
+#: 도보 구간의 갈래. 지도에서 색으로 가르는 축이라 **밟는 것** 순으로 본다 —
+#: 같은 흙길이라도 계단이 놓였으면 밟는 것은 계단이다.
+WALK_STAIR = "계단"
+WALK_ROCK = "암반"
+WALK_STONE = "돌길"
+WALK_PAVED = "포장"
+WALK_DIRT = "흙길"
+WALK_UNKNOWN = "모름"
+
+#: 노면 낱말 → 갈래. `core.trail.SURFACE` 의 값을 그대로 받는다.
+_SURFACE_KIND = {
+    "포장": WALK_PAVED,
+    "거의 흙": WALK_DIRT,
+    "비교적 흙": WALK_DIRT,
+    "비교적 돌": WALK_STONE,
+    "거의 돌": WALK_STONE,
+}
+
+
+@dataclass(frozen=True)
+class WalkSegment:
+    """도보 경로의 한 구간 — 점렬과 그 위를 무엇으로 걷는가.
+
+    경로 전체를 한 색으로 그으면 "20분 걷는다"까지만 보이고 **어디서 계단이 시작되는지**
+    가 안 보인다. 밤에 초행으로 오르는 사람에게는 그게 준비를 가르는 정보다.
+    """
+
+    points: tuple[tuple[float, float], ...]
+    kind: str
+    surface: str
+    rock: str
+
+
+def _segment_kind(surface: str, rock: str) -> str:
+    """무엇을 밟는가. 계단이 놓였으면 노면보다 계단이 먼저다."""
+    if trail.is_stairs(rock):
+        return WALK_STAIR
+    if rock == "약간의 암반":
+        return WALK_ROCK
+    return _SURFACE_KIND.get(surface or "", WALK_UNKNOWN)
 
 
 @dataclass(frozen=True)
@@ -50,13 +93,20 @@ class Spot:
     notes: str
     access: str | None
     walk_type: str | None
-    #: 주차 지점에서 관측 지점까지 **편도** 도보 시간(분). 실측 경로에서 잰 값.
+    #: 주차 지점에서 관측 지점까지 **편도** 도보 시간(분). 경로가 여럿이면
+    #: 가장 오래 걸리는 것 — 아래 세 항목과 함께 '가장 힘든 경로 기준'이다.
     walk_minutes: float | None
     walk_climb_m: float | None
     walk_terrain: str | None
-    #: 주차 지점 → 관측 지점 도보 경로의 점렬들. 지도에 선으로 그린다.
-    #: 값(분·고도차)과 달리 이건 **모양**이라, 요약할 수 없어 원본을 그대로 든다.
-    walk_paths: tuple[tuple[tuple[float, float], ...], ...]
+    #: 대표 경로에 깔린 목재계단 길이(m). 0 이면 계단이 없다는 **확인된 사실**이고,
+    #: None 이면 재지 않았다는 뜻이다 — 둘을 같게 보이면 안 된다.
+    walk_stair_m: float | None
+    #: 국립공원공단 탐방로 등급(매우쉬움~매우어려움). 네 항목 중 하나라도 비면
+    #: None — 짐작으로 채우면 밤에 초행으로 걷는 사람이 그 짐작을 읽는다.
+    trail_grade: str | None
+    #: 주차 지점 → 관측 지점 도보 경로를 **구간별로** 쪼갠 것. 지도가 갈래마다 다른
+    #: 색으로 긋는다. 값(분·고도차)과 달리 이건 모양이라 요약할 수 없다.
+    walk_segments: tuple[WalkSegment, ...]
     elevation_m: float | None
     slope_deg: float | None
     parking: list[dict]
@@ -106,36 +156,115 @@ class Spot:
         return self.coord()
 
 
-def _walk_of(
-    routes: list[dict] | None,
-) -> tuple[float | None, float | None, str | None]:
-    """도보 경로들 중 **가장 긴 것**을 대표로 삼는다. (분, 오름 m, 지형).
+def _walk_worst(routes: list[dict] | None) -> dict:
+    """도보 축을 **가장 힘든 경로 기준**으로 모은다.
 
-    경로가 여럿이면 짧은 쪽을 고르고 싶지만, 그러면 "10분이면 된다"고 답해 놓고
-    실제로는 그 경로가 폐쇄·야간 통제일 수 있다. 보수적으로 긴 쪽을 말한다.
+    경로마다 최댓값을 따로 고른다 — 한 경로만 대표로 뽑으면 실제로 있는 위험이
+    사라진다. 따라비오름이 그 예다: 경로가 둘인데 시간이 긴 쪽은 계단 0m·보통이고
+    짧은 쪽이 계단 260m·어려움이다. 시간으로 대표를 고르면 260m 계단을 안 말하게 된다.
+
+    밤에 초행으로 걷는 사람이 읽는 값이라, 어느 길로 가든 **각오해야 하는 쪽**을
+    말한다. 쉬운 길도 있다는 사실은 경로 수(`walk_paths`)로 드러난다.
+
+    Returns:
+        {"minutes", "climb_m", "terrain", "stair_m", "grade"} — 못 재면 그 항목은 None.
     """
+    out: dict = {
+        "minutes": None, "climb_m": None, "terrain": None,
+        "stair_m": None, "grade": None,
+    }
     if not routes:
-        return (None, None, None)
-    top = max(routes, key=lambda r: r.get("minutes") or 0.0)
-    return (top.get("minutes"), top.get("climb_m"), top.get("terrain"))
+        return out
+
+    def _max(key: str):
+        vals = [r[key] for r in routes if r.get(key) is not None]
+        return max(vals) if vals else None
+
+    out["minutes"] = _max("minutes")
+    out["climb_m"] = _max("climb_m")
+    out["stair_m"] = _max("stair_m")
+
+    # 지형은 값이 아니라 이름이라 최댓값이 없다. 가장 오래 걸리는 경로의 것을 쓴다.
+    longest = max(routes, key=lambda r: r.get("minutes") or 0.0)
+    out["terrain"] = longest.get("terrain")
+
+    # 등급은 점수로 견준다(문자열 비교는 순서가 없다). 가장 힘든 것을 남긴다.
+    hardest = None
+    for route in routes:
+        scored = _grade_of(route)
+        if scored is not None and (hardest is None or scored[0] > hardest[0]):
+            hardest = scored
+    out["grade"] = hardest[1] if hardest else None
+    return out
 
 
-def _paths_of(routes: list[dict] | None) -> tuple[tuple[tuple[float, float], ...], ...]:
-    """도보 경로들의 점렬. 점이 둘 미만인 경로는 선이 안 되므로 버린다."""
-    out = []
+def _grade_of(route: dict) -> tuple[float, str] | None:
+    """경로 하나의 탐방로 (점수, 등급). 항목이 하나라도 비면 None.
+
+    등급 계산은 `core.trail`(국립공원공단 기준)이 한다 — 힘든 정도를 우리가 만든
+    눈금으로 말하면 근거가 없다. 여기서는 경로 데이터를 그 함수의 인자로 옮기기만
+    한다. `slope_deg` 는 각도라 배점표가 쓰는 백분율로 바꾼다.
+    """
+    surface, rock = trail.worst(route.get("segments") or [])
+    slope_deg, distance_m = route.get("slope_deg"), route.get("over_m")
+    if slope_deg is None or distance_m is None:
+        return None
+    result = trail.assess(
+        slope_percent=math.tan(math.radians(float(slope_deg))) * 100.0,
+        distance_m=float(distance_m),
+        terrain=route.get("terrain") or "",
+        surface=surface,
+        rock=rock,
+    )
+    return None if result is None else (result.score, result.grade)
+
+
+def _segments_of(routes: list[dict] | None) -> tuple[WalkSegment, ...]:
+    """도보 경로들을 구간 단위로 편다. 점이 둘 미만인 조각은 선이 안 되므로 버린다.
+
+    `segments` 의 `from`·`to` 는 그 경로 `points` 의 인덱스다. 구간 정보가 아예 없는
+    경로는 통째로 한 조각(갈래 '모름')으로 둔다 — 색을 못 정한다고 길을 안 그리면
+    "여기는 걸어갈 데가 없다"로 읽힌다.
+    """
+    out: list[WalkSegment] = []
     for route in routes or []:
-        pts = tuple(
+        pts = [
             (float(p[0]), float(p[1]))
             for p in (route.get("points") or [])
             if isinstance(p, (list, tuple)) and len(p) >= 2
-        )
-        if len(pts) > 1:
-            out.append(pts)
+        ]
+        if len(pts) < 2:
+            continue
+
+        parts = route.get("segments") or []
+        if not parts:
+            out.append(
+                WalkSegment(tuple(pts), WALK_UNKNOWN, surface="", rock="")
+            )
+            continue
+
+        for part in parts:
+            lo, hi = part.get("from"), part.get("to")
+            if lo is None or hi is None:
+                continue
+            # 인덱스가 경로 밖으로 나가는 자료가 있어 잘라 쓴다.
+            lo, hi = max(0, int(lo)), min(len(pts) - 1, int(hi))
+            if hi - lo < 1:
+                continue
+            surface, rock = part.get("surface") or "", part.get("rock") or ""
+            out.append(
+                WalkSegment(
+                    points=tuple(pts[lo : hi + 1]),
+                    kind=_segment_kind(surface, rock),
+                    surface=surface,
+                    rock=rock,
+                )
+            )
     return tuple(out)
 
 
 def _to_spot(raw: dict) -> Spot:
-    minutes, climb, terrain = _walk_of(raw.get("walk_routes"))
+    walk = _walk_worst(raw.get("walk_routes"))
     return Spot(
         name=raw["name_ko"],
         name_en=raw.get("name_en"),
@@ -147,10 +276,12 @@ def _to_spot(raw: dict) -> Spot:
         notes=raw.get("notes", ""),
         access=raw.get("access"),
         walk_type=raw.get("walk_type"),
-        walk_minutes=minutes,
-        walk_climb_m=climb,
-        walk_terrain=terrain,
-        walk_paths=_paths_of(raw.get("walk_routes")),
+        walk_minutes=walk["minutes"],
+        walk_climb_m=walk["climb_m"],
+        walk_terrain=walk["terrain"],
+        walk_stair_m=walk["stair_m"],
+        trail_grade=walk["grade"],
+        walk_segments=_segments_of(raw.get("walk_routes")),
         elevation_m=raw.get("elevation_m"),
         slope_deg=raw.get("slope_deg"),
         parking=list(raw.get("parking") or []),

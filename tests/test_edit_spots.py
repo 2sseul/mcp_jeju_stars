@@ -44,7 +44,10 @@ def _route(**kw) -> dict:
 #: 저장할 때 표고 격자에서 **잰** 값들(`_measure`). 사람이 적은 값을 보는 시험에서는
 #: 걷어내고 본다 — 여기서 지키는 것은 화면이 보낸 값을 어떻게 받아들이는가이지,
 #: DEM 이 무엇을 답했는가가 아니다 — 그쪽은 `core/elevation.py` 몫이다.
-_MEASURED = ("climb_m", "slope_deg", "over_m", "minutes", "ascent_m", "stair_m")
+_MEASURED = (
+    "climb_m", "slope_deg", "slope_max_deg", "over_m",
+    "minutes", "ascent_m", "stair_m",
+)
 
 
 def _tagged(value):

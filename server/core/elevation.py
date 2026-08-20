@@ -44,24 +44,40 @@ import numpy as np
 from server import path
 from server.core import lamps
 
-if not path.DEM_GRID.exists():
-    raise SystemExit(
-        f"표고 격자가 없습니다: {path.DEM_GRID.relative_to(path.ROOT)}\n"
-        "  라이선스(CC BY-NC-SA)상 커밋하지 않는 파일입니다. 한 번 만들면 됩니다:\n"
-        "    uv run --with tifffile --with imagecodecs "
-        "python -m scripts.build_elevation_grid"
-    )
+#: 격자를 못 찾았을 때 안내. 라이선스(CC BY-NC-SA)상 커밋하지 않는 파일이다.
+_MISSING = (
+    f"표고 격자가 없습니다: {path.DEM_GRID}\n"
+    "  라이선스(CC BY-NC-SA)상 커밋하지 않는 파일입니다. 한 번 만들면 됩니다:\n"
+    "    uv run --with tifffile --with imagecodecs "
+    "python -m scripts.build_elevation_grid"
+)
 
-_npz = np.load(path.DEM_GRID, allow_pickle=True)
+#: FABDEM 은 1초각 격자다 — 파일이 없어도 **간격은 알려져 있다**(자료 사양).
+#: 그래서 아래 CELL_M·MIN_M 은 격자 없이도 맞는 값이 된다.
+_FABDEM_SCALE = 1.0 / 3600.0
 
-#: 데시미터 정수. 미터로 바꾸는 것은 조회할 때 한 번만 한다.
-_GRID = _npz["elevation_dm"]
-_TOP = float(_npz["top"])
-_LEFT = float(_npz["left"])
-_SCALE = float(_npz["scale"])
-_NODATA = int(_npz["nodata"])
-
-SOURCE: str = str(_npz["source"])
+# **격자가 없어도 import 는 된다.** 값을 읽는 `at()` 만 못 쓰고, 나머지(보행 속도
+# 함수·오차 폭·구간 나누기 규칙)는 격자와 무관하다.
+#
+# 서버가 이 모듈을 부르는 이유가 그것이다 — `core/spots.py` 가 논문 오차 폭
+# (`WALK_ERROR_MIN_PER_KM`) 하나를 쓴다. 도보 시간·경사는 배치가 미리 재어
+# `jeju_spots.json` 에 박아 두므로 **배포 컨테이너에는 표고 격자가 필요 없다**
+# (`docs/status.md`). 예전처럼 import 에서 죽으면 그 설계가 무너진다.
+if path.DEM_GRID.exists():
+    _npz = np.load(path.DEM_GRID, allow_pickle=True)
+    #: 데시미터 정수. 미터로 바꾸는 것은 조회할 때 한 번만 한다.
+    _GRID = _npz["elevation_dm"]
+    _TOP = float(_npz["top"])
+    _LEFT = float(_npz["left"])
+    _SCALE = float(_npz["scale"])
+    _NODATA = int(_npz["nodata"])
+    SOURCE: str = str(_npz["source"])
+else:
+    _GRID = None
+    _TOP = _LEFT = 0.0
+    _SCALE = _FABDEM_SCALE
+    _NODATA = 0
+    SOURCE = "표고: FABDEM (격자 파일 없음 — 값 조회 불가)"
 
 #: 격자 한 칸의 크기(m). 1초각을 위도 33도에서 잰 값 — 남북 약 30.8m.
 CELL_M: float = _SCALE * lamps.KM_PER_DEG * 1000.0
@@ -84,6 +100,8 @@ def at(lat: float, lon: float) -> float | None:
     최근접 화소를 그대로 읽는다. 쌍선형 보간을 하면 값이 매끄러워 보이지만 없는
     정밀도가 생길 뿐이다 — 이 격자의 잡음(NMAD 1.27m)이 보간 오차보다 크다.
     """
+    if _GRID is None:
+        raise SystemExit(_MISSING)
     row = int(round((_TOP - lat) / _SCALE))
     col = int(round((lon - _LEFT) / _SCALE))
     if not (0 <= row < _GRID.shape[0] and 0 <= col < _GRID.shape[1]):
@@ -143,6 +161,22 @@ def slope_deg(points) -> float | None:
     if start is None or end is None:
         return None
     return round(math.degrees(math.atan2(end - start, metres)), 1)
+
+
+def slope_max_deg(points) -> float | None:
+    """구간 안에서 **가장 가파른 창**의 경사(도). 창이 하나뿐이면 그 값과 같다.
+
+    `slope_deg` 는 양 끝만 보므로 올랐다 내려오면 상쇄된다 — 저지오름의 한 구간은
+    평균 0.0° 인데 실제로는 7.7° 창이 들어 있고, 송악산 전망대는 평균 -0.9° 에
+    최대 -14.1° 다. 평균만 보여 주면 그 비탈이 통째로 사라진다.
+
+    부호는 절댓값이 가장 큰 창의 것을 그대로 쓴다 — 내리막도 밤에는 위험하다.
+    창 나누기는 `spans()` 가 하므로 격자 잔 톱니가 다시 끼지 않는다.
+    """
+    got = [s.slope_deg for s in spans(points) if s.slope_deg is not None]
+    if not got:
+        return None
+    return max(got, key=abs)
 
 
 def climb_m(points) -> float | None:

@@ -8,8 +8,8 @@ __pycache__/
 .env.*
 !.env.example
 
-# Open-Meteo requests_cache DB
-.cache.sqlite
+# Open-Meteo requests_cache DB (컨테이너에서는 이 디렉터리를 볼륨으로 잡는다)
+.cache/
 
 # 개인용 로컬 Claude 설정 (팀 공유 대상 아님)
 .claude/settings.local.json

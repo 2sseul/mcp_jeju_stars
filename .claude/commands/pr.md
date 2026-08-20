@@ -24,7 +24,7 @@ git diff --stat <base>..HEAD
 
 경로·import를 바꿨으면 파이프라인도 실제로 돌린다 (import 통과 ≠ 동작).
 ```
-uv run python -m server.mcp_server
+uv run python -m server.app
 ```
 
 **중단 조건** (PR을 만들지 말고 보고만 한다)

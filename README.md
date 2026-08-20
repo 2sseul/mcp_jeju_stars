@@ -2,11 +2,25 @@
 
 좌표·시각을 받아 **별이 보이는지** 판정하는 MCP 서버. 외부 LLM이 툴콜로 호출한다.
 
-FastMCP(공식 `mcp` SDK) + LangGraph · uv · Python 3.13 · 온프레미스.
+fastmcp v2 + LangGraph · uv · Python 3.13 · 온프레미스.
 
 ## 무엇을 답하나
 
-두 가지 질의를 지원한다.
+사용자의 **질문 목적**으로 도구가 셋이다 (좌표냐 지명이냐는 입력 형태일 뿐이라
+도구를 가르지 않는다).
+
+| 도구 | 답하는 질문 | 예 |
+|---|---|---|
+| `recommend_spots` | "어디로 갈까" | "지금 근처에서 별 보기 좋은 곳", "30분 안에 갈 수 있는 곳", "등산 없는 곳" |
+| `evaluate_place` | "여기 별 보여?" | "오늘 1100고지에서 별 보여?", "지금 새별오름 가면?" |
+| `spot_details` | "거기 어때?" | "매오름 많이 걸어야 해?", "강아지랑 갈 수 있어?", "밤에 들어갈 수 있어?" |
+
+`evaluate_place` 는 **등록되지 않은 장소도 판정한다** — 좌표만 알면 날씨·광공해·박명은
+똑같이 계산된다. 출발지(현재 위치)를 주면 **주행시간도 등록 여부와 무관하게** 답한다
+(도로 그래프는 좌표만 있으면 되기 때문). 다만 주차·야간 출입·도보 난이도는 검증된
+63곳에만 있으므로, 미등록 장소는 그 정보가 **확인되지 않았음을 응답에 명시**한다.
+
+하늘 판정은 두 가지 질의를 지원한다.
 
 | 질의 | 방법 | 답 |
 |---|---|---|
@@ -30,22 +44,56 @@ FastMCP(공식 `mcp` SDK) + LangGraph · uv · Python 3.13 · 온프레미스.
 
 ## 도구
 
-도구는 **입력 방식으로만** 둘로 나뉜다. "한 시각이냐 밤 전체냐"는 파라미터다.
-
 ```python
-evaluate_spot(lat, lon, date=None, time=None, scope="moment")   # 좌표
-evaluate_place(query, date=None, time=None, scope="moment")     # 지명 → 지오코딩 후 동일 코어
+recommend_spots(origin=None, origin_lat=None, origin_lon=None, max_drive_minutes=None,
+                region=None, no_climb=False, max_walk_minutes=None,
+                parking_required=False, pets=False, date=None, time=None, limit=3)
+evaluate_place(query=None, lat=None, lon=None, origin=None, origin_lat=None,
+               origin_lon=None, date=None, time=None, scope="moment")
+spot_details(name, origin=None, origin_lat=None, origin_lon=None)
 ```
 
-응답은 언제나 같은 모양이다 — `verdict` / `reasons` / `numbers` / `attribution` / `as_of` / `resolved`.
+**거리는 직선거리가 아니라 실제 도로 주행시간이다.** 제주는 가운데가 한라산이라
+직선으로 25km 인 곳도 차로는 산을 넘거나 돌아가야 한다. `data/road/jeju_road_graph.npz`
+(주행 가능 도로 22.6만 노드) 위에서 다익스트라로 최단 시간을 푼다 — 정체를 따지지
+않는 야간 자유주행 기준이라 외부 교통 API 없이 온프레미스로 돈다.
+
+응답은 언제나 같은 모양이다 — `verdict` / `reasons` / `numbers` / `attribution` / `as_of` / `resolved` / `spots` / `map_url`.
+
+**`map_url` 은 '도착한 다음' 지도다.** 검증된 관측지면 주차 지점에서 관측 지점까지의
+**실측 도보 경로**와 주차장·화장실을 그린다. 주행 경로는 그리지 않는다 — 섬을 가로지르는
+선이 들어오면 지도가 줌아웃되어 도보 경로가 뭉개진다. 주행시간은 `numbers.drive` 와
+설명 줄이 답한다.
+등록되지 않은 자리는 반경 200m 안의 주차장·화장실만 표기하고 도보 경로는 그리지
+않는다 — 어디에 세우고 어디로 걷는지는 사람이 확인한 곳에만 있는 정보라서다.
+여러 곳을 그리면 **옆에 목록 박스**가 뜬다 — 곳마다 `차 47분 · 도보 31분 · 계단 260m ·
+난이도 어려움` 같은 조각을 줄 맞춰 실어 한눈에 견주게 한다(난이도는 국립공원공단 탐방로
+등급). 도보선은 **갈래마다 색이 다르다** — 포장·흙길·돌길·암반·계단이 갈려 보여서
+어디서 계단이 시작되는지 알 수 있다.
+
+배경은 **위성사진**이 기본이고 일반 지도는 토글이다. `VWORLD_API_KEY` 가 있으면
+브이월드(국토지리정보원 항공사진, 제주 z19)를, 없으면 Esri World Imagery(z18)로
+떨어진다 — 키 없이도 지도는 뜬다. 키는 지도 HTML 에 실려 나가므로(클라이언트 WMTS)
+브이월드 콘솔의 도메인 등록이 실질적인 접근 통제다. 서버가 `/maps/{name}` 으로 직접 서빙하며, 겉 주소는 `MAP_BASE_URL` 로 바꾼다 —
+같은 Wi-Fi 의 폰에서 열려면 `MCP_HOST=0.0.0.0` 과 함께 LAN 주소를 넣는다.
 `numbers`는 구조화 수치를 문장과 분리해 **LLM이 숫자를 지어내지 못하게** 한다.
 
 ## 실행
 
 ```bash
 uv sync
-uv run python -m server.mcp_server     # → http://127.0.0.1:8000/mcp
+uv run python -m server.app            # → http://127.0.0.1:8000/mcp
 ```
+
+컨테이너로도 뜬다. 이미지에는 서버가 실제로 읽는 데이터만 들어간다(약 26MB).
+
+```bash
+docker build -t jeju-star .
+docker run --rm -p 8000:8000 -v jeju-star-cache:/app/.cache jeju-star
+```
+
+`-v` 로 잡는 것은 Open-Meteo 예보 캐시다. 없어도 뜨지만 재시작마다 캐시가 비어
+외부 호출이 다시 나간다(관측지 63곳 하룻밤 기준 37회).
 
 서버는 키가 없어도 뜬다 — 판정에 쓰는 데이터가 전부 로컬 파일이거나 무인증 API 이기
 때문이다. 키는 아래 **배치 스크립트**만 쓴다. 이름은 `.env.example` 에 있다

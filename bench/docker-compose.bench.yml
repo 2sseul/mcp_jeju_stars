@@ -1,0 +1,26 @@
+# 측정 하네스만 띄운다. Host LLM(etri-jejuax-ollama)과 MCP 서버
+# (etri-jejuax-jeju-star-mcp)는 각각 독립 컨테이너로 이미 떠 있어야 하고,
+# 셋은 같은 네트워크 etri-jejuax-gateway-network 위에 있다.
+#
+#   docker compose -f bench/docker-compose.bench.yml run --rm bench python run_bench.py --arm tool-floor
+services:
+  bench:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: etri-jejuax-bench
+    environment:
+      - OLLAMA_URL=http://etri-jejuax-ollama:11434
+      - MCP_URL=http://etri-jejuax-jeju-star-mcp:11000/
+    volumes:
+      - ./:/bench
+      # 장소명 유효성 채점이 검증된 62곳 이름을 읽는다. 읽기 전용.
+      - ../data:/data:ro
+    networks:
+      - etri-jejuax-gateway-network
+    working_dir: /bench
+
+networks:
+  etri-jejuax-gateway-network:
+    external: true
+    name: etri-jejuax-gateway-network

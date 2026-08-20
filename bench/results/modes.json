@@ -1,0 +1,7 @@
+{
+ "gemma4-e2b-it-qat": "native",
+ "qwen3.5-4b": "native",
+ "llama3.1-8b": "native",
+ "Kanana-2-3B-instruct": "native",
+ "EXAONE-3.5-7.8B": "prompted"
+}

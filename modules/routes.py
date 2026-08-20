@@ -132,13 +132,19 @@ def register_routes(app: FastAPI) -> None:
     @app.post(
         "/recommend-spots",
         operation_id="recommend_spots",
-        summary="조건에 맞는 제주 별 관측지를 추천한다 (검증된 63곳 중에서)",
+        summary="조건에 맞는 제주 별 관측지를 추천한다 (검증된 62곳 중에서)",
     )
-    def recommend_spots(request: RecommendSpotsRequest) -> Dict[str, Any]:
-        """조건에 맞는 제주 별 관측지를 추천한다 (검증된 63곳 중에서).
+    def recommend_spots(
+        request: RecommendSpotsRequest = RecommendSpotsRequest(),
+    ) -> Dict[str, Any]:
+        """조건에 맞는 제주 별 관측지를 추천한다 (검증된 62곳 중에서).
 
         "지금 근처에서 별 보기 좋은 곳", "제주 동쪽에서 추천", "30분 안에 갈 수 있는 곳",
         "주차장에서 바로 보는 곳", "등산 없는 곳" 같은 질의를 처리한다.
+
+        **인자는 전부 선택이다.** "별 관측지 알려줘"처럼 조건이 하나도 없으면 인자 없이
+        부르면 된다 — 오늘 밤 22시 기준으로 전체에서 상위 3곳을 돌려준다. 출발지나
+        조건을 사용자에게 되묻지 말고, 아는 것만 채워 일단 부른다.
 
         출발지를 주면 **실제 도로를 따라간 주행시간**으로 자르고 순위에 반영한다
         (직선거리가 아니다 — 제주는 가운데가 한라산이라 직선거리로 자르면 산 반대편을
@@ -147,6 +153,10 @@ def register_routes(app: FastAPI) -> None:
         추천 목록은 `spots` 배열에 있고 각 항목에 주행시간(`drive`)·도보
         (`walk_minutes`)·야간 출입(`night_access`)이 들어 있다.
         """
+        # 본문 자체를 선택으로 둔다. 인자가 전부 Optional 이라 MCP 스키마는
+        # `required: []` 로 나가는데, 본문이 필수면 `{}` 로 부른 호출이 422 로 튕긴다
+        # — 스키마가 허락한 호출을 서버가 거절하는 꼴이다. "별 관측지 알려줘"처럼
+        # 조건 없는 질의가 정확히 그 호출을 만든다.
         return tools.recommend_spots(
             origin=request.origin,
             origin_lat=request.origin_lat,
@@ -167,14 +177,16 @@ def register_routes(app: FastAPI) -> None:
         operation_id="evaluate_place",
         summary="지목한 제주 장소에서 별이 보이는지 판정한다",
     )
-    def evaluate_place(request: EvaluatePlaceRequest) -> Dict[str, Any]:
+    def evaluate_place(
+        request: EvaluatePlaceRequest = EvaluatePlaceRequest(),
+    ) -> Dict[str, Any]:
         """지목한 제주 장소에서 별이 보이는지 판정한다.
 
         "오늘 1100고지에서 별 보여?", "지금 새별오름 가면 별 잘 보일까?" 같은 질의.
         장소는 이름(`query`)으로 주거나 좌표(`lat`·`lon`)로 준다 — 둘 중 하나면 된다.
 
         **등록되지 않은 장소도 판정한다.** 좌표만 알면 날씨·광공해·천문 조건은 똑같이
-        계산된다. 다만 주차·야간 출입·도보 난이도는 검증된 관측지 63곳에만 있으므로,
+        계산된다. 다만 주차·야간 출입·도보 난이도는 검증된 관측지 62곳에만 있으므로,
         미등록 장소는 그 정보가 **확인되지 않았음을 응답에 명시**한다. 접근성까지 알고
         싶으면 `recommend_spots` 로 등록된 곳을 받거나 `spot_details` 로 조회한다.
 
@@ -191,6 +203,9 @@ def register_routes(app: FastAPI) -> None:
         등록된 관측지면 `spots` 에 그 곳의 접근성 요약이 실리고, 출발지를 줬으면
         `numbers.drive` 에 주행시간·거리가 실린다.
         """
+        # 여기도 같은 이유로 본문을 선택으로 둔다. `{}` 로 부르면 422 가 아니라
+        # "평가할 장소를 알려주세요" 라는 고정 스키마 응답이 나가야 한다 —
+        # 프로토콜 오류보다 프롬프트형 응답이 모델이 회복할 수 있는 형태다.
         return tools.evaluate_place(
             query=request.query,
             lat=request.lat,

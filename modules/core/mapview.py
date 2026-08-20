@@ -265,7 +265,9 @@ _TEMPLATE = """<!doctype html>
     margin:0; height:100%;
     font-family: system-ui, -apple-system, "Malgun Gothic", sans-serif;
   }}
-  #map {{ position:absolute; inset:0; background:var(--bg); }}
+  /* 타일이 아직 안 온 자리의 바탕. 흰색이면 어두운 위성사진 사이로 흰 조각이
+     번쩍여 화면이 깨져 보인다 — 사진과 비슷한 어둠으로 깔아 눈에 안 띄게 한다. */
+  #map {{ position:absolute; inset:0; background:#0f1729; }}
   .legend {{
     display:flex; flex-wrap:wrap; gap:5px 10px;
     font-size:11px; color:var(--ink-2);
@@ -318,6 +320,14 @@ _TEMPLATE = """<!doctype html>
     #map {{ position:absolute; inset:0 0 42% 0; }}
     body {{ display:flex; flex-direction:column; }}
   }}
+  /* 편의시설 마커는 어느 줌에서 켜지고 꺼진다. 그냥 나타나면 줌이 끝나는 순간
+     점이 툭 튀어 화면이 흔들린 것처럼 보인다 — 짧게 떠오르게 한다.
+     자리는 Leaflet 이 **바깥** 요소의 transform 으로 잡으므로 안쪽 div 만 움직인다. */
+  .mk > div {{ animation: mk-in .22s ease-out; }}
+  @keyframes mk-in {{
+    from {{ opacity:0; transform:scale(.72); }}
+    to   {{ opacity:1; transform:none; }}
+  }}
   /* 위성 배경 위에서는 글자·컨트롤이 묻히므로 바탕을 확실히 준다. */
   .leaflet-control-layers {{ font-size:12px; }}
   .leaflet-control-attribution {{ font-size:10px; }}
@@ -334,22 +344,48 @@ _TEMPLATE = """<!doctype html>
 <script>
 const D = {data};
 
-const map = L.map('map', {{ zoomControl: true }});
+// 줌이 뚝뚝 끊기지 않게 하는 값들.
+//
+// `zoomSnap` 은 1 그대로 둔다 — 반 단계에 멈추면 타일이 1.4배로 늘어나 위성사진이
+// 쉬는 동안 내내 흐리다. 부드러움을 얻자고 선명함을 상시로 내주는 거래다.
+// 대신 휠 한 단계에 필요한 스크롤 양을 늘려(60→120px) 한 번 굴릴 때 서너 단계가
+// 통째로 넘어가는 일을 막는다. 급하게 지나친 줌을 되돌리는 게 바로 그 '깨지는' 느낌이다.
+//
+// `zoomAnimationThreshold` 를 키우는 것은 목록에서 한 곳을 눌러 z12 → z19 로 일곱
+// 단계를 뛸 때다. 기본값(4)을 넘으면 Leaflet 이 애니메이션을 통째로 끄고 화면을
+// 순간이동시킨다 — 어디서 어디로 갔는지 이어지지 않아 결국 손으로 다시 줌아웃하게 된다.
+const map = L.map('map', {{
+  zoomControl: true,
+  zoomSnap: 1,
+  zoomDelta: 1,
+  wheelPxPerZoomLevel: 120,
+  wheelDebounceTime: 20,
+  zoomAnimationThreshold: 8
+}});
 // 위성사진 — 기본 배경. 실사진이 있는 줌보다 더 당기면 마지막 타일을 늘린다.
-const SAT = L.tileLayer(D.sat.url, {{
-  maxZoom: D.sat.maxZoom,
+// 실사진이 있는 줌보다 **한 단계까지만** 더 당기게 둔다. 두 단계를 더 가면 픽셀이
+// 가로세로 네 배로 늘어나 사진이라기보다 뭉갠 색덩어리가 된다 — 당길수록 잘 보일
+// 거라 믿고 굴리다 화질만 잃는다. 한 단계(2배)까지는 아직 형태가 읽힌다.
+//
+// `keepBuffer` 는 화면 밖 타일을 몇 겹까지 살려 두느냐다. 기본 2로는 줌아웃하는
+// 순간 바깥쪽이 빈 채로 나타났다가 채워진다. `updateWhenZooming: false` 는 줌이
+// 움직이는 동안 새 타일을 요청하지 않는다는 뜻이고 — 애니메이션 중에 타일이
+// 갈아 끼워지지 않으니 화면이 한 장으로 늘어났다 제자리를 찾는다.
+const TILE = {{ keepBuffer: 4, updateWhenZooming: false }};
+const SAT = L.tileLayer(D.sat.url, Object.assign({{}}, TILE, {{
+  maxZoom: Math.min(D.sat.maxZoom, D.sat.maxNative + 1),
   maxNativeZoom: D.sat.maxNative,
   attribution: D.sat.credit
-}});
+}}));
 // 일반 지도 — 지명·도로 이름을 읽어야 할 때. 위성 위에서는 글자가 잘 안 읽힌다.
 const PLAIN = L.tileLayer(
   'https://{{s}}.basemaps.cartocdn.com/rastertiles/voyager/{{z}}/{{x}}/{{y}}{{r}}.png',
-  {{
+  Object.assign({{}}, TILE, {{
     maxZoom: 20,
     attribution:
       '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' +
       ' 기여자 · 타일 &copy; <a href="https://carto.com/attributions">CARTO</a>'
-  }}
+  }})
 );
 SAT.addTo(map);
 L.control.layers({{ '위성사진': SAT, '일반 지도': PLAIN }}, null,
@@ -408,7 +444,7 @@ D.markers.forEach(m => {{
 // 마커 — 갈래마다 색과 글자를 함께 준다(색만으로 나누지 않는다).
 D.markers.forEach(m => {{
   const icon = L.divIcon({{
-    className: '',
+    className: 'mk',
     html: '<div style="min-width:22px;height:22px;padding:0 3px;' +
           'border-radius:11px;background:' + m.color +
           ';color:#fff;font:700 11px/22px system-ui;text-align:center;' +
@@ -477,10 +513,23 @@ function syncFacilities() {{
 map.on('zoomend', syncFacilities);
 syncFacilities();
 
+// 한 곳으로 옮겨 갈 때는 **날아간다**. `setView` 는 화면을 통째로 갈아치우므로
+// 지금 보던 자리와 도착한 자리가 이어지지 않는다 — 일곱 단계를 뛰면 특히 그렇다.
+// `flyTo` 는 줌아웃했다가 옮겨서 다시 당기는 한 동작이라, 어디서 어디로 갔는지가
+// 화면에 남는다.
+//
+// 팝업은 **도착한 뒤에** 연다. 나는 도중에 열면 팝업이 화면 안에 들어오려고 지도를
+// 따로 밀어서 두 움직임이 겹친다. 듣는 등록을 먼저 해 두는 것은 애니메이션이 꺼진
+// 환경에서 `flyTo` 가 그 자리에서 끝나 버리기 때문이다.
+function fly(latlng, then) {{
+  if (then) map.once('moveend', then);
+  map.flyTo(latlng, FOCUS_ZOOM, {{ duration: .8 }});
+}}
+
 // 점을 눌러도 목록 줄을 누른 것과 같이 움직인다. 전체가 보이는 화면에서 점 하나를
 // 겨우 눌렀는데 팝업만 뜨고 화면이 그대로면, 결국 손으로 다시 확대하게 된다.
 drawn.forEach(pin => {{
-  pin.on('click', () => map.setView(pin.getLatLng(), FOCUS_ZOOM));
+  pin.on('click', () => fly(pin.getLatLng()));
 }});
 
 // 목록 — 마커만으로는 어디가 어디인지 모른다. 눌러서 그 자리로 이동한다.
@@ -502,9 +551,8 @@ if (D.items.length) {{
       fx.appendChild(tag);
     }});
     row.addEventListener('click', () => {{
-      map.setView([it.lat, it.lon], FOCUS_ZOOM);
       const pin = pins.get(it.lat.toFixed(5) + ',' + it.lon.toFixed(5));
-      if (pin) pin.openPopup();
+      fly([it.lat, it.lon], pin ? () => pin.openPopup() : null);
     }});
     box.appendChild(row);
   }});

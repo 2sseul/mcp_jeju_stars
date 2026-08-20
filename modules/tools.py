@@ -20,7 +20,7 @@
 
 등록된 곳과 아닌 곳
 --------------------------------------------------------------------------
-`data/jeju_spots.json` 의 63곳은 사람이 로드뷰·위성으로 확인한 자리다. 그 밖의 좌표도
+`data/jeju_spots.json` 의 62곳은 사람이 로드뷰·위성으로 확인한 자리다. 그 밖의 좌표도
 날씨·광공해·천문 조건은 **똑같이** 판정할 수 있지만 주차·야간 출입·도보 난이도는
 알 수 없다. 그래서 미등록 장소는 관측 가능 여부만 답하고 **접근성은 확인되지 않았음을
 명시한다** — 모르는 것을 아는 척하지 않는다.
@@ -695,6 +695,43 @@ _ROCK_WORDS: dict[str, str] = {
 }
 
 
+#: 이보다 완만한 내리막은 방향을 적지 않는다. 3° 에서는 내려가나 올라가나 준비가
+#: 달라지지 않는데, 내리막 19개 중 13개가 거기 걸려 "(내리막)"이 뜻 없이 반복된다.
+#: 밤에 조심해야 하는 내리막은 송악산 전망대의 14° 같은 것이다.
+_DOWNHILL_DEG = 5
+
+
+def _slope_words(seg: spots.WalkSegment) -> str:
+    """구간의 경사 한 조각. 못 잰 구간은 빈 문자열 — 아무것도 적지 않는다.
+
+    **최대를 적는다. 평균이 아니다.** 평균은 양 끝만 보므로 올랐다 내려오면 상쇄된다 —
+    송악산 전망대의 593m 구간은 평균 -0.9° 라 거의 평지처럼 읽히는데 그 안에 14.1°
+    내리막이 들어 있고, 새별오름의 555m 는 평균 8.4° 인데 실제로는 21.4° 까지 선다.
+    밤에 초행으로 오르는 사람이 각오할 것은 그 비탈이지 상쇄된 평균이 아니다.
+
+    평균을 함께 적지 않는 것은 줄이 길어져서만이 아니다. 걷는 데 드는 시간은 이미
+    도막마다의 경사로 따로 계산해(`elevation.walk_minutes`) `도보 N분` 으로 나가므로,
+    평균이 답하던 몫은 그쪽이 더 정확하게 답하고 있다.
+
+    최대를 아직 안 잰 자료는 가진 것을 **평균이라고 밝혀서** 적는다. 평균을 최대인
+    척 내보내면 비탈을 낮춰 말하게 된다.
+    """
+    steep, average = seg.slope_max_deg, seg.slope_deg
+    value = steep if steep is not None else average
+    if value is None:
+        return ""
+
+    degrees = round(abs(value))
+    if degrees == 0:
+        # 재 보니 평평한 것과 아예 안 잰 것은 다른 말이다. 0° 를 그냥 지우면 둘이
+        # 같아 보이고, `-0°` 라고 적으면 읽는 사람이 오타로 읽는다.
+        return "거의 평평함"
+
+    label = "최대 경사" if steep is not None else "평균 경사"
+    down = "(내리막)" if value < 0 and degrees >= _DOWNHILL_DEG else ""
+    return f"{label} {degrees}°{down}"
+
+
 def _segment_note(seg: spots.WalkSegment) -> str:
     """구간을 눌렀을 때 뜨는 한 줄 — 길이가 먼저다.
 
@@ -704,8 +741,8 @@ def _segment_note(seg: spots.WalkSegment) -> str:
     안 보이고, 계단인데 "노면 포장 · 목재계단"이라 적히면 오히려 헷갈린다. 갈래 이름이
     이미 말하는 것은 빼고, 노면은 어떤 땅인지로 풀어 쓴다.
 
-    경사는 원본이 잰 구간만 붙는다(짐작으로 채우지 않는다). 사람이 적어 둔 말이 있으면
-    맨 뒤에 그대로 붙인다.
+    경사는 가장 가파른 데 하나만 적는다 — 무엇을 왜 적는지는 `_slope_words` 에.
+    사람이 적어 둔 말이 있으면 맨 뒤에 그대로 붙인다.
     """
     parts = [f"{seg.metres:.0f}m"]
 
@@ -716,14 +753,9 @@ def _segment_note(seg: spots.WalkSegment) -> str:
             parts.append(extra)
     elif seg.surface:
         parts.append(_SURFACE_WORDS.get(seg.surface, seg.surface))
-    if seg.slope_deg is not None:
-        # 평균은 양 끝만 보므로 올랐다 내려오면 상쇄된다. 구간 안 가장 가파른 창이
-        # 그보다 크면 함께 적는다 — 안 적으면 그 비탈이 통째로 사라진다.
-        steep = seg.slope_max_deg
-        if steep is not None and abs(steep) > abs(seg.slope_deg) + 0.5:
-            parts.append(f"평균 경사 {seg.slope_deg:.0f}° · 최대 {steep:.0f}°")
-        else:
-            parts.append(f"평균 경사 {seg.slope_deg:.0f}°")
+    slope = _slope_words(seg)
+    if slope:
+        parts.append(slope)
 
     # 사람이 그 구간에 적어 둔 말은 **맨 뒤에 그대로** 붙인다. 배점표 낱말로는 담기지
     # 않는 것이 여기 들어간다 — "좌측의 벤치에서 쉬어갈 수 있음", "해충기피제 분사기
@@ -1103,7 +1135,7 @@ def recommend_spots(
 
     reasons = _recommend_reasons(top, routes)
     if map_url:
-        reasons.append(f"고른 곳들을 지도로 봤어요 → {map_url}")
+        reasons.append(f"지도(고른 곳 전부): {map_url}")
 
     return Response(
         verdict=_recommend_verdict(rows, conditions),
@@ -1195,18 +1227,39 @@ def _recommend_verdict(rows: list[dict], conditions: str) -> str:
 
 
 def _recommend_reasons(judged: list, routes: dict) -> list[str]:
-    """추천 목록을 사람이 읽는 줄들로. 곳마다 왜 골랐는지 한 덩어리씩."""
+    """추천 목록을 사람이 읽는 줄들로. 곳마다 왜 골랐는지 한 덩어리씩.
+
+    **수치를 이 문장들 안에 넣는다.** 구름·등급은 `spots[]` 에도 실리지만, 이 응답을
+    읽는 쪽이 작은 모델일 때 구조화 배열은 잘 안 읽히고 산문만 읽힌다. 실제로
+    측정에서 모델이 곳 이름만 옮기고 숫자는 전부 흘렸다 — 숫자가 문장 안에 있어야
+    인용된다. `spots[]` 는 그대로 두므로 프로그램이 읽는 쪽은 달라지지 않는다.
+
+    `why` 는 판정 줄에서 떼어 뒤로 뺐다. 한 줄에 등급·구름·이유가 같이 있으면 이유가
+    길어 숫자가 문장 끝으로 밀린다.
+    """
     lines: list[str] = []
     for i, (s, final) in enumerate(judged, start=1):
         leg = routes.get(s.name)
+        nums = final.get("numbers", {})
         head = f"{i}. {s.name} ({s.region}·{s.kind})"
         if leg is not None:
             head += f" — 차로 약 {leg.minutes:.0f}분 / {leg.km:.0f}km"
         lines.append(head)
-        lines.append(f"   판정: {final.get('verdict') or '불가'} · {s.why}")
+
+        bits = [f"판정: {final.get('verdict') or '불가'}"]
+        cloud = nums.get("cloud_cover")
+        if cloud is not None:
+            bits.append(f"구름 {cloud:.0f}%")
+        bortle = nums.get("bortle")
+        if bortle is not None:
+            bits.append(f"하늘 어둡기 Bortle {bortle}")
+        lines.append("   " + " · ".join(bits))
+
         lines.append("   " + _walk_phrase(s))
         if s.night_access:
             lines.append(f"   야간 출입: {s.night_access}")
+        if s.why:
+            lines.append(f"   고른 이유: {s.why}")
     return lines
 
 
@@ -1380,7 +1433,7 @@ def evaluate_place(
             )
 
     if result.get("map_url"):
-        reasons.append(f"경로와 주변을 지도로 봤어요 → {result['map_url']}")
+        reasons.append(f"지도(경로와 주변): {result['map_url']}")
 
     return result
 
@@ -1553,7 +1606,7 @@ def spot_details(name: str, origin: str | None = None,
     for c in hit.cautions:
         reasons.append(f"주의: {c}")
     if map_url:
-        reasons.append(f"주차 자리와 걷는 길을 지도로 봤어요 → {map_url}")
+        reasons.append(f"지도(주차 자리와 걷는 길): {map_url}")
 
     return Response(
         verdict=f"{hit.name} 접근성 정보예요",

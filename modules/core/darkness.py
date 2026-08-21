@@ -98,6 +98,18 @@ _FALCHI_LABEL = {
     "vi": "암순응 불가 수준",
 }
 
+#: Falchi 등급 → 사용자에게 그대로 보여 줄 쉬운 말. `_FALCHI_LABEL` 은 학술 용어라
+#: 응답 산문에 그대로 실으면 사용자가 알아듣지 못한다(측정에서 확인). 숫자·등급은
+#: `numbers` 에 그대로 남기고, **사람이 읽는 문장에는 이쪽만 쓴다.**
+_FALCHI_PLAIN = {
+    "i": "사람 손이 닿지 않은 밤하늘이에요",
+    "ii": "거의 깜깜하고 지평선 쪽만 조금 밝아요",
+    "iii": "머리 위까지 옅게 밝아요",
+    "iv": "둘레 불빛 탓에 원래 밤하늘 모습은 아니에요",
+    "v": "불빛이 많아 은하수가 보이지 않아요",
+    "vi": "너무 밝아 눈이 어둠에 익지 않아요",
+}
+
 #: Falchi 등급 → 은하수 가시성. iv 까지는 보이나(흐릿), v 부터 소실(문서 별 예시 절).
 _MILKY_WAY = {
     "i": "visible", "ii": "visible", "iii": "visible",
@@ -120,6 +132,11 @@ SOURCE: str = str(_npz["source"])
 #: Falchi 등급을 어두운 쪽부터 나열한 순서. 표·범례가 등급 순서를 스스로 정하지 않고
 #: 이 튜플을 따르게 해, 경계표(`_FALCHI_UCD`)와 어긋날 여지를 없앤다.
 FALCHI_GRADES: tuple[str, ...] = ("i", "ii", "iii", "iv", "v", "vi")
+
+
+def plain_label(grade: str) -> str:
+    """Falchi 등급 → 사용자에게 그대로 보여 줄 쉬운 말(`_FALCHI_PLAIN` 접근자)."""
+    return _FALCHI_PLAIN[grade]
 
 
 def falchi_label(grade: str) -> str:
@@ -213,10 +230,16 @@ def assess(lat: float, lon: float) -> Darkness | None:
 # --- 표현 헬퍼 (문구) ---------------------------------------------------------
 
 def describe(d: Darkness) -> str:
-    """어둡기 판정을 사람이 읽는 한 줄로."""
+    """어둡기 판정을 사람이 읽는 한 줄로.
+
+    숫자는 **`라벨 숫자단위` 꼴로 앞에 둔다.** 측정에서 확인된 것인데, 작은 모델은
+    "구름이 조금 있어요 (하늘의 20%가 구름)" 처럼 숫자를 문장으로 풀어 쓰면 괄호째
+    흘리고, "(구름 20%)" 처럼 태그 꼴이면 통째로 옮긴다. 쉬운 말로 바꾸는 것과
+    숫자를 문장에 녹이는 것은 다른 일이다 — 앞은 하고 뒤는 하지 않는다.
+    """
     return (
-        f"이 지점 하늘 어둡기: SQM {d.sqm} · Falchi {d.falchi_grade}"
-        f"({d.falchi_label}) · Bortle {d.bortle} 참고"
+        f"이곳 밤하늘 어둡기 {d.bortle}단계 (8단계 중 · 1이 가장 어둡고 8이 도심) "
+        f"— {_FALCHI_PLAIN[d.falchi_grade]}"
     )
 
 
@@ -229,13 +252,13 @@ def milky_way_phrase_from(milky_way: str, falchi_grade: str) -> str | None:
     """
     if milky_way == "degraded":
         return (
-            "완전한 밤이지만 이 지점은 광공해가 있어(Falchi iv) 은하수는 "
-            "흐릿하게만 보이고 성운은 어려워요"
+            "완전히 어두운 시간이지만 둘레 불빛 탓에 은하수는 흐릿하게만 보여요 "
+            "— 망원경이 있어야 보이는 대상은 어렵습니다"
         )
     if milky_way == "lost":
         return (
-            f"완전한 밤이어도 이 지점은 광공해가 심해(Falchi {falchi_grade}) "
-            "은하수는 보기 어렵고 밝은 별·행성 위주예요"
+            "완전히 어두운 시간이어도 둘레 불빛이 세서 은하수는 보기 어렵고, "
+            "밝은 별과 행성 위주로 보여요"
         )
     return None
 
@@ -385,13 +408,13 @@ def milky_way_caveat(d: Darkness) -> str | None:
     """
     if d.milky_way == "degraded":
         return (
-            "이 지점은 광공해가 있어(Falchi iv) 맑은 시간이어도 은하수는 흐릿하고 "
-            "성운은 보기 어려워요"
+            "둘레 불빛이 있어 하늘이 맑아도 은하수는 흐릿하게만 보이고, "
+            "망원경이 있어야 보이는 대상은 어려워요"
         )
     if d.milky_way == "lost":
         return (
-            f"이 지점은 광공해가 심해(Falchi {d.falchi_grade}) 맑은 시간이어도 "
-            "은하수는 보기 어렵고 밝은 별·행성 위주예요"
+            "둘레 불빛이 세서 하늘이 맑아도 은하수는 보기 어렵고, "
+            "밝은 별과 행성 위주로 보여요"
         )
     return None
 

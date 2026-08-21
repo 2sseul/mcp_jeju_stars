@@ -125,7 +125,7 @@ _BY_RANK = {v: k for k, v in _RANK.items()}
 
 #: 태양 고도 상태 → (등급, 사람이 읽는 하늘 설명). 근거: 모듈 docstring 1절.
 _SKY = {
-    0: (OPTIMAL, "완전한 밤이라 은하수·성운까지 볼 수 있어요"),
+    0: (OPTIMAL, "완전히 어두워져서 은하수까지 볼 수 있어요"),
     1: (GOOD, "하늘이 충분히 어두워 대부분의 별이 보여요"),
     2: (LIMITED, "아직 완전히 어둡진 않지만 밝은 별과 별자리는 보이기 시작해요"),
     3: (IMPOSSIBLE, "해가 진 지 얼마 안 돼 하늘이 밝아요 — 가장 밝은 별·행성만 겨우 보입니다"),
@@ -233,29 +233,29 @@ def judge(
         return Judgement(
             IMPOSSIBLE,
             False,
-            [f"구름이 하늘을 덮고 있어요 (총운량 {cloud_cover:.0f}%)"],
+            [f"구름이 하늘을 덮고 있어요 (구름 {cloud_cover:.0f}%)"],
         )
 
-    reasons = [sky_msg, f"{_CLOUD_PHRASE[cloud_grade]} (총운량 {cloud_cover:.0f}%)"]
+    reasons = [sky_msg, f"{_CLOUD_PHRASE[cloud_grade]} (구름 {cloud_cover:.0f}%)"]
 
     # 시정은 등급에 관여하지 않는다 — 참고 정보로만 덧붙인다(docstring 4절).
     if visibility_m is None:
         pass
     elif visibility_m < VISIBILITY_FOG_M:
         reasons.append(
-            f"지상에 안개가 낄 수 있어요 (수평시정 {_km(visibility_m)}) "
+            f"지상에 안개가 낄 수 있어요 (시야 {_km(visibility_m)}) "
             "— 하늘이 열려 있어도 발밑은 뿌옇게 보일 수 있어요"
         )
     elif visibility_m < VISIBILITY_HAZE_M:
-        reasons.append(f"연무가 낄 수 있어요 (수평시정 {_km(visibility_m)})")
+        reasons.append(f"옅은 안개가 낄 수 있어요 (시야 {_km(visibility_m)})")
     else:
-        reasons.append(f"공기 맑음 (수평시정 {_km(visibility_m)})")
+        reasons.append(f"공기가 맑아요 (시야 {_km(visibility_m)})")
 
     # 광공해가 실제로 등급을 끌어내렸을 때만 그 사실을 밝힌다 — 하늘·구름은 좋은데
     # 등급이 낮은 이유가 장소에 있음을 알려야 '다른 곳으로'를 택할 수 있다.
     if capped != verdict:
         reasons.append(
-            f"하늘과 날씨는 '{verdict}'이지만 이 지점은 광공해가 있어 "
+            f"하늘과 날씨는 '{verdict}'이지만 이곳은 둘레 불빛이 있어 "
             f"'{capped}'까지로 봅니다 — 더 어두운 곳으로 가면 나아져요"
         )
 

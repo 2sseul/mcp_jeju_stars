@@ -88,12 +88,19 @@ def _now_iso() -> str:
 
 # --- 입력 검증 (모두 프롬프트형 응답으로 환원한다) --------------------------------
 
+#: 시각을 안 준 질문("오늘 밤 별 보여?")에 쓰는 기준 시각.
+#: 22:00 이었으나 23:00 으로 옮겼다 — 제주 여름 천문박명이 20:40 께 끝나 22시는
+#: 아직 하늘이 덜 가라앉은 시각이고, 사람이 실제로 별을 보러 나가는 때는 그보다
+#: 늦다. 24:00 은 쓰지 않는다: 날짜가 넘어가 "오늘 밤"이 전날 밤을 가리키게 된다.
+DEFAULT_HOUR = 23
+
+
 
 def _resolve_when(date: str | None, time: str | None) -> datetime:
     """평가 시각을 KST datetime 으로 만든다.
 
     - date(YYYY-MM-DD) 생략 → 오늘
-    - time(HH:MM, 24시간) 생략 → 22:00
+    - time(HH:MM, 24시간) 생략 → DEFAULT_HOUR(23:00)
     - date·time 모두 생략 → 현재 시각 그대로
     파싱 실패 시 ValueError.
     """
@@ -103,12 +110,12 @@ def _resolve_when(date: str | None, time: str | None) -> datetime:
     y, m, d = (now.year, now.month, now.day) if date is None else (
         int(x) for x in date.split("-")
     )
-    hh, mm = (22, 0) if time is None else (int(x) for x in time.split(":"))
+    hh, mm = (DEFAULT_HOUR, 0) if time is None else (int(x) for x in time.split(":"))
     return datetime(y, m, d, hh, mm, tzinfo=KST)
 
 
 def _resolve_plan_when(date: str | None, time: str | None) -> datetime:
-    """추천이 쓰는 기준 시각. date 생략 → 오늘, time 생략 → 22:00.
+    """추천이 쓰는 기준 시각. date 생략 → 오늘, time 생략 → DEFAULT_HOUR.
 
     `_resolve_when` 과 **한 군데가 다르다**: 둘 다 생략해도 '지금'으로 떨어지지 않는다.
     추천은 "어디로 갈까"를 묻는 도구라 낮에도 부른다. 지금 시각으로 판정하면 오후
@@ -121,7 +128,7 @@ def _resolve_plan_when(date: str | None, time: str | None) -> datetime:
     y, m, d = (now.year, now.month, now.day) if date is None else (
         int(x) for x in date.split("-")
     )
-    hh, mm = (22, 0) if time is None else (int(x) for x in time.split(":"))
+    hh, mm = (DEFAULT_HOUR, 0) if time is None else (int(x) for x in time.split(":"))
     return datetime(y, m, d, hh, mm, tzinfo=KST)
 
 
@@ -251,6 +258,12 @@ def _evaluate_moment(
     reasons = list(final.get("reasons", []))
     nums = final.get("numbers", {})
 
+    # 판정을 산문 맨 앞에 한 번 더 적는다. `verdict` 는 최상위 필드로 이미 나가지만,
+    # 작은 모델은 구조화 필드를 잘 안 읽고 산문만 읽는다 — 실제로 "양호"를 한 번도
+    # 답에 옮기지 않았다. 추천 도구는 곳마다 "판정: …" 을 달고 있어 이 문제가 없다.
+    if final.get("verdict"):
+        reasons.insert(0, f"판정: {final['verdict']}")
+
     # 관측 가능하면 오늘 완전히 어두운 시간대를 덤으로 알려준다.
     window = nums.get("dark_window")
     if final.get("possible") and window:
@@ -317,8 +330,8 @@ def _night_reasons(summary: dict | None, window: dict | None, label: str) -> lis
         reasons.append("등급별로는 " + ", ".join(parts) + "예요")
 
     reasons.append(
-        f"맑은 시간(총운량 30% 이하) {summary['photometric_hours']}시간, "
-        f"다소 맑은 시간(50% 이하) {summary['spectroscopic_hours']}시간"
+        f"구름이 거의 없는 시간(구름 30% 이하) {summary['photometric_hours']}시간, "
+        f"조금 있는 시간(50% 이하) {summary['spectroscopic_hours']}시간"
     )
 
     if summary["unknown_hours"]:
@@ -467,7 +480,7 @@ def _walk_phrase(s: spots.Spot) -> str:
     minutes = s.walk_minutes_safe or s.walk_minutes
     if minutes is None:
         return "도보 시간은 재지 못했어요"
-    if minutes < 1:
+    if minutes < spots.IMMEDIATE_WALK_MIN:
         return "주차 후 바로 관측 가능해요"
     return f"주차장에서 관측지까지 예상 소요시간: 약 {minutes:.0f}분"
 
@@ -1133,7 +1146,7 @@ def recommend_spots(
         items=items,
     )
 
-    reasons = _recommend_reasons(top, routes)
+    reasons = _recommend_reasons(top, routes, show_pets=pets)
     if map_url:
         reasons.append(f"지도(고른 곳 전부): {map_url}")
 
@@ -1226,7 +1239,7 @@ def _recommend_verdict(rows: list[dict], conditions: str) -> str:
     return f"{conditions} — 조건에 맞는 관측지 {len(rows)}곳을 추천드립니다"
 
 
-def _recommend_reasons(judged: list, routes: dict) -> list[str]:
+def _recommend_reasons(judged: list, routes: dict, show_pets: bool = False) -> list[str]:
     """추천 목록을 사람이 읽는 줄들로. 곳마다 왜 골랐는지 한 덩어리씩.
 
     **수치를 이 문장들 안에 넣는다.** 구름·등급은 `spots[]` 에도 실리지만, 이 응답을
@@ -1236,6 +1249,11 @@ def _recommend_reasons(judged: list, routes: dict) -> list[str]:
 
     `why` 는 판정 줄에서 떼어 뒤로 뺐다. 한 줄에 등급·구름·이유가 같이 있으면 이유가
     길어 숫자가 문장 끝으로 밀린다.
+
+    `show_pets` — 반려동물 조건으로 걸러 달라고 했을 때만 각 곳의 `pets` 원문을 함께
+    싣는다. 거르기는 파생 축(`spots.pets_allowed`)이 하지만, 답에는 원문이 실려야
+    사용자가 "목줄 필수" 같은 단서를 볼 수 있다. 조건으로 안 물었을 때까지 붙이면
+    줄만 길어지므로 물었을 때만 붙인다.
     """
     lines: list[str] = []
     for i, (s, final) in enumerate(judged, start=1):
@@ -1252,10 +1270,12 @@ def _recommend_reasons(judged: list, routes: dict) -> list[str]:
             bits.append(f"구름 {cloud:.0f}%")
         bortle = nums.get("bortle")
         if bortle is not None:
-            bits.append(f"하늘 어둡기 Bortle {bortle}")
+            bits.append(f"밤하늘 어둡기 8단계 중 {bortle}단계")
         lines.append("   " + " · ".join(bits))
 
         lines.append("   " + _walk_phrase(s))
+        if show_pets and s.pets:
+            lines.append(f"   반려동물: {s.pets}")
         if s.night_access:
             lines.append(f"   야간 출입: {s.night_access}")
         if s.why:
@@ -1411,7 +1431,7 @@ def evaluate_place(
             )
         else:
             reasons.append(
-                "이 위치는 검증된 관측지 목록에 없어요. 하늘 상태(날씨·광공해·박명)는 "
+                "이 위치는 검증된 관측지 목록에 없어요. 하늘 상태(날씨·둘레 불빛·어둡기)는 "
                 "위와 같이 판정했지만 **주차 가능 여부·야간 출입·진입로 상태·도보 "
                 "난이도는 확인되지 않았습니다.**"
             )
@@ -1502,7 +1522,7 @@ def _alternatives_reason(
     for spot, leg, sqm in rows:
         bits = [f"차로 약 {leg.minutes:.0f}분"]
         if sqm is not None:
-            bits.append(f"SQM {sqm:.2f}")
+            bits.append(f"하늘 밝기 {sqm:.2f} (클수록 어두움)")
         bits.append(f"야간 출입 {spot.night_access or '확인 필요'}")
         parts.append(f"{spot.name}({' · '.join(bits)})")
     return (

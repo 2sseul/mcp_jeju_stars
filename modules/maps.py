@@ -111,7 +111,11 @@ def write(
     if not document:
         return None
 
-    digest = hashlib.sha256(document.encode("utf-8")).hexdigest()[:16]
+    # 10자리로 줄였다. 16자리였을 때 qwen3.5:4b 가 "871efe3f80f07e5d" 를
+    # "871fe3f80f07e5d" 로 한 글자 흘려 죽은 주소를 내보냈다(E-02). 지도는 이 서버가
+    # 만드는 산출물이라 주소가 한 글자만 틀려도 사용자에게 닿지 않는다. 10자리
+    # sha256 이면 충돌 확률이 지도 수십만 장 규모에서도 무시할 만하다.
+    digest = hashlib.sha256(document.encode("utf-8")).hexdigest()[:10]
     name = f"{digest}.html"
     target = MAPS_DIR / name
     if not target.exists():

@@ -116,7 +116,10 @@ def _darkness_numbers(site) -> dict | None:
     nums = {
         "sqm": d.sqm,
         "falchi_grade": d.falchi_grade,
-        "falchi_label": d.falchi_label,
+        # 학술 라벨("하늘의 자연스러운 외관 상실")이 아니라 쉬운 말을 싣는다 —
+        # 이 값을 읽는 것이 사람 아니면 작은 모델이고, 실제로 모델이 이 문자열을
+        # 그대로 답에 옮겨 썼다(E-05). 등급 문자(i~vi)는 falchi_grade 에 그대로 있다.
+        "falchi_label": _darkness.plain_label(d.falchi_grade),
         "bortle": d.bortle,
         "artificial_mcd": d.artificial_mcd,
         "light_pollution_ratio": d.ratio,

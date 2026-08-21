@@ -82,8 +82,8 @@ class RecommendSpotsRequest(BaseModel):
     )
     time: Optional[str] = Field(
         default=None,
-        description="형식 HH:MM 24시간 KST (예: 22:00). 생략하면 22:00. "
-                    "'밤 10시'→'22:00'.",
+        description="형식 HH:MM 24시간 KST (예: 23:00). 생략하면 23:00. "
+                    "'밤 10시'→'22:00', '자정'→'23:59'.",
     )
     limit: int = Field(
         default=3, ge=1, le=10,
@@ -120,9 +120,10 @@ class EvaluatePlaceRequest(BaseModel):
     )
     time: Optional[str] = Field(
         default=None,
-        description="형식 HH:MM 24시간 KST (예: 22:00). scope='moment' 에서만 쓰인다 "
-                    "(date·time 모두 생략 시 현재). '밤 10시'→'22:00', "
-                    "'새벽 1시'→'01:00'. scope='night' 이면 무시.",
+        description="형식 HH:MM 24시간 KST (예: 23:00). 생략하면 23:00. "
+                    "scope='moment' 에서만 쓰인다(date·time 모두 생략 시 현재). "
+                    "'밤 10시'→'22:00', '새벽 1시'→'01:00', '자정'→'23:59'. "
+                    "scope='night' 이면 무시.",
     )
     scope: str = Field(
         default="moment",

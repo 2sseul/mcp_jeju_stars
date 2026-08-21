@@ -161,6 +161,15 @@ class WalkSegment:
     #: 그 구간에 대해 사람이 적어 둔 말("좌측의 벤치에서 쉬어갈 수 있음", "야자매트").
     #: 배점표 낱말로는 담기지 않는, 그 자리에 가 본 사람만 아는 것이 여기 들어간다.
     note: str
+    #: 같은 경로에서 나온 조각끼리 같은 값. 조각은 원래 한 줄이던 길을 노면별로 자른
+    #: 것이라, **다시 이어 붙여야 하는 쪽**이 있다 — 진행 방향 화살표가 그렇다. 조각마다
+    #: 따로 얹으면 1100고지의 10m 계단 같은 짧은 조각에는 하나도 안 들어간다.
+    #: 한 관측지에 오르는 길이 여럿이면(다랑쉬는 둘) 그 길들도 서로 다른 값이다.
+    route: int = 0
+    #: 그 자리에 있는 것의 짧은 이름("벤치"·"평상"·"사슴동상"). `note` 의 문장을 지도
+    #: 위에 그대로 얹으면 라벨이 길을 덮으므로, 화면에 찍을 말은 사람이 따로 적는다.
+    #: 코드가 문장을 잘라 만들지 않는다 — "…의자가 있" 같은 것이 나온다.
+    landmark: str = ""
 
 
 def _segment_kind(surface: str, rock: str) -> str:
@@ -364,7 +373,7 @@ def _segments_of(routes: list[dict] | None) -> tuple[WalkSegment, ...]:
     "여기는 걸어갈 데가 없다"로 읽힌다.
     """
     out: list[WalkSegment] = []
-    for route in routes or []:
+    for rid, route in enumerate(routes or []):
         pts = [
             (float(p[0]), float(p[1]))
             for p in (route.get("points") or [])
@@ -379,7 +388,7 @@ def _segments_of(routes: list[dict] | None) -> tuple[WalkSegment, ...]:
             out.append(WalkSegment(
                 points=whole, kind=WALK_UNKNOWN, surface="", rock="",
                 metres=_path_metres(whole), slope_deg=None, slope_max_deg=None,
-                note="",
+                note="", route=rid,
             ))
             continue
 
@@ -403,6 +412,8 @@ def _segments_of(routes: list[dict] | None) -> tuple[WalkSegment, ...]:
                     slope_deg=part.get("slope_deg"),
                     slope_max_deg=part.get("slope_max_deg"),
                     note=str(part.get("note") or ""),
+                    route=rid,
+                    landmark=str(part.get("landmark") or ""),
                 )
             )
     return tuple(out)

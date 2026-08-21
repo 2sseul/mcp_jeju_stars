@@ -43,7 +43,7 @@ from zoneinfo import ZoneInfo
 from modules import maps
 from modules.clients.geocode import geocode
 from modules.core import astro, darkness, parking, places, routing, spots, toilet
-from modules.core.mapview import Fact, Item, Marker
+from modules.core.mapview import Fact, Item, Marker, Walk
 from modules.engine import graph
 from modules.schema import Response
 
@@ -778,11 +778,32 @@ def _segment_note(seg: spots.WalkSegment) -> str:
     return " · ".join(parts)
 
 
-def _walk_layers(spot: spots.Spot) -> list[tuple[list[tuple[float, float]], str, str]]:
-    """도보 구간을 지도가 받는 모양으로."""
+def _walk_layers(spot: spots.Spot, base: int = 0) -> list[Walk]:
+    """도보 구간을 지도가 받는 모양으로.
+
+    `base` 는 경로 번호를 어디서부터 매길지다. 번호는 **지도 한 장 안에서** 유일해야
+    한다 — 여러 곳을 한 장에 그릴 때 각자의 0번 경로가 같은 번호로 들어가면, 서로
+    상관없는 두 산길이 한 줄로 이어져 그 사이 허공에 방향 화살표가 생긴다.
+    """
     return [
-        (list(g.points), g.kind, _segment_note(g)) for g in spot.walk_segments
+        Walk(
+            points=tuple(g.points),
+            kind=g.kind,
+            note=_segment_note(g),
+            route=base + g.route,
+            landmark=g.landmark,
+        )
+        for g in spot.walk_segments
     ]
+
+
+def _walk_layers_of(chosen: list[spots.Spot]) -> list[Walk]:
+    """여러 곳의 도보 구간을 한 장에. 경로 번호가 곳끼리 겹치지 않게 이어 매긴다."""
+    out: list[Walk] = []
+    for spot in chosen:
+        base = out[-1].route + 1 if out else 0
+        out.extend(_walk_layers(spot, base))
+    return out
 
 
 def _origin_marker(
@@ -1142,7 +1163,7 @@ def recommend_spots(
     map_url = maps.write(
         title=f"관측지 추천 {len(rows)}곳",
         markers=markers,
-        walk_segments=[layer for s, _ in top for layer in _walk_layers(s)],
+        walk_segments=_walk_layers_of([s for s, _ in top]),
         items=items,
     )
 

@@ -18,6 +18,11 @@ DEM_GRID   = DATA / "elevation" / "jeju_dem_grid.npz"
 DEM_RAW    = DATA / "elevation" / "N33E126_FABDEM_V1-2.tif"
 SPOTS      = DATA / "jeju_spots.json"
 
+# 마커에 얹는 그림. `icon/` 의 원본을 `scripts/build_icons.py` 가 마커 크기(56px)로
+# 줄여 둔 것이고, 파일 이름이 마커 갈래다(spot·parking·toilet). 지도 HTML 이 이것을
+# 통째로 품고 나가므로(base64) 원본을 그대로 쓸 수 없다 — 셋이 합쳐 3.4MB 다.
+ICONS      = DATA / "icon"
+
 LAMPS_JEJU     = DATA / "streetlight" / "jeju_streetlight.csv"
 LAMPS_SEOGWIPO = DATA / "streetlight" / "seogwipo_streetlight.csv"
 

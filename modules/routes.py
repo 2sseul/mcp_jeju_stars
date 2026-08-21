@@ -64,8 +64,10 @@ class RecommendSpotsRequest(BaseModel):
     )
     max_walk_minutes: Optional[float] = Field(
         default=None,
-        description="주차 지점→관측 지점 편도 도보 상한(분). 0 이면 "
-                    "'주차하고 바로 보는 곳'. 예: 0 · 5 · 10.",
+        description="주차 지점→관측 지점 편도 도보 상한(분). 예: 0 · 5 · 10. "
+                    "0 은 '주차하고 바로'라는 뜻이고 도보 1분 미만인 곳이 나온다 "
+                    "('걸어가지 않아도'·'차 대고 바로' → 0). 이 조건을 주면 도보 "
+                    "시간이 확인되지 않은 곳은 빠진다.",
     )
     parking_required: bool = Field(
         default=False,
@@ -74,7 +76,8 @@ class RecommendSpotsRequest(BaseModel):
     pets: bool = Field(
         default=False,
         description="True 면 반려동물 동반 가능한 곳만. '강아지'·'반려견' → True. "
-                    "기본 False.",
+                    "기본 False. 조건이 붙은 곳(목줄 필수·일부 구역만)도 포함되므로, "
+                    "결과 각 항목의 `pets` 원문을 답에 그대로 옮긴다.",
     )
     date: Optional[str] = Field(
         default=None,
@@ -170,7 +173,7 @@ def register_routes(app: FastAPI) -> None:
         [다른 도구와] 한 장소를 지목해 "거기 별 보여?" → evaluate_place.
                      정해진 곳의 주차·화장실·반려견만 → spot_details.
         [사전 조건] 없다. **인자를 하나도 안 줘도 부를 수 있다** — 조건이 없으면
-                   오늘 밤 22시 기준 상위 3곳이 나온다. 출발지나 조건을 되묻지 말고
+                   오늘 밤 23시 기준 상위 3곳이 나온다. 출발지나 조건을 되묻지 말고
                    아는 것만 채워 일단 부른다.
         [다음] 고른 곳의 접근성은 spot_details(name), 하늘 판정은 evaluate_place(query).
 
@@ -198,8 +201,10 @@ def register_routes(app: FastAPI) -> None:
         "등산 안 하고 강아지랑 갈 수 있는 곳" → {"no_climb":true,"pets":true}
 
         추천 목록은 `spots` 배열에 있고 각 항목에 주행시간(`drive`)·도보
-        (`walk_minutes`)·야간 출입(`night_access`)이 들어 있다. 답에 쓰는 값은
-        결과에서 그대로 가져오고, 결과의 `map_url` 도 함께 옮긴다.
+        (`walk_minutes`)·구름(`cloud_cover`)·어둡기(`bortle`)·야간 출입
+        (`night_access`)이 들어 있다. **이 값들은 곳마다 다르다** — 한 곳의 구름이나
+        등급을 다른 곳에 갖다 쓰지 않는다. 답에 쓰는 값은 결과에서 그대로 가져오고,
+        결과의 `map_url` 도 함께 옮긴다.
         """
         # 본문 자체를 선택으로 둔다. 인자가 전부 Optional 이라 MCP 스키마는
         # `required: []` 로 나가는데, 본문이 필수면 `{}` 로 부른 호출이 422 로 튕긴다
@@ -313,7 +318,8 @@ def register_routes(app: FastAPI) -> None:
         - 이름을 못 찾으면 목록에 없는 곳이다 → `recommend_spots` 로 정확한 이름을
           받아 다시 부르거나, 하늘만 필요하면 `evaluate_place` 로 넘어간다.
         - 값이 "확인불가"·빈 값이면 **모르는 것이다.** 답에도 "확인되지 않았다"고
-          쓴다. `pets` 가 "반려견 동반 불가능" 이면 가능하다고 답하지 않는다.
+          쓴다. `pets`·`night_access` 는 자유 문장이라 조건이 붙어 있을 수 있으므로
+          (목줄 필수·일부 구역만·불가) **원문의 조건까지 함께 옮긴다.**
 
         [부르지 않는 경우] 제주도 밖의 장소, 별 관측과 무관한 질문(맛집·숙소 등).
 

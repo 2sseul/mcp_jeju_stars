@@ -95,6 +95,26 @@ def _now_iso() -> str:
 DEFAULT_HOUR = 23
 
 
+def _forecast_caveat(when: datetime) -> str:
+    """예보로 판정했다는 것을 답 끝에 한 줄로 밝힌다.
+
+    구름·시정은 **예보**지 관측값이 아니다. 그런데 응답 문장들이 "양호"·"최적"처럼
+    단정형이라, 그대로 옮기면 사용자에게는 확정된 사실로 읽힌다. 제주는 한라산을
+    사이에 두고 오름과 해안의 하늘이 갈리고(이 측정에서도 같은 시각 같은 섬 안에서
+    구름 9%~99% 가 나왔다) 예보도 자주 갱신된다.
+
+    날짜가 멀수록 세게 말한다 — 오늘 밤과 사흘 뒤를 같은 말로 덧붙이면, 그 말이
+    아무 곳에나 붙는 상투구가 되어 정작 읽어야 할 때 안 읽힌다.
+
+    `spot_details` 에는 붙이지 않는다. 주차·화장실·야간 출입은 예보가 아니라 사람이
+    확인해 둔 값이라 이 주의가 해당하지 않는다.
+    """
+    days = (when.date() - datetime.now(KST).date()).days
+    tail = "며칠 뒤 예보라 더 그래요 — " if days >= 2 else ""
+    return (f"참고로 구름·시정은 예보값이에요. {tail}제주는 오름과 해안 사이에서도 "
+            "하늘이 갈리고 예보가 자주 바뀌니, 떠나기 전에 한 번 더 확인해 보세요")
+
+
 
 def _resolve_when(date: str | None, time: str | None) -> datetime:
     """평가 시각을 KST datetime 으로 만든다.
@@ -258,11 +278,16 @@ def _evaluate_moment(
     reasons = list(final.get("reasons", []))
     nums = final.get("numbers", {})
 
-    # 판정을 산문 맨 앞에 한 번 더 적는다. `verdict` 는 최상위 필드로 이미 나가지만,
-    # 작은 모델은 구조화 필드를 잘 안 읽고 산문만 읽는다 — 실제로 "양호"를 한 번도
-    # 답에 옮기지 않았다. 추천 도구는 곳마다 "판정: …" 을 달고 있어 이 문제가 없다.
+    # 판정을 **완결된 문장 한 줄**로 산문 맨 앞에 둔다.
+    #
+    # 두 번 틀렸다. (1) "판정: 양호" 라는 딱지만 두었더니 모델이 낱말 "판정"은 가져가면서
+    # 값은 다른 데서 집어 왔다 — `numbers.darkness_cap` 에 "최적" 이 들어 있었기 때문이다
+    # (그 필드는 응답에서 뺐다). (2) 그래서 "판정: 양호 · 구름 20% · 어둡기 4단계" 로
+    # 세 값을 한 줄에 묶었더니, 모델이 **숫자만 집고 등급 낱말은 풀어 썼다** — 그전까지
+    # 잘 옮기던 E-04·E-07 까지 놓치기 시작했다. 숫자는 제 줄에 이미 있으므로 여기서는
+    # 등급 하나만, 인용부호를 붙인 완결 문장으로 둔다. 딱지보다 문장이 옮겨진다.
     if final.get("verdict"):
-        reasons.insert(0, f"판정: {final['verdict']}")
+        reasons.insert(0, f"이곳의 관측 조건은 '{final['verdict']}' 입니다")
 
     # 관측 가능하면 오늘 완전히 어두운 시간대를 덤으로 알려준다.
     window = nums.get("dark_window")
@@ -271,6 +296,8 @@ def _evaluate_moment(
             f"참고로 오늘 완전히 어두운 시간대는 "
             f"{window['start'][11:16]}~{window['end'][11:16]}예요"
         )
+
+    reasons.append(_forecast_caveat(when))
 
     return Response(
         verdict=final.get("verdict") or "불가",
@@ -377,6 +404,8 @@ def _evaluate_night(
         reasons.extend(result.get("darkness_reasons", []))
         if result.get("milky_way_caveat"):
             reasons.append(result["milky_way_caveat"])
+
+    reasons.append(_forecast_caveat(when))
 
     return Response(
         verdict=_night_verdict(summary, window, label),
@@ -1170,6 +1199,7 @@ def recommend_spots(
     reasons = _recommend_reasons(top, routes, show_pets=pets)
     if map_url:
         reasons.append(f"지도(고른 곳 전부): {map_url}")
+    reasons.append(_forecast_caveat(when))
 
     return Response(
         verdict=_recommend_verdict(rows, conditions),
@@ -1280,19 +1310,20 @@ def _recommend_reasons(judged: list, routes: dict, show_pets: bool = False) -> l
     for i, (s, final) in enumerate(judged, start=1):
         leg = routes.get(s.name)
         nums = final.get("numbers", {})
-        head = f"{i}. {s.name} ({s.region}·{s.kind})"
+        # 곳마다의 수치를 **이름 줄에 붙인다.** 아래 별도 줄에 두었더니 모델이 세 곳을
+        # "모두 구름이 적고 밤하늘이 어둡며" 로 뭉개고 숫자를 통째로 흘렸다(R-02·03·
+        # 05·07). 이름은 언제나 옮겨지므로, 숫자를 이름에 붙이면 같이 딸려 온다.
+        bits = []
         if leg is not None:
-            head += f" — 차로 약 {leg.minutes:.0f}분 / {leg.km:.0f}km"
-        lines.append(head)
-
-        bits = [f"판정: {final.get('verdict') or '불가'}"]
+            bits.append(f"차로 약 {leg.minutes:.0f}분 / {leg.km:.0f}km")
         cloud = nums.get("cloud_cover")
         if cloud is not None:
             bits.append(f"구름 {cloud:.0f}%")
         bortle = nums.get("bortle")
         if bortle is not None:
-            bits.append(f"밤하늘 어둡기 8단계 중 {bortle}단계")
-        lines.append("   " + " · ".join(bits))
+            bits.append(f"어둡기 {bortle}단계")
+        bits.append(f"판정 {final.get('verdict') or '불가'}")
+        lines.append(f"{i}. {s.name} ({s.region}·{s.kind}) — " + " · ".join(bits))
 
         lines.append("   " + _walk_phrase(s))
         if show_pets and s.pets:

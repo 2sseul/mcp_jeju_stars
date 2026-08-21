@@ -57,6 +57,10 @@ def satellite() -> Tiles:
     z19 네 장의 해시가 모두 달랐다(같으면 '자료 없음' 타일이다). 기본 공급자는 대부분
     z18 까지라, 키가 있으면 주차 구획과 탐방로가 눈에 띄게 선명해진다.
 
+    키가 막히면(만료·미등록) 지도는 화면에서 기본 공급자로 갈아탄다 — `write` 가
+    `fallback` 으로 함께 실어 보낸다. 이미 내보낸 지도 파일도 그 뒤로 계속 열리므로
+    갈아타기는 서버가 아니라 지도 안에 있어야 한다.
+
     **키는 지도 HTML 에 그대로 실린다.** 클라이언트가 직접 타일을 받는 방식이라
     피할 수 없다(카카오 JS 키와 같은 성격). 그래서 지도를 여는 사람에게는 키가 보인다 —
     VWorld 콘솔에서 도메인을 등록해 접근을 제한하는 것이 실질적인 통제다.
@@ -93,9 +97,13 @@ def write(
     같은 내용이면 같은 주소가 나온다(이름이 내용 해시라서). 이미 있으면 다시 쓰지
     않는다 — 추천을 두 번 물어도 파일이 두 개 생기지 않는다.
     """
+    sat = satellite()
     document = render(
         title=title,
-        satellite=satellite(),
+        satellite=sat,
+        # 키가 필요한 공급자를 쓸 때만 갈아탈 자리를 함께 실어 보낸다. 키는 언젠가
+        # 만료되거나 등록에서 빠지고, 그때 이미 나간 지도들은 배경 없이 열린다.
+        fallback=None if sat is DEFAULT_SATELLITE else DEFAULT_SATELLITE,
         markers=markers,
         walk_segments=walk_segments,
         items=items,

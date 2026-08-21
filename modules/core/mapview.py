@@ -30,6 +30,10 @@
 실사진이 있는 최대 줌은 공급자마다 다르다(`Tiles.max_native_zoom`). 그보다 더 당기면
 마지막 타일을 늘려 보여준다 — 없는 줌을 그대로 요청하면 화면이 회색으로 비어 버린다.
 
+키가 죽으면 **화면에서 갈아탄다**(`fallback`). 키가 필요한 공급자는 언젠가 막히고,
+그때 배경만 통째로 사라진 지도는 이유를 아무 데도 안 적어 준다. 서버가 미리 확인할
+수도 없다 — 타일은 지도를 여는 사람의 브라우저가 직접 받아 가기 때문이다.
+
 타일과 Leaflet 만 인터넷에서 받는다. 나머지 데이터는 전부 파일 안에 들어 있어서,
 지도를 띄우는 데 이 서버가 살아 있을 필요가 없다.
 """
@@ -155,10 +159,21 @@ def _points(path: list[tuple[float, float]] | None) -> list[list[float]]:
     return [[lat, lon] for lat, lon in (path or [])]
 
 
+def _tiles(t: Tiles) -> dict[str, object]:
+    """배경 한 겹을 화면이 읽는 모양으로."""
+    return {
+        "url": t.url,
+        "credit": t.attribution,
+        "maxNative": t.max_native_zoom,
+        "maxZoom": t.max_zoom,
+    }
+
+
 def render(
     title: str,
     markers: list[Marker],
     satellite: Tiles | None = None,
+    fallback: Tiles | None = None,
     walk_segments: list[tuple[list[tuple[float, float]], str, str]] | None = None,
     items: list[Item] | None = None,
 ) -> str:
@@ -168,6 +183,8 @@ def render(
         title: 문서 제목이자 화면 왼쪽 위 제목.
         markers: 찍을 점들. 하나도 없으면 지도를 만들지 않는다(빈 문자열).
         satellite: 위성 배경. 생략하면 키가 필요 없는 기본 공급자를 쓴다.
+        fallback: 위 배경이 타일을 못 줄 때 갈아탈 배경. 키가 필요한 공급자를 쓸 때만
+            의미가 있다 — 만료·미등록으로 막히면 화면에 바탕색만 남기 때문이다.
         walk_segments: (점렬, 갈래, 설명) 짝들. 갈래는 `계단`·`돌길`·`흙길`·`포장`
             처럼 무엇을 밟는가이며 색이 거기서 갈린다. 설명은 구간을 눌렀을 때 뜨는
             한 줄(길이·노면·경사)이다.
@@ -183,12 +200,8 @@ def render(
 
     sat = satellite or DEFAULT_SATELLITE
     data = {
-        "sat": {
-            "url": sat.url,
-            "credit": sat.attribution,
-            "maxNative": sat.max_native_zoom,
-            "maxZoom": sat.max_zoom,
-        },
+        "sat": _tiles(sat),
+        "fallback": _tiles(fallback) if fallback else None,
         "markers": [
             {
                 "lat": m.lat,
@@ -372,11 +385,14 @@ const map = L.map('map', {{
 // 움직이는 동안 새 타일을 요청하지 않는다는 뜻이고 — 애니메이션 중에 타일이
 // 갈아 끼워지지 않으니 화면이 한 장으로 늘어났다 제자리를 찾는다.
 const TILE = {{ keepBuffer: 4, updateWhenZooming: false }};
-const SAT = L.tileLayer(D.sat.url, Object.assign({{}}, TILE, {{
-  maxZoom: Math.min(D.sat.maxZoom, D.sat.maxNative + 1),
-  maxNativeZoom: D.sat.maxNative,
-  attribution: D.sat.credit
-}}));
+function tiles(t) {{
+  return L.tileLayer(t.url, Object.assign({{}}, TILE, {{
+    maxZoom: Math.min(t.maxZoom, t.maxNative + 1),
+    maxNativeZoom: t.maxNative,
+    attribution: t.credit
+  }}));
+}}
+const SAT = tiles(D.sat);
 // 일반 지도 — 지명·도로 이름을 읽어야 할 때. 위성 위에서는 글자가 잘 안 읽힌다.
 const PLAIN = L.tileLayer(
   'https://{{s}}.basemaps.cartocdn.com/rastertiles/voyager/{{z}}/{{x}}/{{y}}{{r}}.png',
@@ -388,9 +404,36 @@ const PLAIN = L.tileLayer(
   }})
 );
 SAT.addTo(map);
-L.control.layers({{ '위성사진': SAT, '일반 지도': PLAIN }}, null,
-                 {{ collapsed: false }}).addTo(map);
+const LAYERS = L.control.layers({{ '위성사진': SAT, '일반 지도': PLAIN }}, null,
+                                {{ collapsed: false }}).addTo(map);
 L.control.scale({{ imperial:false }}).addTo(map);
+
+// 위성 배경이 안 오면 키가 필요 없는 공급자로 갈아탄다.
+//
+// 키가 만료되거나 등록에서 빠지면 공급자는 그림 대신 오류 문서를 준다 — 게다가 200 으로
+// 준다(브이월드가 그렇다). 브라우저는 그것을 그림으로 못 읽고, 남는 것은 타일이 아직
+// 안 온 자리의 바탕색뿐이다. **지도는 열리는데 배경만 없는** 화면이 되고, 여는 사람에게는
+// 이유가 아무 데도 안 보인다.
+//
+// 서버가 미리 막을 수 없는 종류의 고장이다. 타일은 지도를 여는 브라우저가 공급자에게
+// 직접 받아 가고, 한 번 내보낸 지도 파일은 그 뒤로도 계속 열린다 — 어제 되던 키가
+// 오늘 막히면 이미 나간 지도들이 전부 같이 죽는다. 그래서 실패를 화면에서 받는다.
+//
+// 넉 장이 실패해야 옮긴다. 가장자리 한 장이 비는 것과 배경이 통째로 없는 것은 다르고,
+// 앞의 것 때문에 공급자를 바꾸면 더 선명한 사진을 공짜로 내주는 셈이다.
+// 사람이 직접 '일반 지도'로 바꿔 둔 뒤라면 건드리지 않는다.
+if (D.fallback) {{
+  const BACKUP = tiles(D.fallback);
+  let misses = 0;
+  SAT.on('tileerror', () => {{
+    if (++misses < 4 || !map.hasLayer(SAT)) return;
+    SAT.off('tileerror');
+    map.removeLayer(SAT);
+    LAYERS.removeLayer(SAT);
+    BACKUP.addTo(map);
+    LAYERS.addBaseLayer(BACKUP, '위성사진');
+  }});
+}}
 
 const bounds = [];
 

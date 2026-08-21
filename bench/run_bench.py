@@ -19,6 +19,9 @@ import statistics
 import sys
 import time
 from pathlib import Path
+from urllib.parse import urlparse
+
+import httpx
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -54,9 +57,34 @@ def slug(s: str) -> str:
 # arm T — 정답 생성 + 도구 로직 시간
 # ────────────────────────────────────────────────────────────────────────
 
+def map_status(map_url: str | None) -> int | None:
+    """도구가 준 지도 주소가 **실제로 열리는가.** (HTTP 상태 코드, 없으면 None)
+
+    왜 재는가 — 채점의 `map_relayed` 는 `/maps/<해시>` 조각이 답변에 실렸는지만 본다.
+    주소가 죽었는지는 안 본다. 실제로 두 번 놓쳤다:
+
+    1. `MAP_BASE_URL` 이 꺼진 ngrok 터널을 가리켜 내보낸 주소가 전부 죽어 있었다(§9.4).
+    2. 파일 이름 해시를 16 → 10자리로 줄이면서 서빙 쪽 이름 검사식(`maps.NAME_RE`)을
+       못 고쳐, 새로 만든 지도가 전부 404 였다. 그 동안 지도 전달률은 100% 로 찍혔다.
+
+    **겉면 호스트가 아니라 경로로 친다.** `map_url` 의 호스트는 `MAP_BASE_URL`(배포마다
+    다르고, 컨테이너 안에서는 127.0.0.1 이 자기 자신이다)이라 그대로 때리면 뜻이 없다.
+    경로만 떼어 MCP 서버에 직접 물어, "서버가 이 파일을 내줄 수 있는가"를 본다.
+    겉면 주소가 밖에서 열리는지는 배포 설정 문제라 여기서 가르지 않는다.
+    """
+    if not map_url:
+        return None
+    path = urlparse(map_url).path
+    base = MCP_URL.rstrip("/")
+    try:
+        return httpx.get(f"{base}{path}", timeout=20.0).status_code
+    except Exception:
+        return 0        # 연결 자체가 안 됨 — 404 와 갈라 두면 원인을 찾기 쉽다
+
+
 async def tool_floor(reps: int = 3) -> None:
     client, box = await open_toolbox(MCP_URL)
-    gold, timing = {}, {}
+    gold, timing, bad_maps = {}, {}, []
     try:
         for case in CASES:
             if not case["gold_tool"]:
@@ -71,10 +99,15 @@ async def tool_floor(reps: int = 3) -> None:
             for _ in range(reps):
                 text, rtt, err = await box.call(name, args)
                 warm.append(rtt)
+            resp = json.loads(text)
+            code = map_status(resp.get("map_url"))
+            if code is not None and code != 200:
+                bad_maps.append((case["id"], resp.get("map_url"), code))
             gold[case["id"]] = {
                 "tool": name,
                 "args": args,
-                "response": json.loads(text),
+                "response": resp,
+                "map_http": code,
             }
             timing[case["id"]] = {
                 "tool": name,
@@ -94,6 +127,13 @@ async def tool_floor(reps: int = 3) -> None:
                    ensure_ascii=False, indent=1), encoding="utf-8")
     (RESULTS / "tool_timing.json").write_text(
         json.dumps(timing, ensure_ascii=False, indent=1), encoding="utf-8")
+    if bad_maps:
+        print(f"  !! 열리지 않는 지도 {len(bad_maps)}건 — 답변에 실려도 사용자에게 닿지 않는다")
+        for cid, url, code in bad_maps:
+            print(f"     {cid}  HTTP {code}  {url}")
+    else:
+        served = sum(1 for g in gold.values() if g.get("map_http") == 200)
+        print(f"  지도 {served}건 전부 열린다 (HTTP 200)")
     print(f"  → {RESULTS/'gold.json'} · {RESULTS/'tool_timing.json'}")
 
 
@@ -176,7 +216,7 @@ def main() -> None:
                    help="표시 이름 또는 ollama 태그 (생략 시 6종 전부)")
     p.add_argument("--reps", type=int, default=3)
     p.add_argument("--cases", nargs="*", default=None, help="케이스 id 필터")
-    p.add_argument("--variant", default="v0", choices=["v0", "v1", "v2"],
+    p.add_argument("--variant", default="v0", choices=["v0", "v1", "v2", "v3"],
                    help="도구 설명 판본. v0=서버 그대로, v1·v2=증강(bench/tool_desc_<판본>.py)")
     a = p.parse_args()
 

@@ -321,6 +321,31 @@ def score_run(run: dict, gold: dict, known: set) -> dict:
     fake = [u for u in urls if not (stem and stem in u.lower())]
     out["mapfake_parts"] = (len(fake), len(urls)) if urls else (0, 0)
 
+    # 실패를 네 갈래로 나눈다. "틀렸다"만 세면 설명을 어디부터 고칠지 알 수 없다.
+    #   tool     — 다른 도구를 골랐다        → 의도 명확화·키워드 배치 문제
+    #   param    — 도구는 맞고 인자가 틀렸다  → 인자 주석의 형식·범위·제외가 모자람
+    #   workflow — 사전 조건 도구를 안 불렀다 → [사전 조건]·[다음] 힌트가 모자람
+    #   ground   — 호출은 옳고 답이 근거를 놓쳤다 → 응답 산문·결과 인용 문제
+    # 이 서버에는 성능 제약(타임아웃·레이트리밋) 실패가 없다. 없는 갈래는 세지 않는다.
+    fail = None
+    if case["gold_tool"] is None:
+        if calls:
+            fail = "tool"
+    elif not out["tsa"]:
+        fail = "tool"
+    elif out["invalid"]:
+        fail = "workflow"
+    elif out["aem"] is False:
+        fail = "param"
+    elif (hit / tot if tot else 1.0) < 0.5:
+        fail = "ground"
+    out["fail_kind"] = fail
+
+    # PCA — 도구를 옳게 고른 호출 중 인자까지 유효했던 비율. AEM 과 달리 분모가
+    # "정답 도구를 고른 호출"이라, 도구 선택 정확도와 인자 구성 정확도를 갈라 준다.
+    out["pca"] = None if not out["tsa"] or out["aem"] is None else bool(
+        out["aem"] and not out["invalid"])
+
     abst = bool(_ABSTAIN.search(ans))
     out["abstain_ok"] = abst if case.get("abstain") else None
     forbidden = any(re.search(p, ans) for p in case.get("forbid", []))
@@ -496,6 +521,26 @@ def main() -> None:
         if den:
             w(f"| {lb} · {marm} | {pct(r)} | {num}/{den} |")
     w("")
+
+    # 옮겼는지와 **열리는지는 다른 질문이다.** 전달률이 100% 인데 주소가 전부 죽어
+    # 있던 적이 두 번 있다(꺼진 ngrok 터널 · 파일 이름 검사식 불일치). 그래서 arm T 가
+    # 정답을 만들 때 실제로 GET 해 본 상태 코드를 여기 함께 싣는다.
+    codes = [(cid, g.get("map_http")) for cid, g in gold.items()
+             if g.get("map_http") is not None]
+    if codes:
+        dead = [(cid, c) for cid, c in codes if c != 200]
+        if dead:
+            w(f"**받은 지도 주소 {len(codes)}건 중 {len(dead)}건이 열리지 않는다.** "
+              "옮겨져도 사용자에게 닿지 않으므로 전달률과 함께 읽어야 한다.
+")
+            w("| 케이스 | HTTP |")
+            w("|---|---|")
+            for cid, c in dead:
+                w(f"| {cid} | {c if c else '연결 실패'} |")
+        else:
+            w(f"받은 지도 주소 {len(codes)}건은 **전부 열린다**(HTTP 200). "
+              "arm T 가 정답을 만들 때 실제로 조회해 확인한 값이다.")
+        w("")
 
     # 4. 지연 분해
     w("## 4. 지연 분해 — LLM 시간과 도구 로직 시간을 갈라서\n")

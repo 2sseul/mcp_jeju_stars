@@ -1,0 +1,961 @@
+<title>제주 별 MCP 검수대</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@300;400;500;600&display=swap">
+<style>
+:root{
+  --paper:#F4F6FA; --surface:#FFFFFF; --surface-2:#EEF1F7;
+  --ink:#141A26; --muted:#5B6478; --line:#DDE3EC;
+  --accent:#3A4FC4; --accent-soft:#E4E8FA;
+  --good:#0B6E5F; --good-soft:#DCF0EB;
+  --bad:#C03A22;  --bad-soft:#FBE2DC;
+  --warn:#8A6300; --warn-soft:#F7ECD4;
+  --shadow:0 1px 2px rgba(20,26,38,.05),0 8px 24px -16px rgba(20,26,38,.28);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0D1119; --surface:#151B27; --surface-2:#1B2231;
+    --ink:#E6EAF2; --muted:#8B97AC; --line:#242D3E;
+    --accent:#92A2FF; --accent-soft:#1E2643;
+    --good:#4FD1B4; --good-soft:#123029;
+    --bad:#FF8A6E;  --bad-soft:#3A1D16;
+    --warn:#E2B25A; --warn-soft:#332711;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -16px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0D1119; --surface:#151B27; --surface-2:#1B2231;
+  --ink:#E6EAF2; --muted:#8B97AC; --line:#242D3E;
+  --accent:#92A2FF; --accent-soft:#1E2643;
+  --good:#4FD1B4; --good-soft:#123029;
+  --bad:#FF8A6E;  --bad-soft:#3A1D16;
+  --warn:#E2B25A; --warn-soft:#332711;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -16px rgba(0,0,0,.7);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  font-size:15px; line-height:1.7; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1080px; margin:0 auto; padding:0 24px 140px}
+
+/* ── 머리 ── */
+header.top{
+  position:sticky; top:0; z-index:20; background:var(--paper);
+  border-bottom:1px solid var(--line);
+}
+.top-inner{max-width:1080px; margin:0 auto; padding:20px 24px 0}
+.eyebrow{
+  font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:11px;
+  letter-spacing:.16em; text-transform:uppercase; color:var(--muted); margin:0 0 6px;
+}
+h1{
+  font-family:"Gowun Batang","Apple SD Gothic Neo",serif; font-weight:700;
+  font-size:clamp(26px,3.4vw,38px); line-height:1.2; margin:0 0 4px; text-wrap:balance;
+}
+.sub{color:var(--muted); font-size:13.5px; margin:0 0 18px}
+.sub code{font-family:"IBM Plex Mono",monospace; font-size:12.5px; color:var(--ink)}
+
+.rail{display:flex; flex-wrap:wrap; gap:10px; margin:0 0 18px}
+.stat{
+  flex:1 1 132px; background:var(--surface); border:1px solid var(--line);
+  border-radius:10px; padding:10px 12px; box-shadow:var(--shadow);
+}
+.stat .k{font-size:11px; letter-spacing:.08em; color:var(--muted); text-transform:uppercase;
+  font-family:"IBM Plex Mono",monospace}
+.stat .v{font-size:24px; font-weight:600; font-variant-numeric:tabular-nums; line-height:1.25}
+.stat .d{font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums}
+.stat.is-good .v{color:var(--good)} .stat.is-bad .v{color:var(--bad)}
+
+.filters{display:flex; flex-wrap:wrap; gap:8px; padding-bottom:16px}
+.filters button{
+  font:inherit; font-size:13px; padding:5px 12px; border-radius:999px; cursor:pointer;
+  border:1px solid var(--line); background:var(--surface); color:var(--muted);
+}
+.filters button:hover{border-color:var(--accent); color:var(--ink)}
+.filters button[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:#fff}
+.filters button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+:root[data-theme="dark"] .filters button[aria-pressed="true"],
+.filters button[aria-pressed="true"]{color:#fff}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) .filters button[aria-pressed="true"]{color:#0D1119}
+}
+
+/* ── 범례 ── */
+.legend{
+  display:flex; flex-wrap:wrap; gap:8px 18px; margin:20px 0 26px; padding:14px 16px;
+  background:var(--surface); border:1px solid var(--line); border-radius:10px; font-size:13px;
+}
+.legend b{font-weight:500; color:var(--muted)}
+
+/* ── 케이스 카드 ── */
+.case{
+  background:var(--surface); border:1px solid var(--line); border-radius:12px;
+  margin:0 0 18px; overflow:hidden; box-shadow:var(--shadow);
+  border-left:4px solid var(--good);
+}
+.case.fail{border-left-color:var(--bad)}
+.case.warn{border-left-color:var(--warn)}
+.case-head{display:flex; flex-wrap:wrap; align-items:baseline; gap:10px; padding:16px 20px 0}
+.cid{font-family:"IBM Plex Mono",monospace; font-weight:600; font-size:13px; color:var(--accent)}
+.tag{
+  font-size:11px; letter-spacing:.06em; padding:2px 8px; border-radius:999px;
+  background:var(--surface-2); color:var(--muted);
+}
+.tag.pass{background:var(--good-soft); color:var(--good)}
+.tag.fail{background:var(--bad-soft); color:var(--bad)}
+.tag.warn{background:var(--warn-soft); color:var(--warn)}
+.q{
+  font-family:"Gowun Batang","Apple SD Gothic Neo",serif; font-size:20px; line-height:1.45;
+  margin:8px 20px 14px; text-wrap:balance;
+}
+.rows{display:grid; grid-template-columns:88px 1fr; gap:2px 14px; padding:0 20px 4px; font-size:13.5px}
+.rows dt{color:var(--muted); font-size:12px; padding-top:3px}
+.rows dd{margin:0; min-width:0; overflow-x:auto}
+code.chip{
+  font-family:"IBM Plex Mono",monospace; font-size:12.5px; background:var(--surface-2);
+  border:1px solid var(--line); border-radius:6px; padding:1px 7px; white-space:nowrap;
+}
+code.chip.none{background:var(--bad-soft); border-color:transparent; color:var(--bad)}
+table.spots{
+  border-collapse:collapse; font-size:13px; margin:2px 0 4px;
+  font-variant-numeric:tabular-nums; min-width:100%;
+}
+table.spots th{
+  text-align:left; font-weight:500; font-size:11px; letter-spacing:.05em; color:var(--muted);
+  border-bottom:1px solid var(--line); padding:2px 12px 4px 0; white-space:nowrap;
+}
+table.spots td{padding:4px 12px 4px 0; border-bottom:1px solid var(--line); white-space:nowrap}
+table.spots tr:last-child td{border-bottom:0}
+table.spots td:first-child{font-weight:500}
+.chk{
+  font-size:10px; letter-spacing:.04em; padding:1px 5px; border-radius:4px;
+  background:var(--accent-soft); color:var(--accent); vertical-align:1px;
+}
+code.chip b{color:var(--accent); font-weight:600}
+.muted{color:var(--muted); font-size:12.5px}
+
+.answer{
+  margin:14px 20px 18px; padding:14px 16px; background:var(--surface-2);
+  border:1px solid var(--line); border-radius:10px; font-size:14px; line-height:1.85;
+  overflow-x:auto;
+}
+.answer .empty{color:var(--muted); font-style:italic}
+details.base{margin:0 20px 18px}
+details.base summary{
+  cursor:pointer; font-size:12.5px; color:var(--muted); list-style:none;
+  padding:6px 10px; border:1px dashed var(--line); border-radius:8px; display:inline-block;
+}
+details.base summary::-webkit-details-marker{display:none}
+details.base summary:hover{color:var(--ink); border-color:var(--accent)}
+details.base[open] summary{margin-bottom:10px}
+details.base .answer{margin:0}
+
+mark{background:none; color:inherit; padding:0 1px; border-radius:3px}
+mark.ok-num{color:var(--good); background:var(--good-soft); font-weight:500}
+mark.bad-num{color:var(--bad); background:var(--bad-soft); font-weight:600;
+  box-shadow:inset 0 -2px 0 var(--bad)}
+mark.ok-url{color:var(--accent); background:var(--accent-soft); word-break:break-all}
+mark.bad-url{color:var(--bad); background:var(--bad-soft); word-break:break-all;
+  box-shadow:inset 0 -2px 0 var(--bad)}
+mark.ok-place{box-shadow:inset 0 -1px 0 var(--good)}
+mark.bad-place{color:var(--warn); box-shadow:inset 0 -2px 0 var(--warn)}
+mark.latin{color:var(--warn); background:var(--warn-soft); font-style:italic}
+mark.jargon{
+  color:var(--accent); cursor:help;
+  box-shadow:inset 0 -2px 0 var(--accent-soft), inset 0 -3px 0 -1px var(--accent);
+}
+.tag.jargon{background:var(--accent-soft); color:var(--accent)}
+
+.sw{display:inline-block; width:11px; height:11px; border-radius:3px; vertical-align:-1px; margin-right:5px}
+.sw.g{background:var(--good-soft); box-shadow:inset 0 0 0 1px var(--good)}
+.sw.b{background:var(--bad-soft); box-shadow:inset 0 0 0 1px var(--bad)}
+.sw.a{background:var(--accent-soft); box-shadow:inset 0 0 0 1px var(--accent)}
+.sw.w{background:var(--warn-soft); box-shadow:inset 0 0 0 1px var(--warn)}
+.sw.j{background:var(--accent-soft); box-shadow:inset 0 0 0 1px var(--accent)}
+
+/* ── 사람 판정 ── */
+.judge{
+  display:flex; flex-wrap:wrap; align-items:center; gap:8px;
+  margin:0 20px 18px; padding-top:14px; border-top:1px dashed var(--line);
+}
+.judge .lbl{font-size:12px; color:var(--muted); margin-right:4px}
+.jbtn{
+  font:inherit; font-size:13px; padding:5px 15px; border-radius:8px; cursor:pointer;
+  border:1px solid var(--line); background:var(--surface); color:var(--muted);
+}
+.jbtn:hover{border-color:var(--accent); color:var(--ink)}
+.jbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.jbtn.o[aria-pressed="true"]{background:var(--good); border-color:var(--good); color:var(--surface)}
+.jbtn.x[aria-pressed="true"]{background:var(--bad); border-color:var(--bad); color:var(--surface)}
+.jclear{font:inherit; font-size:12px; background:none; border:0; color:var(--muted);
+  cursor:pointer; text-decoration:underline; padding:4px}
+.jclear:hover{color:var(--ink)}
+.fix{display:none; width:100%; margin-top:6px}
+.judge.is-x .fix{display:block}
+.fix .why{font-size:12px; color:var(--muted); margin:0 0 6px}
+.fix .chips{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px}
+.fix .chips button{
+  font:inherit; font-size:12px; padding:3px 11px; border-radius:999px; cursor:pointer;
+  border:1px dashed var(--line); background:transparent; color:var(--muted);
+}
+.fix .chips button:hover{border-color:var(--warn); color:var(--ink)}
+.fix .chips button[aria-pressed="true"]{
+  background:var(--warn-soft); border-style:solid; border-color:var(--warn); color:var(--warn);
+}
+.fix textarea{
+  width:100%; min-height:66px; resize:vertical; font:inherit; font-size:13.5px;
+  padding:10px 12px; border-radius:8px; border:1px solid var(--line);
+  background:var(--surface-2); color:var(--ink);
+}
+.fix textarea:focus{outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent)}
+.case.judged-o{border-left-color:var(--good)}
+.case.judged-x{border-left-color:var(--bad)}
+.seal{font-size:12px; font-weight:600; margin-left:auto}
+.seal.o{color:var(--good)} .seal.x{color:var(--bad)}
+
+/* ── 내보내기 독 ── */
+.dock{
+  position:fixed; left:0; right:0; bottom:0; z-index:30; background:var(--surface);
+  border-top:1px solid var(--line); box-shadow:0 -10px 30px -22px rgba(0,0,0,.6);
+  max-height:78vh; overflow-y:auto;
+}
+.dock-bar{max-width:1080px; margin:0 auto; padding:10px 24px; display:flex;
+  align-items:center; gap:12px; flex-wrap:wrap}
+.dock .prog{font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums}
+.dock .prog b{color:var(--ink); font-weight:600}
+.dock .prog .o{color:var(--good)} .dock .prog .x{color:var(--bad)}
+.dock button.act{
+  font:inherit; font-size:13px; padding:6px 15px; border-radius:8px; cursor:pointer;
+  border:1px solid var(--accent); background:var(--accent); color:#fff;
+}
+.dock button.act:first-of-type{margin-left:auto}
+.dock button.ghost{background:transparent; color:var(--muted); border-color:var(--line)}
+.dock button.ghost:hover{color:var(--ink); border-color:var(--accent)}
+.dock button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.dock-panel{display:none; max-width:1080px; margin:0 auto; padding:0 24px 20px}
+.dock.open .dock-panel{display:block}
+.dock-panel h3{font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted);
+  margin:14px 0 6px; font-weight:500; font-family:"IBM Plex Mono",monospace}
+.dock-panel p.how{font-size:12.5px; color:var(--muted); margin:0 0 8px}
+.dock-panel textarea{
+  width:100%; height:160px; font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:12px;
+  line-height:1.6; padding:10px 12px; border-radius:8px; border:1px solid var(--line);
+  background:var(--surface-2); color:var(--ink); resize:vertical;
+}
+
+.hidden{display:none}
+footer{color:var(--muted); font-size:12.5px; border-top:1px solid var(--line); padding-top:18px; margin-top:32px}
+@media (max-width:640px){
+  .rows{grid-template-columns:1fr; gap:0}
+  .rows dt{padding-top:8px}
+}
+</style>
+<header class="top"><div class="top-inner">
+  <p class="eyebrow">Jeju-Star MCP · 사람 검수</p>
+  <h1>qwen3.5-4b 가 도구를 부르고 쓴 답, 24 케이스</h1>
+  <p class="sub">운영 서버가 지금 주는 도구 설명 그대로 · 케이스당 3회 · 정답은 <code>2026-08-21T04:51:10+0000</code> 에 도구를 직접 불러 만든 것</p>
+  <div class="rail">
+    <div class="stat is-good"><div class="k">도구 선택 TSA</div><div class="v">100.0%</div><div class="d">72/72</div></div>
+    <div class="stat is-good"><div class="k">인자 일치 AEM</div><div class="v">100.0%</div><div class="d">60/60</div></div>
+    <div class="stat "><div class="k">근거 재현 GFR</div><div class="v">82.8%</div><div class="d">159/192</div></div>
+    <div class="stat is-bad"><div class="k">환각 수치 FNR</div><div class="v">1.3%</div><div class="d">3/229</div></div>
+    <div class="stat "><div class="k">지도 전달</div><div class="v">100.0%</div><div class="d">60/60</div></div>
+    <div class="stat "><div class="k">과제 성공 TSR</div><div class="v">87.5%</div><div class="d">63/72</div></div>
+  </div>
+  <div class="filters">
+    <button data-cat="all">전체 24</button>
+    <button data-cat="recommend">추천 7</button>
+    <button data-cat="evaluate">판정 8</button>
+    <button data-cat="details">상세 5</button>
+    <button data-cat="no-tool">도구 금지 4</button>
+    <button data-only="1">눈여겨볼 것만</button>
+    <button data-todo="1">아직 안 본 것만</button>
+  </div>
+</div></header>
+<div class="wrap">
+  <div class="legend">
+    <span><span class="sw g"></span><b>근거 있는 수치</b> — 도구 응답이나 질문에 있는 값</span>
+    <span><span class="sw b"></span><b>환각 수치 · 위조 주소</b> — 어디에도 없는 값</span>
+    <span><span class="sw a"></span><b>도구가 준 지도 주소</b></span>
+    <span><span class="sw w"></span><b>검증 목록에 없는 지명</b> (추천 케이스만) · <b><i>한국어 답에 섞인 영어</i></b></span>
+    <span><span class="sw j"></span><b>어려운 말</b> — 짚어 보면 풀어 쓴 뜻이 나옵니다</span>
+  </div>
+<article class="case pass" data-cat="recommend" data-flag="pass">
+<div class="case-head">
+<span class="cid">R-01</span>
+<span class="tag">추천</span>
+<span class="tag pass">도구 선택 3/3</span>
+<span class="tag pass">인자 일치 3/3</span>
+<span class="tag warn">근거 21/24</span>
+<span class="tag pass">환각 수치 0건</span>
+<span class="tag pass">지도 3/3</span>
+</div>
+<p class="q">제주공항에서 차로 40분 안에 갈 수 있는 별 보기 좋은 곳 3군데 알려줘.</p>
+<dl class="rows">
+<dt>기대 호출</dt><dd><code class="chip"><b>recommend_spots</b> {&quot;origin&quot;: &quot;제주공항&quot;, &quot;max_drive_minutes&quot;: 40}</code></dd>
+<dt>실제 호출</dt><dd><code class="chip"><b>recommend_spots</b> {&quot;origin&quot;: &quot;제주공항&quot;, &quot;max_drive_minutes&quot;: 40, &quot;limit&quot;: 3}</code></dd>
+<dt>도구 정답</dt><dd><table class="spots"><thead><tr><th>도구가 고른 곳</th><th>구름</th><th>어둡기</th><th>차로</th><th>도보</th></tr></thead><tbody><tr><td>어리목입구주차장 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>26.0% <span class="chk" title="이 값이 채점 대상">채점</span></td><td>4 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>19.8분 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>0.3분</td></tr><tr><td>물영아리오름 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>50.0%</td><td>4</td><td>38.5분 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>34.8분</td></tr><tr><td>아부오름 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>26.0%</td><td>4</td><td>39.3분 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>5.4분</td></tr></tbody></table></dd>
+<dt>답에 없던 값</dt><dd><span class="muted">spots[0].bortle=4</span></dd>
+</dl>
+<div class="answer">지도: <mark class="ok-url" title="도구가 준 지도 주소 그대로">http://127.0.0.1:11000/maps/55474da06f.html</mark><br><br>제주공항에서 차로 <mark class="ok-num" title="도구 응답·질문에 있는 값">40 분</mark> 안에 갈 수 있는 별 관측지 3 군데를 추천해 드립니다. <mark class="ok-place" title="검증된 62곳에 있는 이름">어리목입구주차장</mark>은 중산간 고지로, 차로 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">20 분</mark> 소요되며 구름이 <mark class="ok-num" title="도구 응답·질문에 있는 값">26%</mark> 로 밤하늘이 매우 어둡습니다. <mark class="ok-place" title="검증된 62곳에 있는 이름">물영아리오름</mark>은 남쪽 습지 오름으로, 차로 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">38 분</mark> 걸리며 밝은 별만 관측할 수 있습니다. <mark class="ok-place" title="검증된 62곳에 있는 이름">아부오름</mark>은 동쪽 원형 분화구로, 차로 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">39 분</mark> 소요되며 넓은 시야를 자랑합니다.</div>
+<details class="base"><summary>도구 없이 쓴 답(baseline)과 비교</summary>
+<div class="answer">제주공항에서 차로 <mark class="ok-num" title="도구 응답·질문에 있는 값">40 분</mark> 이내로 이동 가능한 관측지는 **제주시 해수욕장** (약 <mark class="ok-num" title="도구 응답·질문에 있는 값">25 분</mark>, 구름 영향 확인 필요), **서귀포시 <mark class="bad-place" title="검증 목록에 없는 이름">성산일출봉</mark> 전망대** (약 <mark class="ok-num" title="도구 응답·질문에 있는 값">35 분</mark>, 등급 4 등), 그리고 **아라섬 해변** (약 <mark class="ok-num" title="도구 응답·질문에 있는 값">40 분</mark>, 등급 3 등) 입니다.<br><br>오늘 밤하늘은 월광의 간섭과 지역적 구름 상태에 따라 관측 조건이 달라질 수 있으므로, 정확한 구량량과 별의 밝기 등급은 현장 확인이 필요합니다. 이 세 곳은 도시 조명 대비 상대적으로 어두운 편이나, 제주공항 인근이라 완전한 천문대 수준의 관측은 어렵습니다.<br><br>별관측을 원하신다면 이동 시간과 예상 구름량을 고려하여 가장 가까운 곳으로 먼저 가보시는 것을 추천합니다.</div></details>
+<div class="judge" data-cid="R-01"><span class="lbl">이 답,</span><button type="button" class="jbtn o" data-v="O" aria-pressed="false">잘 나옴</button><button type="button" class="jbtn x" data-v="X" aria-pressed="false">안 나옴</button><button type="button" class="jclear hidden">지우기</button><span class="seal"></span><div class="fix"><p class="why">어디를 고쳐야 하나 — 자리를 고르고, 무엇이 어떻게 되어야 하는지 한 줄 적습니다.</p><div class="chips"><button type="button" data-tag="도구 설명" title="modules/routes.py 의 도구·인자 설명" aria-pressed="false">도구 설명</button><button type="button" data-tag="시스템 프롬프트" title="bench/harness.py 의 역할·답변 규칙" aria-pressed="false">시스템 프롬프트</button><button type="button" data-tag="도구 응답" title="modules/tools.py 가 돌려주는 값·문장" aria-pressed="false">도구 응답</button><button type="button" data-tag="서버 로직" title="판정·경로·천문 계산 자체" aria-pressed="false">서버 로직</button><button type="button" data-tag="채점 규칙" title="score.py 가 사람과 다르게 셈" aria-pressed="false">채점 규칙</button><button type="button" data-tag="케이스 설계" title="질문·정답이 잘못 잡힘" aria-pressed="false">케이스 설계</button></div><textarea rows="3" placeholder="예: 도구가 준 verdict 를 답변 첫 문단에 그대로 옮기게 해야 한다"></textarea></div></div>
+</article><article class="case pass" data-cat="recommend" data-flag="pass">
+<div class="case-head">
+<span class="cid">R-02</span>
+<span class="tag">추천</span>
+<span class="tag pass">도구 선택 3/3</span>
+<span class="tag pass">인자 일치 3/3</span>
+<span class="tag pass">근거 15/15</span>
+<span class="tag pass">환각 수치 0건</span>
+<span class="tag pass">지도 3/3</span>
+</div>
+<p class="q">제주 동쪽에서 별 보기 좋은 데 추천해줘.</p>
+<dl class="rows">
+<dt>기대 호출</dt><dd><code class="chip"><b>recommend_spots</b> {&quot;region&quot;: &quot;동&quot;}</code></dd>
+<dt>실제 호출</dt><dd><code class="chip"><b>recommend_spots</b> {&quot;region&quot;: &quot;동&quot;, &quot;limit&quot;: 3}</code></dd>
+<dt>도구 정답</dt><dd><table class="spots"><thead><tr><th>도구가 고른 곳</th><th>구름</th><th>어둡기</th><th>차로</th><th>도보</th></tr></thead><tbody><tr><td>아부오름 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>26.0% <span class="chk" title="이 값이 채점 대상">채점</span></td><td>4 <span class="chk" title="이 값이 채점 대상">채점</span></td><td></td><td>5.4분</td></tr><tr><td>다랑쉬오름 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>13.0%</td><td>4</td><td></td><td>40.1분</td></tr><tr><td>부소오름주차장 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>26.0%</td><td>4</td><td></td><td>0.2분</td></tr></tbody></table></dd>
+</dl>
+<div class="answer">지도: <mark class="ok-url" title="도구가 준 지도 주소 그대로">http://127.0.0.1:11000/maps/2604322eca.html</mark><br><br>제주 동쪽에서 추천하는 별 관측지는 다음과 같습니다.<br><br>첫 번째는 **<mark class="ok-place" title="검증된 62곳에 있는 이름">아부오름</mark>**입니다. 넓은 원형 분화구와 트인 시야로 유명하며, 송당 일대 어두운 하늘을 자랑합니다. 야간 출입은 상시 개방되어 있고, 주차장에서 관측지까지 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">6 분</mark> 정도 걸립니다. 구름은 <mark class="ok-num" title="도구 응답·질문에 있는 값">26%</mark> 로 양호한 상태이며, 밤하늘 어둡기 등급은 4 단계로 별이 잘 보입니다.<br><br>두 번째는 **<mark class="ok-place" title="검증된 62곳에 있는 이름">다랑쉬오름</mark>**입니다. &#x27;오름의 여왕&#x27;이라 불리며 표고 <mark class="ok-num" title="도구 응답·질문에 있는 값">382m</mark> 의 정상에서 <mark class="ok-num" title="도구 응답·질문에 있는 값">360 도</mark> 파노라마를 감상할 수 있습니다. 한라산과 성산 <mark class="bad-place" title="검증 목록에 없는 이름">일출봉</mark>까지 조망 가능하고, 주변 광원이 적어 다크스카이 촬영지로 인기가 많습니다. 주차장에서 관측지까지 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">43 분</mark> 소요되며, 구름은 <mark class="ok-num" title="도구 응답·질문에 있는 값">13%</mark> 로 매우 맑습니다.<br><br>세 번째는 **<mark class="bad-place" title="검증 목록에 없는 이름">부소오름</mark>주차장**입니다. 카카오맵 주차장 전수 수집에서 해발 <mark class="ok-num" title="도구 응답·질문에 있는 값">200m</mark> 이상 중산간 지점에 뽑힌 곳으로, 좌표가 곧 주차 지점입니다. 평지 위를 걷기만 하면 <mark class="ok-num" title="도구 응답·질문에 있는 값">0.2 분</mark> 만에 바로 관측이 가능하고, 야간 출입도 상시 개방되어 있습니다. 구름은 <mark class="ok-num" title="도구 응답·질문에 있는 값">26%</mark> 로 양호하며 밤하늘 어둡기 등급도 4 단계로 좋은 조건을 갖추고 있습니다.</div>
+<details class="base"><summary>도구 없이 쓴 답(baseline)과 비교</summary>
+<div class="answer">2026 년 8 월 20 일 제주도의 밤하늘 관측은 주로 서쪽 해안선과 남서쪽 산지가 가장 유리합니다. 동쪽 지역은 해가 뜨기 전까지도 지평선이 낮아 별을 보기 어렵습니다.<br><br>관측하기 좋은 곳은 서귀포시 성산읍 성산성 주변이나 제주시 삼다수길 인근 등 서해안 평지입니다. 이곳에서 관측하려면 약 <mark class="bad-num" title="도구 응답에도 질문에도 없는 값 — 환각">45 분</mark>의 주행시간이 필요하며, 도보로 이동하면 <mark class="ok-num" title="도구 응답·질문에 있는 값">30 분</mark> 정도 소요됩니다.<br><br>오늘은 구름이 적어 관측 등급을 4 점 중 3 점으로 평가할 수 있습니다. 다만 동쪽 지역은 해가 뜨기 전까지도 지형적 제약으로 인해 별을 보기 어렵습니다.</div></details>
+<div class="judge" data-cid="R-02"><span class="lbl">이 답,</span><button type="button" class="jbtn o" data-v="O" aria-pressed="false">잘 나옴</button><button type="button" class="jbtn x" data-v="X" aria-pressed="false">안 나옴</button><button type="button" class="jclear hidden">지우기</button><span class="seal"></span><div class="fix"><p class="why">어디를 고쳐야 하나 — 자리를 고르고, 무엇이 어떻게 되어야 하는지 한 줄 적습니다.</p><div class="chips"><button type="button" data-tag="도구 설명" title="modules/routes.py 의 도구·인자 설명" aria-pressed="false">도구 설명</button><button type="button" data-tag="시스템 프롬프트" title="bench/harness.py 의 역할·답변 규칙" aria-pressed="false">시스템 프롬프트</button><button type="button" data-tag="도구 응답" title="modules/tools.py 가 돌려주는 값·문장" aria-pressed="false">도구 응답</button><button type="button" data-tag="서버 로직" title="판정·경로·천문 계산 자체" aria-pressed="false">서버 로직</button><button type="button" data-tag="채점 규칙" title="score.py 가 사람과 다르게 셈" aria-pressed="false">채점 규칙</button><button type="button" data-tag="케이스 설계" title="질문·정답이 잘못 잡힘" aria-pressed="false">케이스 설계</button></div><textarea rows="3" placeholder="예: 도구가 준 verdict 를 답변 첫 문단에 그대로 옮기게 해야 한다"></textarea></div></div>
+</article><article class="case pass" data-cat="recommend" data-flag="pass">
+<div class="case-head">
+<span class="cid">R-03</span>
+<span class="tag">추천</span>
+<span class="tag pass">도구 선택 3/3</span>
+<span class="tag pass">인자 일치 3/3</span>
+<span class="tag pass">근거 15/15</span>
+<span class="tag pass">환각 수치 0건</span>
+<span class="tag pass">지도 3/3</span>
+</div>
+<p class="q">등산은 못 하겠고, 안 올라가도 되는 별 관측지 알려줘.</p>
+<dl class="rows">
+<dt>기대 호출</dt><dd><code class="chip"><b>recommend_spots</b> {&quot;no_climb&quot;: true}</code></dd>
+<dt>실제 호출</dt><dd><code class="chip"><b>recommend_spots</b> {&quot;no_climb&quot;: true, &quot;limit&quot;: 3}</code></dd>
+<dt>도구 정답</dt><dd><table class="spots"><thead><tr><th>도구가 고른 곳</th><th>구름</th><th>어둡기</th><th>차로</th><th>도보</th></tr></thead><tbody><tr><td>가시리 풍력발전단지 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>33.0% <span class="chk" title="이 값이 채점 대상">채점</span></td><td>4 <span class="chk" title="이 값이 채점 대상">채점</span></td><td></td><td>0.1분</td></tr><tr><td>어리목입구주차장 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>26.0%</td><td>4</td><td></td><td>0.3분</td></tr><tr><td>천아계곡 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>18.0%</td><td>4</td><td></td><td>0.1분</td></tr></tbody></table></dd>
+</dl>
+<div class="answer">지도: <mark class="ok-url" title="도구가 준 지도 주소 그대로">http://127.0.0.1:11000/maps/b1ea2f8734.html</mark><br><br>등산 없이도 별을 볼 수 있는 곳으로 가시리 풍력발전단지, <mark class="ok-place" title="검증된 62곳에 있는 이름">어리목입구주차장</mark>, <mark class="ok-place" title="검증된 62곳에 있는 이름">천아계곡</mark>이 추천됩니다. 오늘 밤 <mark class="ok-num" title="도구 응답·질문에 있는 값">23 시</mark> 기준 구름은 각각 <mark class="ok-num" title="도구 응답·질문에 있는 값">33%</mark>, <mark class="ok-num" title="도구 응답·질문에 있는 값">26%</mark>, <mark class="ok-num" title="도구 응답·질문에 있는 값">18%</mark> 로 <mark class="ok-place" title="검증된 62곳에 있는 이름">천아계곡</mark>이 가장 맑고, 관측 등급은 모두 <mark class="ok-num" title="도구 응답·질문에 있는 값">4 등급</mark>으로 밝은 별만 보일 수 있습니다.<br><br>가시리 풍력발전단지는 남쪽 평지이며 주차 후 바로 볼 수 있고, <mark class="ok-place" title="검증된 62곳에 있는 이름">어리목입구주차장</mark>은 중산간 고지로 지방도 옆이라 접근이 쉽습니다. <mark class="ok-place" title="검증된 62곳에 있는 이름">천아계곡</mark>은 한라산 서북 사면 계곡으로 발밑 광원이 0 이며, 모두 야간 출입이 상시 개방되어 반려견 동반도 가능합니다.</div>
+<details class="base"><summary>도구 없이 쓴 답(baseline)과 비교</summary>
+<div class="answer">제주도 남부 해안선과 산간 평지 등 등산이 필요 없는 지역에서도 밤하늘 관측이 가능합니다. 제주시 성산동해면이나 서귀포시 대정읍의 일부 평지처럼 도로 접근이 용이한 곳들이 추천됩니다.<br><br>주행 시간 <mark class="bad-num" title="도구 응답에도 질문에도 없는 값 — 환각">15 분</mark> 내외로 이동 가능한 해안도로 구간에서 구름은 적고 관측 등급은 3~<mark class="ok-num" title="도구 응답·질문에 있는 값">4 등급</mark>으로 밤하늘을 감상할 수 있습니다. 등산 없이도 차량이나 도보로 충분히 접근 가능한 지역을 선택하시면 됩니다.</div></details>
+<div class="judge" data-cid="R-03"><span class="lbl">이 답,</span><button type="button" class="jbtn o" data-v="O" aria-pressed="false">잘 나옴</button><button type="button" class="jbtn x" data-v="X" aria-pressed="false">안 나옴</button><button type="button" class="jclear hidden">지우기</button><span class="seal"></span><div class="fix"><p class="why">어디를 고쳐야 하나 — 자리를 고르고, 무엇이 어떻게 되어야 하는지 한 줄 적습니다.</p><div class="chips"><button type="button" data-tag="도구 설명" title="modules/routes.py 의 도구·인자 설명" aria-pressed="false">도구 설명</button><button type="button" data-tag="시스템 프롬프트" title="bench/harness.py 의 역할·답변 규칙" aria-pressed="false">시스템 프롬프트</button><button type="button" data-tag="도구 응답" title="modules/tools.py 가 돌려주는 값·문장" aria-pressed="false">도구 응답</button><button type="button" data-tag="서버 로직" title="판정·경로·천문 계산 자체" aria-pressed="false">서버 로직</button><button type="button" data-tag="채점 규칙" title="score.py 가 사람과 다르게 셈" aria-pressed="false">채점 규칙</button><button type="button" data-tag="케이스 설계" title="질문·정답이 잘못 잡힘" aria-pressed="false">케이스 설계</button></div><textarea rows="3" placeholder="예: 도구가 준 verdict 를 답변 첫 문단에 그대로 옮기게 해야 한다"></textarea></div></div>
+</article><article class="case pass" data-cat="recommend" data-flag="pass">
+<div class="case-head">
+<span class="cid">R-04</span>
+<span class="tag">추천</span>
+<span class="tag pass">도구 선택 3/3</span>
+<span class="tag pass">인자 일치 3/3</span>
+<span class="tag warn">근거 12/15</span>
+<span class="tag pass">환각 수치 0건</span>
+<span class="tag pass">지도 3/3</span>
+</div>
+<p class="q">강아지 데리고 갈 수 있는 별 보는 곳 추천해줘.</p>
+<dl class="rows">
+<dt>기대 호출</dt><dd><code class="chip"><b>recommend_spots</b> {&quot;pets&quot;: true}</code></dd>
+<dt>실제 호출</dt><dd><code class="chip"><b>recommend_spots</b> {&quot;pets&quot;: true, &quot;limit&quot;: 3}</code></dd>
+<dt>도구 정답</dt><dd><table class="spots"><thead><tr><th>도구가 고른 곳</th><th>구름</th><th>어둡기</th><th>차로</th><th>도보</th></tr></thead><tbody><tr><td>따라비오름 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>33.0% <span class="chk" title="이 값이 채점 대상">채점</span></td><td>4 <span class="chk" title="이 값이 채점 대상">채점</span></td><td></td><td>30.7분</td></tr><tr><td>가시리 풍력발전단지 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>33.0%</td><td>4</td><td></td><td>0.1분</td></tr><tr><td>아부오름 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>26.0%</td><td>4</td><td></td><td>5.4분</td></tr></tbody></table></dd>
+<dt>답에 없던 값</dt><dd><span class="muted">spots[0].bortle=4</span></dd>
+</dl>
+<div class="answer">지도: <mark class="ok-url" title="도구가 준 지도 주소 그대로">http://127.0.0.1:11000/maps/08bb950862.html</mark><br><br>강아지 데리고 별 볼 수 있는 곳으로 <mark class="ok-place" title="검증된 62곳에 있는 이름">따라비오름</mark>, 가시리 풍력발전단지, <mark class="ok-place" title="검증된 62곳에 있는 이름">아부오름</mark>을 추천합니다. 모두 반려견 동반 가능하고 야간 출입이 상시 개방되어 있습니다.<br><br><mark class="ok-place" title="검증된 62곳에 있는 이름">따라비오름</mark>은 남쪽 중산간 오름으로 <mark class="ok-num" title="도구 응답·질문에 있는 값">34 분</mark> 정도 걸리고, 가시리 풍력발전단지는 평지로 주차 후 바로 볼 수 있습니다. <mark class="ok-place" title="검증된 62곳에 있는 이름">아부오름</mark>은 동쪽 오름으로 접근성이 가장 좋으며 <mark class="ok-num" title="도구 응답·질문에 있는 값">6 분</mark> 정도 소요됩니다.</div>
+<details class="base"><summary>도구 없이 쓴 답(baseline)과 비교</summary>
+<div class="answer">제주도 남부 해안가인 &#x27;청학산&#x27;과 &#x27;제물대&#x27;를 추천합니다. 청학산은 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">1 시간</mark> 소요되며 구름이 적어 관측 등급 4/5 점입니다. 제물대는 도보로 접근 가능하고 주행시간 <mark class="ok-num" title="도구 응답·질문에 있는 값">30 분</mark>이며, 관측 등급 3/5 점으로 강아지와 함께 이동하기 좋습니다. 두 곳 모두 야간 조명 제한 구역이라 천체 관측에 유리합니다.</div></details>
+<div class="judge" data-cid="R-04"><span class="lbl">이 답,</span><button type="button" class="jbtn o" data-v="O" aria-pressed="false">잘 나옴</button><button type="button" class="jbtn x" data-v="X" aria-pressed="false">안 나옴</button><button type="button" class="jclear hidden">지우기</button><span class="seal"></span><div class="fix"><p class="why">어디를 고쳐야 하나 — 자리를 고르고, 무엇이 어떻게 되어야 하는지 한 줄 적습니다.</p><div class="chips"><button type="button" data-tag="도구 설명" title="modules/routes.py 의 도구·인자 설명" aria-pressed="false">도구 설명</button><button type="button" data-tag="시스템 프롬프트" title="bench/harness.py 의 역할·답변 규칙" aria-pressed="false">시스템 프롬프트</button><button type="button" data-tag="도구 응답" title="modules/tools.py 가 돌려주는 값·문장" aria-pressed="false">도구 응답</button><button type="button" data-tag="서버 로직" title="판정·경로·천문 계산 자체" aria-pressed="false">서버 로직</button><button type="button" data-tag="채점 규칙" title="score.py 가 사람과 다르게 셈" aria-pressed="false">채점 규칙</button><button type="button" data-tag="케이스 설계" title="질문·정답이 잘못 잡힘" aria-pressed="false">케이스 설계</button></div><textarea rows="3" placeholder="예: 도구가 준 verdict 를 답변 첫 문단에 그대로 옮기게 해야 한다"></textarea></div></div>
+</article><article class="case pass" data-cat="recommend" data-flag="pass">
+<div class="case-head">
+<span class="cid">R-05</span>
+<span class="tag">추천</span>
+<span class="tag pass">도구 선택 3/3</span>
+<span class="tag pass">인자 일치 3/3</span>
+<span class="tag pass">근거 15/15</span>
+<span class="tag pass">환각 수치 0건</span>
+<span class="tag pass">지도 3/3</span>
+</div>
+<p class="q">주차하고 걸어가지 않아도 바로 별 볼 수 있는 데 있을까?</p>
+<dl class="rows">
+<dt>기대 호출</dt><dd><code class="chip"><b>recommend_spots</b> {&quot;max_walk_minutes&quot;: 0}</code></dd>
+<dt>실제 호출</dt><dd><code class="chip"><b>recommend_spots</b> {&quot;max_walk_minutes&quot;: 0, &quot;limit&quot;: 3}</code></dd>
+<dt>도구 정답</dt><dd><table class="spots"><thead><tr><th>도구가 고른 곳</th><th>구름</th><th>어둡기</th><th>차로</th><th>도보</th></tr></thead><tbody><tr><td>가시리 풍력발전단지 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>33.0% <span class="chk" title="이 값이 채점 대상">채점</span></td><td>4 <span class="chk" title="이 값이 채점 대상">채점</span></td><td></td><td>0.1분</td></tr><tr><td>어리목입구주차장 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>26.0%</td><td>4</td><td></td><td>0.3분</td></tr><tr><td>천아계곡 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>18.0%</td><td>4</td><td></td><td>0.1분</td></tr></tbody></table></dd>
+</dl>
+<div class="answer">지도: <mark class="ok-url" title="도구가 준 지도 주소 그대로">http://127.0.0.1:11000/maps/b1ea2f8734.html</mark><br><br>**가시리 풍력발전단지** (남쪽 평지): 구름 <mark class="ok-num" title="도구 응답·질문에 있는 값">33%</mark>, 밤하늘 어둡기 4단계, 밝은 별 한정<br>**<mark class="ok-place" title="검증된 62곳에 있는 이름">어리목입구주차장</mark>** (중산간 고지): 구름 <mark class="ok-num" title="도구 응답·질문에 있는 값">26%</mark>, 밤하늘 어둡기 4단계, 양호<br>**<mark class="ok-place" title="검증된 62곳에 있는 이름">천아계곡</mark>** (중산간 계곡): 구름 <mark class="ok-num" title="도구 응답·질문에 있는 값">18%</mark>, 밤하늘 어둡기 4단계, 양호<br><br>이 세 곳 모두 주차 후 바로 관측 가능하며 야간 출입은 상시 개방됩니다.</div>
+<details class="base"><summary>도구 없이 쓴 답(baseline)과 비교</summary>
+<div class="answer">2026 년 8 월 20 일 제주도 밤하늘 관측에 가장 적합한 곳은 서귀포시 <mark class="bad-place" title="검증 목록에 없는 이름">해운대해수욕장</mark> 인근의 평지입니다. 이곳은 차량 주차 후 도보로 <mark class="ok-num" title="도구 응답·질문에 있는 값">5 분</mark> 거리에서 바로 천체 망원경을 세울 수 있어 접근성이 뛰어납니다.<br><br>오늘은 구름이 매우 적어 관측 등급을 9/10 으로 평가하며, 달이 뜨기 전인 자정 이후부터 새벽 <mark class="ok-num" title="도구 응답·질문에 있는 값">3 시</mark>까지 가장 선명한 별들을 볼 수 있습니다. <mark class="bad-place" title="검증 목록에 없는 이름">해운대해수욕장</mark> 주차장에서 도보로 <mark class="ok-num" title="도구 응답·질문에 있는 값">5 분</mark> 거리에서 바로 관측이 가능합니다.</div></details>
+<div class="judge" data-cid="R-05"><span class="lbl">이 답,</span><button type="button" class="jbtn o" data-v="O" aria-pressed="false">잘 나옴</button><button type="button" class="jbtn x" data-v="X" aria-pressed="false">안 나옴</button><button type="button" class="jclear hidden">지우기</button><span class="seal"></span><div class="fix"><p class="why">어디를 고쳐야 하나 — 자리를 고르고, 무엇이 어떻게 되어야 하는지 한 줄 적습니다.</p><div class="chips"><button type="button" data-tag="도구 설명" title="modules/routes.py 의 도구·인자 설명" aria-pressed="false">도구 설명</button><button type="button" data-tag="시스템 프롬프트" title="bench/harness.py 의 역할·답변 규칙" aria-pressed="false">시스템 프롬프트</button><button type="button" data-tag="도구 응답" title="modules/tools.py 가 돌려주는 값·문장" aria-pressed="false">도구 응답</button><button type="button" data-tag="서버 로직" title="판정·경로·천문 계산 자체" aria-pressed="false">서버 로직</button><button type="button" data-tag="채점 규칙" title="score.py 가 사람과 다르게 셈" aria-pressed="false">채점 규칙</button><button type="button" data-tag="케이스 설계" title="질문·정답이 잘못 잡힘" aria-pressed="false">케이스 설계</button></div><textarea rows="3" placeholder="예: 도구가 준 verdict 를 답변 첫 문단에 그대로 옮기게 해야 한다"></textarea></div></div>
+</article><article class="case pass" data-cat="recommend" data-flag="pass">
+<div class="case-head">
+<span class="cid">R-06</span>
+<span class="tag">추천</span>
+<span class="tag pass">도구 선택 3/3</span>
+<span class="tag pass">인자 일치 3/3</span>
+<span class="tag pass">근거 18/18</span>
+<span class="tag pass">환각 수치 0건</span>
+<span class="tag pass">지도 3/3</span>
+</div>
+<p class="q">서귀포에서 출발해서 30분 안에 갈 수 있고 주차되는 곳으로 2군데만 골라줘.</p>
+<dl class="rows">
+<dt>기대 호출</dt><dd><code class="chip"><b>recommend_spots</b> {&quot;origin&quot;: &quot;서귀포&quot;, &quot;max_drive_minutes&quot;: 30, &quot;limit&quot;: 2}</code></dd>
+<dt>실제 호출</dt><dd><code class="chip"><b>recommend_spots</b> {&quot;origin&quot;: &quot;서귀포&quot;, &quot;max_drive_minutes&quot;: 30, &quot;parking_required&quot;: true, &quot;limit&quot;: 2}</code></dd>
+<dt>도구 정답</dt><dd><table class="spots"><thead><tr><th>도구가 고른 곳</th><th>구름</th><th>어둡기</th><th>차로</th><th>도보</th></tr></thead><tbody><tr><td>어리목입구주차장 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>26.0% <span class="chk" title="이 값이 채점 대상">채점</span></td><td>4 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>18.4분 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>0.3분</td></tr><tr><td>천아계곡 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>18.0%</td><td>4</td><td>24.2분 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>0.1분</td></tr></tbody></table></dd>
+</dl>
+<div class="answer">지도: <mark class="ok-url" title="도구가 준 지도 주소 그대로">http://127.0.0.1:11000/maps/b98604e1e7.html</mark><br><br>서귀포천문과학문화관에서 <mark class="ok-num" title="도구 응답·질문에 있는 값">30 분</mark> 안에 갈 수 있는 주차 가능한 별 관측지 두 군데를 추천해 드립니다. 첫 번째는 <mark class="ok-place" title="검증된 62곳에 있는 이름">어리목입구주차장</mark>으로 서쪽으로 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">18 분</mark>, <mark class="ok-num" title="도구 응답·질문에 있는 값">16km</mark> 를 달리면 도착합니다. 밤하늘 어둡기 등급이 4 단계로 양호하며 구름은 <mark class="ok-num" title="도구 응답·질문에 있는 값">26%</mark> 입니다.<br><br>두 번째는 <mark class="ok-place" title="검증된 62곳에 있는 이름">천아계곡</mark>으로 서쪽으로 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">24 분</mark>, <mark class="ok-num" title="도구 응답·질문에 있는 값">21km</mark> 를 달리면 도착합니다. 밤하늘 어둡기 등급도 4 단계로 양호하며 구름은 <mark class="ok-num" title="도구 응답·질문에 있는 값">18%</mark> 입니다. 두 곳 모두 주차 가능하고 야간 출입이 상시 개방되어 있습니다.</div>
+<details class="base"><summary>도구 없이 쓴 답(baseline)과 비교</summary>
+<div class="answer">서귀포에서 <mark class="ok-num" title="도구 응답·질문에 있는 값">30 분</mark> 내로 이동하여 차량 주차가 가능한 곳은 &#x27;해남리 해수욕장&#x27;과 &#x27;<mark class="bad-place" title="검증 목록에 없는 이름">도립공원</mark> 제1호&#x27;입니다. 두 곳 모두 구름이 적고 관측 등급이 높기로 유명합니다. 각 장소까지의 주행 시간은 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">25 분</mark>이며, 도보 시간이나 대기 시간은 확인되지 않았습니다.</div></details>
+<div class="judge" data-cid="R-06"><span class="lbl">이 답,</span><button type="button" class="jbtn o" data-v="O" aria-pressed="false">잘 나옴</button><button type="button" class="jbtn x" data-v="X" aria-pressed="false">안 나옴</button><button type="button" class="jclear hidden">지우기</button><span class="seal"></span><div class="fix"><p class="why">어디를 고쳐야 하나 — 자리를 고르고, 무엇이 어떻게 되어야 하는지 한 줄 적습니다.</p><div class="chips"><button type="button" data-tag="도구 설명" title="modules/routes.py 의 도구·인자 설명" aria-pressed="false">도구 설명</button><button type="button" data-tag="시스템 프롬프트" title="bench/harness.py 의 역할·답변 규칙" aria-pressed="false">시스템 프롬프트</button><button type="button" data-tag="도구 응답" title="modules/tools.py 가 돌려주는 값·문장" aria-pressed="false">도구 응답</button><button type="button" data-tag="서버 로직" title="판정·경로·천문 계산 자체" aria-pressed="false">서버 로직</button><button type="button" data-tag="채점 규칙" title="score.py 가 사람과 다르게 셈" aria-pressed="false">채점 규칙</button><button type="button" data-tag="케이스 설계" title="질문·정답이 잘못 잡힘" aria-pressed="false">케이스 설계</button></div><textarea rows="3" placeholder="예: 도구가 준 verdict 를 답변 첫 문단에 그대로 옮기게 해야 한다"></textarea></div></div>
+</article><article class="case pass" data-cat="recommend" data-flag="pass">
+<div class="case-head">
+<span class="cid">R-07</span>
+<span class="tag">추천</span>
+<span class="tag pass">도구 선택 3/3</span>
+<span class="tag pass">인자 일치 3/3</span>
+<span class="tag warn">근거 15/21</span>
+<span class="tag pass">환각 수치 0건</span>
+<span class="tag pass">지도 3/3</span>
+</div>
+<p class="q">중산간 쪽에서 등산 없이 갈 수 있는 관측지 5곳 알려줘.</p>
+<dl class="rows">
+<dt>기대 호출</dt><dd><code class="chip"><b>recommend_spots</b> {&quot;region&quot;: &quot;중산간&quot;, &quot;no_climb&quot;: true, &quot;limit&quot;: 5}</code></dd>
+<dt>실제 호출</dt><dd><code class="chip"><b>recommend_spots</b> {&quot;region&quot;: &quot;중산간&quot;, &quot;no_climb&quot;: true, &quot;limit&quot;: 5}</code></dd>
+<dt>도구 정답</dt><dd><table class="spots"><thead><tr><th>도구가 고른 곳</th><th>구름</th><th>어둡기</th><th>차로</th><th>도보</th></tr></thead><tbody><tr><td>어리목입구주차장 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>26.0% <span class="chk" title="이 값이 채점 대상">채점</span></td><td>4 <span class="chk" title="이 값이 채점 대상">채점</span></td><td></td><td>0.3분</td></tr><tr><td>천아계곡 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>18.0%</td><td>4</td><td></td><td>0.1분</td></tr><tr><td>노꼬메오름 주차장 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>17.0%</td><td>4</td><td></td><td>0.1분</td></tr><tr><td>영실입구 주차장 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>77.0%</td><td>4</td><td></td><td>0.2분</td></tr><tr><td>성판악 주차장 <span class="chk" title="이 값이 채점 대상">채점</span></td><td>99.0%</td><td>4</td><td></td><td>0.3분</td></tr></tbody></table></dd>
+<dt>답에 없던 값</dt><dd><span class="muted">spots[0].cloud_cover=26.0, spots[0].bortle=4</span></dd>
+</dl>
+<div class="answer">지도: <mark class="ok-url" title="도구가 준 지도 주소 그대로">http://127.0.0.1:11000/maps/cfb4ba5db0.html</mark><br><br><mark class="ok-place" title="검증된 62곳에 있는 이름">어리목입구주차장</mark>, <mark class="ok-place" title="검증된 62곳에 있는 이름">천아계곡</mark>, <mark class="bad-place" title="검증 목록에 없는 이름">노꼬메오름</mark> 주차장이 오늘 밤 <mark class="ok-num" title="도구 응답·질문에 있는 값">23시</mark> 기준 별을 볼 수 있는 곳으로 판정되었습니다. 이 세 곳은 구름이 적고 어둡기 조건이 양호하며, 등산 없이 바로 관측할 수 있습니다. 영실입구와 성판악은 구름이 많아 관측이 어렵다고 판단되어 제외했습니다.</div>
+<details class="base"><summary>도구 없이 쓴 답(baseline)과 비교</summary>
+<div class="answer">2026 년 8 월 20 일 제주도를 방문하신다면 중산간 지대에서도 차량으로 접근 가능한 천문 관측지는 제한적입니다. 해발 <mark class="bad-num" title="도구 응답에도 질문에도 없는 값 — 환각">300 미터</mark> 이상의 고도가 필요한 맑은 밤하늘을 보려면 등산을 해야 하며, 그 외의 지역은 구름이 많거나 대기 조건이 열악할 가능성이 높습니다.<br><br>현재 확인된 구체적인 관측지 목록이나 주행 시간, 소요 시간은 제공되지 않았습니다. 제주도 밖의 다른 지역의 별 관측 정보도 알 수 없습니다.<br><br>관측 등급과 구름 상태는 실시간 기상 데이터에 따라 달라지므로 정확한 수치로 안내하기 어렵습니다. 오늘 밤의 하늘을 보시려면 현지에서 직접 대기 상태를 확인하시는 것이 가장 좋습니다.</div></details>
+<div class="judge" data-cid="R-07"><span class="lbl">이 답,</span><button type="button" class="jbtn o" data-v="O" aria-pressed="false">잘 나옴</button><button type="button" class="jbtn x" data-v="X" aria-pressed="false">안 나옴</button><button type="button" class="jclear hidden">지우기</button><span class="seal"></span><div class="fix"><p class="why">어디를 고쳐야 하나 — 자리를 고르고, 무엇이 어떻게 되어야 하는지 한 줄 적습니다.</p><div class="chips"><button type="button" data-tag="도구 설명" title="modules/routes.py 의 도구·인자 설명" aria-pressed="false">도구 설명</button><button type="button" data-tag="시스템 프롬프트" title="bench/harness.py 의 역할·답변 규칙" aria-pressed="false">시스템 프롬프트</button><button type="button" data-tag="도구 응답" title="modules/tools.py 가 돌려주는 값·문장" aria-pressed="false">도구 응답</button><button type="button" data-tag="서버 로직" title="판정·경로·천문 계산 자체" aria-pressed="false">서버 로직</button><button type="button" data-tag="채점 규칙" title="score.py 가 사람과 다르게 셈" aria-pressed="false">채점 규칙</button><button type="button" data-tag="케이스 설계" title="질문·정답이 잘못 잡힘" aria-pressed="false">케이스 설계</button></div><textarea rows="3" placeholder="예: 도구가 준 verdict 를 답변 첫 문단에 그대로 옮기게 해야 한다"></textarea></div></div>
+</article><article class="case pass" data-cat="evaluate" data-flag="pass">
+<div class="case-head">
+<span class="cid">E-01</span>
+<span class="tag">판정</span>
+<span class="tag pass">도구 선택 3/3</span>
+<span class="tag pass">인자 일치 3/3</span>
+<span class="tag pass">근거 9/9</span>
+<span class="tag pass">환각 수치 0건</span>
+<span class="tag pass">지도 3/3</span>
+</div>
+<p class="q">오늘 밤 10시에 새별오름에서 별 보여?</p>
+<dl class="rows">
+<dt>기대 호출</dt><dd><code class="chip"><b>evaluate_place</b> {&quot;query&quot;: &quot;새별오름&quot;}</code></dd>
+<dt>실제 호출</dt><dd><code class="chip"><b>evaluate_place</b> {&quot;query&quot;: &quot;새별오름&quot;, &quot;time&quot;: &quot;22:00&quot;, &quot;scope&quot;: &quot;moment&quot;, &quot;date&quot;: &quot;2026-08-20&quot;}</code></dd>
+<dt>도구 정답</dt><dd><code class="chip">verdict <b>양호</b></code> <code class="chip">cloud_cover <b>20.0</b></code> <code class="chip">bortle <b>4</b></code></dd>
+</dl>
+<div class="answer">지도: <mark class="ok-url" title="도구가 준 지도 주소 그대로">http://127.0.0.1:11000/maps/d04a4f0dd1.html</mark><br><br>오늘 밤 <mark class="ok-num" title="도구 응답·질문에 있는 값">10시</mark>에 새별오름에서는 별이 보입니다. 판정은 양호하며 구름은 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">20%</mark>입니다. 다만 둘레 불빛 탓에 은하수는 흐릿하게만 보이며, 망원경이 있어야 보이는 대상은 어렵습니다. 완전히 어두운 시간대는 오후 <mark class="ok-num" title="도구 응답·질문에 있는 값">8시</mark> <mark class="ok-num" title="도구 응답·질문에 있는 값">44분</mark>부터 다음 날 새벽 <mark class="ok-num" title="도구 응답·질문에 있는 값">4 시</mark> <mark class="ok-num" title="도구 응답·질문에 있는 값">32 분</mark>까지입니다.<br><br>새별오름은 서부 중산간 초원 위에 위치해 있으며, 주차장에서 관측지까지 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">18 분</mark>이 소요됩니다. 야간 출입은 상시 개방되어 있습니다.</div>
+<details class="base"><summary>도구 없이 쓴 답(baseline)과 비교</summary>
+<div class="answer">2026 년 8 월 20 일 밤 <mark class="ok-num" title="도구 응답·질문에 있는 값">10 시</mark>, 제주도 남쪽 해안선인 새별오름은 관측에 최적의 장소입니다. 이 지역은 구름이 적고 대기 투과율이 높아 천체 관측 등급을 &#x27;우수&#x27;로 평가할 수 있습니다.<br><br>새별오름에서 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">30 분</mark> 정도 차를 타고 이동하면 야간 별자리를 감상할 수 있으며, 도보로 약 <mark class="bad-num" title="도구 응답에도 질문에도 없는 값 — 환각">15 분</mark>만 걸어도 산 정상에 도착합니다. <mark class="latin" title="한국어 답변에 섞인 영어 — 도구 응답에도 없는 말">tonight</mark>의 달은 해가 지고 나서 서쪽 하늘에 떠 있어 일부 별들을 가릴 수 있으나, 대부분의 관측 대상은 여전히 선명하게 보입니다.<br><br>주행 시간 <mark class="ok-num" title="도구 응답·질문에 있는 값">30 분</mark>, 도보 시간 <mark class="bad-num" title="도구 응답에도 질문에도 없는 값 — 환각">15 분</mark>, 구름량 적음, 관측 등급 우수입니다.</div></details>
+<div class="judge" data-cid="E-01"><span class="lbl">이 답,</span><button type="button" class="jbtn o" data-v="O" aria-pressed="false">잘 나옴</button><button type="button" class="jbtn x" data-v="X" aria-pressed="false">안 나옴</button><button type="button" class="jclear hidden">지우기</button><span class="seal"></span><div class="fix"><p class="why">어디를 고쳐야 하나 — 자리를 고르고, 무엇이 어떻게 되어야 하는지 한 줄 적습니다.</p><div class="chips"><button type="button" data-tag="도구 설명" title="modules/routes.py 의 도구·인자 설명" aria-pressed="false">도구 설명</button><button type="button" data-tag="시스템 프롬프트" title="bench/harness.py 의 역할·답변 규칙" aria-pressed="false">시스템 프롬프트</button><button type="button" data-tag="도구 응답" title="modules/tools.py 가 돌려주는 값·문장" aria-pressed="false">도구 응답</button><button type="button" data-tag="서버 로직" title="판정·경로·천문 계산 자체" aria-pressed="false">서버 로직</button><button type="button" data-tag="채점 규칙" title="score.py 가 사람과 다르게 셈" aria-pressed="false">채점 규칙</button><button type="button" data-tag="케이스 설계" title="질문·정답이 잘못 잡힘" aria-pressed="false">케이스 설계</button></div><textarea rows="3" placeholder="예: 도구가 준 verdict 를 답변 첫 문단에 그대로 옮기게 해야 한다"></textarea></div></div>
+</article><article class="case pass" data-cat="evaluate" data-flag="pass">
+<div class="case-head">
+<span class="cid">E-02</span>
+<span class="tag">판정</span>
+<span class="tag pass">도구 선택 3/3</span>
+<span class="tag pass">인자 일치 3/3</span>
+<span class="tag pass">근거 6/6</span>
+<span class="tag pass">환각 수치 0건</span>
+<span class="tag pass">지도 3/3</span>
+</div>
+<p class="q">오늘 밤 1100고지 어때? 몇 시간이나 볼 수 있어?</p>
+<dl class="rows">
+<dt>기대 호출</dt><dd><code class="chip"><b>evaluate_place</b> {&quot;query&quot;: &quot;1100고지&quot;, &quot;scope&quot;: &quot;night&quot;}</code></dd>
+<dt>실제 호출</dt><dd><code class="chip"><b>evaluate_place</b> {&quot;query&quot;: &quot;1100고지&quot;, &quot;date&quot;: &quot;2026-08-20&quot;, &quot;time&quot;: &quot;23:00&quot;, &quot;scope&quot;: &quot;night&quot;}</code></dd>
+<dt>도구 정답</dt><dd><code class="chip">observable_hours <b>6</b></code> <code class="chip">matched_query <b>1100고지 휴게소</b></code></dd>
+</dl>
+<div class="answer">지도: <mark class="ok-url" title="도구가 준 지도 주소 그대로">http://127.0.0.1:11000/maps/871efe3f80.html</mark><br><br>오늘 밤 1100고지 휴게소에서 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">6시간</mark> 동안 별을 볼 수 있습니다. 관측 가능 시간은 8월 20일 밤 <mark class="ok-num" title="도구 응답·질문에 있는 값">8시</mark> <mark class="ok-num" title="도구 응답·질문에 있는 값">40분</mark>부터 21일 아침 <mark class="ok-num" title="도구 응답·질문에 있는 값">5 시</mark> <mark class="ok-num" title="도구 응답·질문에 있는 값">34 분</mark>까지이며, 이 중 밝은 별만 보이는 시간이 <mark class="ok-num" title="도구 응답·질문에 있는 값">1 시간</mark>, 양호한 상태가 <mark class="ok-num" title="도구 응답·질문에 있는 값">3 시간</mark>, 최적의 조건이 <mark class="ok-num" title="도구 응답·질문에 있는 값">2 시간</mark>입니다.<br><br>구름이 거의 없는 시간은 <mark class="ok-num" title="도구 응답·질문에 있는 값">6 시간</mark>, 조금 있는 시간도 <mark class="ok-num" title="도구 응답·질문에 있는 값">6 시간</mark>으로 관측 조건이 괜찮습니다. 다만 둘레 불빛 탓에 원래 밤하늘 모습은 아니라고 평가받으며, 망원경이 있어야 보이는 대상은 어려워요.</div>
+<details class="base"><summary>도구 없이 쓴 답(baseline)과 비교</summary>
+<div class="answer">2026 년 8 월 20 일 제주도 밤 <mark class="bad-num" title="도구 응답에도 질문에도 없는 값 — 환각">11 시</mark> 고지대 관측은 구름이 적어 매우 좋은 조건입니다. 주요 천체들은 지평선에서 약 <mark class="bad-num" title="도구 응답에도 질문에도 없는 값 — 환각">45 도</mark>까지 높이 올라가 있어 선명하게 보입니다. 관측 가능한 시간은 대략 <mark class="ok-num" title="도구 응답·질문에 있는 값">3 시간</mark>으로, 해 질 녘부터 새벽 <mark class="ok-num" title="도구 응답·질문에 있는 값">2 시</mark>까지 지속됩니다.<br><br>주행시간은 목적지까지 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">1 시간</mark>이며, 관측 등급은 8/10 입니다.</div></details>
+<div class="judge" data-cid="E-02"><span class="lbl">이 답,</span><button type="button" class="jbtn o" data-v="O" aria-pressed="false">잘 나옴</button><button type="button" class="jbtn x" data-v="X" aria-pressed="false">안 나옴</button><button type="button" class="jclear hidden">지우기</button><span class="seal"></span><div class="fix"><p class="why">어디를 고쳐야 하나 — 자리를 고르고, 무엇이 어떻게 되어야 하는지 한 줄 적습니다.</p><div class="chips"><button type="button" data-tag="도구 설명" title="modules/routes.py 의 도구·인자 설명" aria-pressed="false">도구 설명</button><button type="button" data-tag="시스템 프롬프트" title="bench/harness.py 의 역할·답변 규칙" aria-pressed="false">시스템 프롬프트</button><button type="button" data-tag="도구 응답" title="modules/tools.py 가 돌려주는 값·문장" aria-pressed="false">도구 응답</button><button type="button" data-tag="서버 로직" title="판정·경로·천문 계산 자체" aria-pressed="false">서버 로직</button><button type="button" data-tag="채점 규칙" title="score.py 가 사람과 다르게 셈" aria-pressed="false">채점 규칙</button><button type="button" data-tag="케이스 설계" title="질문·정답이 잘못 잡힘" aria-pressed="false">케이스 설계</button></div><textarea rows="3" placeholder="예: 도구가 준 verdict 를 답변 첫 문단에 그대로 옮기게 해야 한다"></textarea></div></div>
+</article><article class="case fail" data-cat="evaluate" data-flag="fail">
+<div class="case-head">
+<span class="cid">E-03</span>
+<span class="tag">판정</span>
+<span class="tag pass">도구 선택 3/3</span>
+<span class="tag pass">인자 일치 3/3</span>
+<span class="tag warn">근거 0/6</span>
+<span class="tag pass">환각 수치 0건</span>
+<span class="tag pass">지도 3/3</span>
+</div>
+<p class="q">위도 33.46, 경도 126.83 지점에서 오늘 밤 10시에 별이 보일까?</p>
+<dl class="rows">
+<dt>기대 호출</dt><dd><code class="chip"><b>evaluate_place</b> {&quot;lat&quot;: 33.46, &quot;lon&quot;: 126.83}</code></dd>
+<dt>실제 호출</dt><dd><code class="chip"><b>evaluate_place</b> {&quot;lat&quot;: 33.46, &quot;lon&quot;: 126.83, &quot;time&quot;: &quot;22:00&quot;, &quot;scope&quot;: &quot;moment&quot;}</code></dd>
+<dt>도구 정답</dt><dd><code class="chip">verdict <b>양호</b></code> <code class="chip">cloud_cover <b>18.0</b></code></dd>
+<dt>답에 없던 값</dt><dd><span class="muted">verdict=양호, numbers.cloud_cover=18.0</span></dd>
+</dl>
+<div class="answer">지도: <mark class="ok-url" title="도구가 준 지도 주소 그대로">http://127.0.0.1:11000/maps/4df835f674.html</mark><br><br>오늘 밤 <mark class="ok-num" title="도구 응답·질문에 있는 값">10시</mark>에는 별이 보이지만, 둘레 불빛 때문에 은하수는 흐릿하게만 보입니다. 구름이 조금 있거나 옅은 안개가 낄 수 있어 시야가 제한적일 수 있습니다. 완전히 어두운 시간은 다음 날 20:40부터 시작합니다.<br><br>이 위치는 용눈이오름과 매우 가깝습니다. 주차장에서 관측지까지 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">26분</mark>이 소요되며, 야간 출입은 상시 개방됩니다.</div>
+<details class="base"><summary>도구 없이 쓴 답(baseline)과 비교</summary>
+<div class="answer">요청하신 좌표 (위도 33.46, 경도 126.83) 는 제주도 남쪽 해안가에 위치하며, 이 지역은 천문 관측에 매우 유리합니다. 오늘 밤 <mark class="ok-num" title="도구 응답·질문에 있는 값">10 시</mark>에는 달이 서쪽 하늘에 뜨고 있어 일부 별을 가릴 수 있으나, 대체로 관측 가능한 시간입니다.<br><br>주행시간은 목적지까지 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">30 분</mark> 정도 소요되며, 도보 시간은 약 <mark class="bad-num" title="도구 응답에도 질문에도 없는 값 — 환각">45 분</mark>입니다. <mark class="latin" title="한국어 답변에 섞인 영어 — 도구 응답에도 없는 말">tonight</mark>의 기상은 확실히 확인되지 않았으나, 일반적으로 맑은 밤이라면 관측 등급은 2~<mark class="ok-num" title="도구 응답·질문에 있는 값">3 등급</mark>으로 평가됩니다.</div></details>
+<div class="judge" data-cid="E-03"><span class="lbl">이 답,</span><button type="button" class="jbtn o" data-v="O" aria-pressed="false">잘 나옴</button><button type="button" class="jbtn x" data-v="X" aria-pressed="false">안 나옴</button><button type="button" class="jclear hidden">지우기</button><span class="seal"></span><div class="fix"><p class="why">어디를 고쳐야 하나 — 자리를 고르고, 무엇이 어떻게 되어야 하는지 한 줄 적습니다.</p><div class="chips"><button type="button" data-tag="도구 설명" title="modules/routes.py 의 도구·인자 설명" aria-pressed="false">도구 설명</button><button type="button" data-tag="시스템 프롬프트" title="bench/harness.py 의 역할·답변 규칙" aria-pressed="false">시스템 프롬프트</button><button type="button" data-tag="도구 응답" title="modules/tools.py 가 돌려주는 값·문장" aria-pressed="false">도구 응답</button><button type="button" data-tag="서버 로직" title="판정·경로·천문 계산 자체" aria-pressed="false">서버 로직</button><button type="button" data-tag="채점 규칙" title="score.py 가 사람과 다르게 셈" aria-pressed="false">채점 규칙</button><button type="button" data-tag="케이스 설계" title="질문·정답이 잘못 잡힘" aria-pressed="false">케이스 설계</button></div><textarea rows="3" placeholder="예: 도구가 준 verdict 를 답변 첫 문단에 그대로 옮기게 해야 한다"></textarea></div></div>
+</article><article class="case warn" data-cat="evaluate" data-flag="warn">
+<div class="case-head">
+<span class="cid">E-04</span>
+<span class="tag">판정</span>
+<span class="tag pass">도구 선택 3/3</span>
+<span class="tag pass">인자 일치 3/3</span>
+<span class="tag pass">근거 6/6</span>
+<span class="tag fail">환각 수치 3건</span>
+<span class="tag warn">한영 혼용 3건</span>
+<span class="tag pass">지도 3/3</span>
+</div>
+<p class="q">제주공항에서 출발할 건데 용눈이오름 별 보기 어때? 거기까지 얼마나 걸려?</p>
+<dl class="rows">
+<dt>기대 호출</dt><dd><code class="chip"><b>evaluate_place</b> {&quot;query&quot;: &quot;용눈이오름&quot;, &quot;origin&quot;: &quot;제주공항&quot;}</code></dd>
+<dt>실제 호출</dt><dd><code class="chip"><b>evaluate_place</b> {&quot;query&quot;: &quot;용눈이오름&quot;, &quot;date&quot;: &quot;2026-08-20&quot;, &quot;time&quot;: &quot;22:00&quot;, &quot;origin&quot;: &quot;제주공항&quot;}</code></dd>
+<dt>도구 정답</dt><dd><code class="chip">verdict <b>양호</b></code> <code class="chip">minutes <b>47.2</b></code></dd>
+</dl>
+<div class="answer">지도: <mark class="ok-url" title="도구가 준 지도 주소 그대로">http://127.0.0.1:11000/maps/a22e36f053.html</mark><br><br>용눈이오름은 <mark class="latin" title="한국어 답변에 섞인 영어 — 도구 응답에도 없는 말">tonight</mark> 밤 <mark class="ok-num" title="도구 응답·질문에 있는 값">10 시</mark>에 별 관측 조건이 양호합니다. 구름이 <mark class="ok-num" title="도구 응답·질문에 있는 값">18%</mark> 정도 있긴 하지만 공기가 맑아 시야가 <mark class="bad-num" title="도구 응답에도 질문에도 없는 값 — 환각">11.4km</mark> 로 확보되어 있습니다. 다만 둘레 불빛 때문에 은하수는 흐릿하게만 보이며, 망원경이 있어야 보이는 대상은 어렵습니다.<br><br>제주공항에서 용눈이오름까지 차로 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">47 분</mark> / <mark class="ok-num" title="도구 응답·질문에 있는 값">38km</mark> 걸립니다. 관측지 주차장에서 도보로 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">26 분</mark>이 소요되며, 야간 출입은 상시 개방되어 있습니다.</div>
+<details class="base"><summary>도구 없이 쓴 답(baseline)과 비교</summary>
+<div class="answer">2026 년 8 월 20 일 제주공항에서 용눈이오름까지 도보로 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">1 시간</mark> <mark class="ok-num" title="도구 응답·질문에 있는 값">30 분</mark> 정도 소요됩니다. 이 날은 제주도 남쪽 해안가인 용눈이오름이 밤하늘 관측에 가장 적합한 장소 중 하나이나, 정확한 구름량과 관측 등급은 실시간 기상 데이터 확인이 필요합니다.<br><br>제주도 내 특정 야간 경로는 안전 관리 구역으로 지정되어 있어 일반 차량 접근이 제한될 수 있으므로, 이동 수단 선택 시 사전 확인이 필수적입니다. 별 관측을 위해 도착 후 최소 <mark class="ok-num" title="도구 응답·질문에 있는 값">30 분</mark>간 대기하여 천체 위치를 잡는 것이 좋습니다.</div></details>
+<div class="judge" data-cid="E-04"><span class="lbl">이 답,</span><button type="button" class="jbtn o" data-v="O" aria-pressed="false">잘 나옴</button><button type="button" class="jbtn x" data-v="X" aria-pressed="false">안 나옴</button><button type="button" class="jclear hidden">지우기</button><span class="seal"></span><div class="fix"><p class="why">어디를 고쳐야 하나 — 자리를 고르고, 무엇이 어떻게 되어야 하는지 한 줄 적습니다.</p><div class="chips"><button type="button" data-tag="도구 설명" title="modules/routes.py 의 도구·인자 설명" aria-pressed="false">도구 설명</button><button type="button" data-tag="시스템 프롬프트" title="bench/harness.py 의 역할·답변 규칙" aria-pressed="false">시스템 프롬프트</button><button type="button" data-tag="도구 응답" title="modules/tools.py 가 돌려주는 값·문장" aria-pressed="false">도구 응답</button><button type="button" data-tag="서버 로직" title="판정·경로·천문 계산 자체" aria-pressed="false">서버 로직</button><button type="button" data-tag="채점 규칙" title="score.py 가 사람과 다르게 셈" aria-pressed="false">채점 규칙</button><button type="button" data-tag="케이스 설계" title="질문·정답이 잘못 잡힘" aria-pressed="false">케이스 설계</button></div><textarea rows="3" placeholder="예: 도구가 준 verdict 를 답변 첫 문단에 그대로 옮기게 해야 한다"></textarea></div></div>
+</article><article class="case pass" data-cat="evaluate" data-flag="pass">
+<div class="case-head">
+<span class="cid">E-05</span>
+<span class="tag">판정</span>
+<span class="tag pass">도구 선택 3/3</span>
+<span class="tag pass">인자 일치 3/3</span>
+<span class="tag warn">근거 3/6</span>
+<span class="tag pass">환각 수치 0건</span>
+<span class="tag pass">지도 3/3</span>
+</div>
+<p class="q">내일 밤 섭지코지에서 별 볼 수 있을까?</p>
+<dl class="rows">
+<dt>기대 호출</dt><dd><code class="chip"><b>evaluate_place</b> {&quot;query&quot;: &quot;섭지코지&quot;, &quot;date&quot;: &quot;2026-08-21&quot;}</code></dd>
+<dt>실제 호출</dt><dd><code class="chip"><b>evaluate_place</b> {&quot;query&quot;: &quot;섭지코지&quot;, &quot;date&quot;: &quot;2026-08-21&quot;, &quot;time&quot;: &quot;23:00&quot;}</code></dd>
+<dt>도구 정답</dt><dd><code class="chip">verdict <b>양호</b></code> <code class="chip">cloud_cover <b>13.0</b></code></dd>
+<dt>답에 없던 값</dt><dd><span class="muted">verdict=양호</span></dd>
+</dl>
+<div class="answer">지도: <mark class="ok-url" title="도구가 준 지도 주소 그대로">http://127.0.0.1:11000/maps/abd8e4b320.html</mark><br><br>내일 밤 섭지코지는 별을 볼 수 있습니다. 밤하늘 어둡기 4 단계로 완전한 어둠은 아니지만, 망원경 없이도 은하수를 흐릿하게 볼 수 있습니다. 구름이 조금 있거나 옅은 안개가 낄 수 있어 시야가 제한될 수도 있습니다.<br><br>섭지코지는 동쪽 해안으로 야간 출입이 상시 개방되며, 주차장에서 관측지까지 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">12 분</mark> 정도 걸립니다.</div>
+<details class="base"><summary>도구 없이 쓴 답(baseline)과 비교</summary>
+<div class="answer">2026 년 8 월 21 일 제주도의 밤하늘 관측은 천체 위치와 기상 조건에 따라 달라질 수 있습니다. 섭지코지 (<mark class="latin" title="한국어 답변에 섞인 영어 — 도구 응답에도 없는 말">Celestron</mark>) 망원경 사용 시 관측 등급은 일반적으로 5~<mark class="bad-num" title="도구 응답에도 질문에도 없는 값 — 환각">6 등급</mark>까지 확인 가능하나, 이는 구름량과 대기 상태에 크게 의존합니다.<br><br>오늘날의 날씨 예보나 구체적인 구름량을 확인하지 못했으므로, 내일 밤의 실제 관측 가능성은 **확인되지 않았습니다**. 제주도 외 다른 지역의 별 관측 정보도 제공할 수 없습니다.<br><br>관측을 원하신다면 제주지역 실시간 기상 정보를 반드시 확인하시기 바랍니다.</div></details>
+<div class="judge" data-cid="E-05"><span class="lbl">이 답,</span><button type="button" class="jbtn o" data-v="O" aria-pressed="false">잘 나옴</button><button type="button" class="jbtn x" data-v="X" aria-pressed="false">안 나옴</button><button type="button" class="jclear hidden">지우기</button><span class="seal"></span><div class="fix"><p class="why">어디를 고쳐야 하나 — 자리를 고르고, 무엇이 어떻게 되어야 하는지 한 줄 적습니다.</p><div class="chips"><button type="button" data-tag="도구 설명" title="modules/routes.py 의 도구·인자 설명" aria-pressed="false">도구 설명</button><button type="button" data-tag="시스템 프롬프트" title="bench/harness.py 의 역할·답변 규칙" aria-pressed="false">시스템 프롬프트</button><button type="button" data-tag="도구 응답" title="modules/tools.py 가 돌려주는 값·문장" aria-pressed="false">도구 응답</button><button type="button" data-tag="서버 로직" title="판정·경로·천문 계산 자체" aria-pressed="false">서버 로직</button><button type="button" data-tag="채점 규칙" title="score.py 가 사람과 다르게 셈" aria-pressed="false">채점 규칙</button><button type="button" data-tag="케이스 설계" title="질문·정답이 잘못 잡힘" aria-pressed="false">케이스 설계</button></div><textarea rows="3" placeholder="예: 도구가 준 verdict 를 답변 첫 문단에 그대로 옮기게 해야 한다"></textarea></div></div>
+</article><article class="case pass" data-cat="evaluate" data-flag="pass">
+<div class="case-head">
+<span class="cid">E-06</span>
+<span class="tag">판정</span>
+<span class="tag pass">도구 선택 3/3</span>
+<span class="tag pass">인자 일치 3/3</span>
+<span class="tag pass">근거 6/6</span>
+<span class="tag pass">환각 수치 0건</span>
+<span class="tag pass">지도 3/3</span>
+<span class="tag pass">모른다고 밝힘 3/3</span>
+</div>
+<p class="q">협재해수욕장에서 오늘 밤 별 보여? 거기 주차랑 야간 출입은 어때?</p>
+<dl class="rows">
+<dt>기대 호출</dt><dd><code class="chip"><b>evaluate_place</b> {&quot;query&quot;: &quot;협재해수욕장&quot;}</code></dd>
+<dt>실제 호출</dt><dd><code class="chip"><b>evaluate_place</b> {&quot;query&quot;: &quot;협재해수욕장&quot;, &quot;date&quot;: &quot;2026-08-20&quot;, &quot;time&quot;: &quot;23:00&quot;}</code> <span class="muted">+1회 더</span></dd>
+<dt>도구 정답</dt><dd><code class="chip">verdict <b>양호</b></code> <code class="chip">cloud_cover <b>17.0</b></code></dd>
+</dl>
+<div class="answer">지도: <mark class="ok-url" title="도구가 준 지도 주소 그대로">http://127.0.0.1:11000/maps/360a6acc31.html</mark><br><br>협재해수욕장은 검증된 관측지 목록에 없으므로 주차·화장실·야간 출입 정보는 확인되지 않았습니다. 오늘 밤 <mark class="ok-num" title="도구 응답·질문에 있는 값">11시</mark> 기준 하늘 상태는 구름 <mark class="ok-num" title="도구 응답·질문에 있는 값">17%</mark>로 양호하며, 완전한 어둠 시간대는 20:44~04:32입니다. 둘레 불빛 때문에 은하수는 흐릿하게만 보이며 망원경이 필요한 대상 관측은 어렵습니다.</div>
+<details class="base"><summary>도구 없이 쓴 답(baseline)과 비교</summary>
+<div class="answer">협재해수욕장은 제주도 내륙에 위치하므로 해안선에서 보이는 맑은 밤하늘 관측에는 적합하지 않습니다. 해당 장소의 야간 차량 진입 및 주차 가능 여부는 현재 확인되지 않았습니다. 별 관측을 원하신다면 서귀포시 남쪽 해안선의 제물포나 성산일출봉 인근 등 해안가 공원이 더 적절합니다.</div></details>
+<div class="judge" data-cid="E-06"><span class="lbl">이 답,</span><button type="button" class="jbtn o" data-v="O" aria-pressed="false">잘 나옴</button><button type="button" class="jbtn x" data-v="X" aria-pressed="false">안 나옴</button><button type="button" class="jclear hidden">지우기</button><span class="seal"></span><div class="fix"><p class="why">어디를 고쳐야 하나 — 자리를 고르고, 무엇이 어떻게 되어야 하는지 한 줄 적습니다.</p><div class="chips"><button type="button" data-tag="도구 설명" title="modules/routes.py 의 도구·인자 설명" aria-pressed="false">도구 설명</button><button type="button" data-tag="시스템 프롬프트" title="bench/harness.py 의 역할·답변 규칙" aria-pressed="false">시스템 프롬프트</button><button type="button" data-tag="도구 응답" title="modules/tools.py 가 돌려주는 값·문장" aria-pressed="false">도구 응답</button><button type="button" data-tag="서버 로직" title="판정·경로·천문 계산 자체" aria-pressed="false">서버 로직</button><button type="button" data-tag="채점 규칙" title="score.py 가 사람과 다르게 셈" aria-pressed="false">채점 규칙</button><button type="button" data-tag="케이스 설계" title="질문·정답이 잘못 잡힘" aria-pressed="false">케이스 설계</button></div><textarea rows="3" placeholder="예: 도구가 준 verdict 를 답변 첫 문단에 그대로 옮기게 해야 한다"></textarea></div></div>
+</article><article class="case fail" data-cat="evaluate" data-flag="fail">
+<div class="case-head">
+<span class="cid">E-07</span>
+<span class="tag">판정</span>
+<span class="tag pass">도구 선택 3/3</span>
+<span class="tag pass">인자 일치 3/3</span>
+<span class="tag warn">근거 0/3</span>
+<span class="tag pass">환각 수치 0건</span>
+<span class="tag warn">한영 혼용 1건</span>
+<span class="tag pass">지도 3/3</span>
+<span class="tag pass">모른다고 밝힘 3/3</span>
+</div>
+<p class="q">사려니숲길 오늘 밤 별 관측 괜찮아? 밤에 들어가도 되는 곳이야?</p>
+<dl class="rows">
+<dt>기대 호출</dt><dd><code class="chip"><b>evaluate_place</b> {&quot;query&quot;: &quot;사려니숲길&quot;}</code></dd>
+<dt>실제 호출</dt><dd><code class="chip"><b>evaluate_place</b> {&quot;query&quot;: &quot;사려니숲길&quot;, &quot;date&quot;: &quot;2026-08-20&quot;, &quot;time&quot;: &quot;23:00&quot;, &quot;scope&quot;: &quot;moment&quot;}</code> <span class="muted">+1회 더</span></dd>
+<dt>도구 정답</dt><dd><code class="chip">verdict <b>최적</b></code></dd>
+<dt>답에 없던 값</dt><dd><span class="muted">verdict=최적</span></dd>
+</dl>
+<div class="answer">지도: <mark class="ok-url" title="도구가 준 지도 주소 그대로">http://127.0.0.1:11000/maps/3e173283ad.html</mark><br><br>사려니숲길은 검증된 관측지 목록에 없으며, 야간 출입 여부나 주차 시설은 확인되지 않았습니다. 오늘 밤 <mark class="ok-num" title="도구 응답·질문에 있는 값">23시</mark>는 완전히 어두운 시간대 (20:43~04:30) 에 속해 구름이 거의 없는 상태지만, 둘레 불빛 탓에 은하수는 흐릿하게만 보입니다.<br><br>야간 진입과 주차가 가능할지 확실하지 않아 별 관측을 위해 추천하기 어렵습니다. 근처에 어둡고 접근성이 확인된 성판악 주차장이나 가시리 풍력발전단지를 고려해 보시는 것이 좋습니다.</div>
+<details class="base"><summary>도구 없이 쓴 답(baseline)과 비교</summary>
+<div class="answer">2026 년 8 월 20 일 제주도 밤하늘 관측은 구름이 적고 대기 조건이 매우 좋기로 유명합니다. 사려니 숲길은 해안가 산책로로 야생동물 보호 구역에 속해 있어, 야간 진입 시 반드시 가이드를 동반하거나 관리자의 허가를 받아야 합니다. 별 관측 등급은 <mark class="ok-num" title="도구 응답·질문에 있는 값">4 등급</mark>으로 우수하며, 주행시간과 도보 시간은 해당 구간 길이에 따라 달라집니다.</div></details>
+<div class="judge" data-cid="E-07"><span class="lbl">이 답,</span><button type="button" class="jbtn o" data-v="O" aria-pressed="false">잘 나옴</button><button type="button" class="jbtn x" data-v="X" aria-pressed="false">안 나옴</button><button type="button" class="jclear hidden">지우기</button><span class="seal"></span><div class="fix"><p class="why">어디를 고쳐야 하나 — 자리를 고르고, 무엇이 어떻게 되어야 하는지 한 줄 적습니다.</p><div class="chips"><button type="button" data-tag="도구 설명" title="modules/routes.py 의 도구·인자 설명" aria-pressed="false">도구 설명</button><button type="button" data-tag="시스템 프롬프트" title="bench/harness.py 의 역할·답변 규칙" aria-pressed="false">시스템 프롬프트</button><button type="button" data-tag="도구 응답" title="modules/tools.py 가 돌려주는 값·문장" aria-pressed="false">도구 응답</button><button type="button" data-tag="서버 로직" title="판정·경로·천문 계산 자체" aria-pressed="false">서버 로직</button><button type="button" data-tag="채점 규칙" title="score.py 가 사람과 다르게 셈" aria-pressed="false">채점 규칙</button><button type="button" data-tag="케이스 설계" title="질문·정답이 잘못 잡힘" aria-pressed="false">케이스 설계</button></div><textarea rows="3" placeholder="예: 도구가 준 verdict 를 답변 첫 문단에 그대로 옮기게 해야 한다"></textarea></div></div>
+</article><article class="case pass" data-cat="evaluate" data-flag="pass">
+<div class="case-head">
+<span class="cid">E-08</span>
+<span class="tag">판정</span>
+<span class="tag pass">도구 선택 3/3</span>
+<span class="tag pass">인자 일치 3/3</span>
+<span class="tag pass">근거 3/3</span>
+<span class="tag pass">환각 수치 0건</span>
+<span class="tag pass">지도 3/3</span>
+</div>
+<p class="q">오늘 밤 알뜨르비행장에서 별 볼 수 있는 시간이 총 몇 시간이나 돼?</p>
+<dl class="rows">
+<dt>기대 호출</dt><dd><code class="chip"><b>evaluate_place</b> {&quot;query&quot;: &quot;알뜨르비행장&quot;, &quot;scope&quot;: &quot;night&quot;}</code></dd>
+<dt>실제 호출</dt><dd><code class="chip"><b>evaluate_place</b> {&quot;query&quot;: &quot;알뜨르비행장&quot;, &quot;date&quot;: &quot;2026-08-20&quot;, &quot;time&quot;: &quot;23:00&quot;, &quot;scope&quot;: &quot;night&quot;}</code></dd>
+<dt>도구 정답</dt><dd><code class="chip">observable_hours <b>10</b></code></dd>
+</dl>
+<div class="answer">지도: <mark class="ok-url" title="도구가 준 지도 주소 그대로">http://127.0.0.1:11000/maps/252a9c5f45.html</mark><br><br>오늘 밤 알뜨르비행장에서 별을 볼 수 있는 시간은 총 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">10 시간</mark>입니다. 관측 가능 구간은 8 월 20 일 밤 <mark class="ok-num" title="도구 응답·질문에 있는 값">8 시</mark> <mark class="ok-num" title="도구 응답·질문에 있는 값">41 분</mark>부터 21 일 아침 <mark class="ok-num" title="도구 응답·질문에 있는 값">5 시</mark> <mark class="ok-num" title="도구 응답·질문에 있는 값">35 분</mark>까지이며, 이 중 밝은 별만 보이는 시간은 <mark class="ok-num" title="도구 응답·질문에 있는 값">1 시간</mark>, 양호한 조건은 <mark class="ok-num" title="도구 응답·질문에 있는 값">8 시간</mark>, 최적의 조건은 <mark class="ok-num" title="도구 응답·질문에 있는 값">1 시간</mark>입니다.<br><br>이곳은 야간 출입이 상시 개방되어 있고 주차장이 있어 접근성이 좋으나, 가로등 불빛 때문에 원래 밤하늘 모습은 아니라는 점에 유의해야 합니다.</div>
+<details class="base"><summary>도구 없이 쓴 답(baseline)과 비교</summary>
+<div class="answer">알뜨르 비행장은 제주도 남쪽 해안가에 위치해 있어, 2026 년 8 월 20 일 밤의 관측 조건을 고려할 때 실제 별이 보이는 시간은 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">1 시간</mark> <mark class="ok-num" title="도구 응답·질문에 있는 값">30 분</mark>입니다. 이 기간은 해가 지고 달이 완전히 뜨기 전인 자정 이후부터 새벽 <mark class="ok-num" title="도구 응답·질문에 있는 값">3 시</mark>경까지로 추정됩니다.<br><br>하지만 알뜨르 비행장 주변은 공항 시설과 인공 조명이 밀집해 있어 천문 관측에 매우 불리하며, 구름의 유무나 대기 상태에 따라 실제 관측 가능 시간은 크게 줄어들 수 있습니다. 따라서 정확한 소요 시간과 관측 등급은 실시간 기상 데이터와 현지 조건을 확인하지 않고는 확정할 수 없습니다.<br><br>제주도 내 다른 야간 활동이나 별 관측과 무관한 질문은 답변드리지 않습니다.</div></details>
+<div class="judge" data-cid="E-08"><span class="lbl">이 답,</span><button type="button" class="jbtn o" data-v="O" aria-pressed="false">잘 나옴</button><button type="button" class="jbtn x" data-v="X" aria-pressed="false">안 나옴</button><button type="button" class="jclear hidden">지우기</button><span class="seal"></span><div class="fix"><p class="why">어디를 고쳐야 하나 — 자리를 고르고, 무엇이 어떻게 되어야 하는지 한 줄 적습니다.</p><div class="chips"><button type="button" data-tag="도구 설명" title="modules/routes.py 의 도구·인자 설명" aria-pressed="false">도구 설명</button><button type="button" data-tag="시스템 프롬프트" title="bench/harness.py 의 역할·답변 규칙" aria-pressed="false">시스템 프롬프트</button><button type="button" data-tag="도구 응답" title="modules/tools.py 가 돌려주는 값·문장" aria-pressed="false">도구 응답</button><button type="button" data-tag="서버 로직" title="판정·경로·천문 계산 자체" aria-pressed="false">서버 로직</button><button type="button" data-tag="채점 규칙" title="score.py 가 사람과 다르게 셈" aria-pressed="false">채점 규칙</button><button type="button" data-tag="케이스 설계" title="질문·정답이 잘못 잡힘" aria-pressed="false">케이스 설계</button></div><textarea rows="3" placeholder="예: 도구가 준 verdict 를 답변 첫 문단에 그대로 옮기게 해야 한다"></textarea></div></div>
+</article><article class="case pass" data-cat="details" data-flag="pass">
+<div class="case-head">
+<span class="cid">D-01</span>
+<span class="tag">상세</span>
+<span class="tag pass">도구 선택 3/3</span>
+<span class="tag pass">인자 일치 3/3</span>
+<span class="tag pass">근거 6/6</span>
+<span class="tag pass">환각 수치 0건</span>
+<span class="tag pass">지도 3/3</span>
+</div>
+<p class="q">매오름 많이 걸어야 해?</p>
+<dl class="rows">
+<dt>기대 호출</dt><dd><code class="chip"><b>spot_details</b> {&quot;name&quot;: &quot;매오름&quot;}</code></dd>
+<dt>실제 호출</dt><dd><code class="chip"><b>spot_details</b> {&quot;name&quot;: &quot;매오름&quot;}</code></dd>
+<dt>도구 정답</dt><dd><code class="chip">walk_minutes <b>5.8</b></code> <code class="chip">trail_grade <b>쉬움</b></code></dd>
+</dl>
+<div class="answer">지도: <mark class="ok-url" title="도구가 준 지도 주소 그대로">http://127.0.0.1:11000/maps/038645f36a.html</mark><br><br>매오름은 정상까지 차량으로 이동해 주차할 수 있지만, 진입로가 좁고 노면이 고르지 않아 서행해야 합니다. 주차장에서 관측지까지 도보 소요 시간은 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">6 분</mark>이며, 오르막 높이는 <mark class="ok-num" title="도구 응답·질문에 있는 값">20m</mark> 로 등반 난이도는 &#x27;쉬움&#x27;입니다.</div>
+<details class="base"><summary>도구 없이 쓴 답(baseline)과 비교</summary>
+<div class="answer">2026 년 8 월 20 일 제주도 밤하늘 관측을 위해 매오름은 필수로 가야 합니다. 이곳의 높은 지대 (해발 약 1,<mark class="bad-num" title="도구 응답에도 질문에도 없는 값 — 환각">300m</mark>) 와 평야 지역보다 더 맑은 공기가 별 관측에 유리하기 때문입니다.<br><br>관측 시간은 대략 <mark class="ok-num" title="도구 응답·질문에 있는 값">1 시간</mark>에서 <mark class="ok-num" title="도구 응답·질문에 있는 값">1 시간</mark> <mark class="ok-num" title="도구 응답·질문에 있는 값">30 분</mark> 정도 소요되며, 구름이 없는 맑은 날을 기다려야 합니다. 관측 등급은 보통 4~<mark class="ok-num" title="도구 응답·질문에 있는 값">5 등급</mark>으로 평가됩니다.<br><br>도보로 접근하는 경우 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">2 시간</mark>에서 <mark class="ok-num" title="도구 응답·질문에 있는 값">2 시간</mark> <mark class="ok-num" title="도구 응답·질문에 있는 값">30 분</mark>이 걸리므로, 출발 전 충분한 준비가 필요합니다.</div></details>
+<div class="judge" data-cid="D-01"><span class="lbl">이 답,</span><button type="button" class="jbtn o" data-v="O" aria-pressed="false">잘 나옴</button><button type="button" class="jbtn x" data-v="X" aria-pressed="false">안 나옴</button><button type="button" class="jclear hidden">지우기</button><span class="seal"></span><div class="fix"><p class="why">어디를 고쳐야 하나 — 자리를 고르고, 무엇이 어떻게 되어야 하는지 한 줄 적습니다.</p><div class="chips"><button type="button" data-tag="도구 설명" title="modules/routes.py 의 도구·인자 설명" aria-pressed="false">도구 설명</button><button type="button" data-tag="시스템 프롬프트" title="bench/harness.py 의 역할·답변 규칙" aria-pressed="false">시스템 프롬프트</button><button type="button" data-tag="도구 응답" title="modules/tools.py 가 돌려주는 값·문장" aria-pressed="false">도구 응답</button><button type="button" data-tag="서버 로직" title="판정·경로·천문 계산 자체" aria-pressed="false">서버 로직</button><button type="button" data-tag="채점 규칙" title="score.py 가 사람과 다르게 셈" aria-pressed="false">채점 규칙</button><button type="button" data-tag="케이스 설계" title="질문·정답이 잘못 잡힘" aria-pressed="false">케이스 설계</button></div><textarea rows="3" placeholder="예: 도구가 준 verdict 를 답변 첫 문단에 그대로 옮기게 해야 한다"></textarea></div></div>
+</article><article class="case pass" data-cat="details" data-flag="pass">
+<div class="case-head">
+<span class="cid">D-02</span>
+<span class="tag">상세</span>
+<span class="tag pass">도구 선택 3/3</span>
+<span class="tag pass">인자 일치 3/3</span>
+<span class="tag pass">근거 3/3</span>
+<span class="tag pass">환각 수치 0건</span>
+<span class="tag pass">지도 3/3</span>
+</div>
+<p class="q">1100고지 휴게소에 강아지 데려가도 돼?</p>
+<dl class="rows">
+<dt>기대 호출</dt><dd><code class="chip"><b>spot_details</b> {&quot;name&quot;: &quot;1100고지 휴게소&quot;}</code></dd>
+<dt>실제 호출</dt><dd><code class="chip"><b>spot_details</b> {&quot;name&quot;: &quot;1100고지 휴게소&quot;, &quot;pets&quot;: &quot;True&quot;}</code></dd>
+<dt>도구 정답</dt><dd><code class="chip">pets <b>반려견 동반 불가능</b></code></dd>
+</dl>
+<div class="answer">지도: <mark class="ok-url" title="도구가 준 지도 주소 그대로">http://127.0.0.1:11000/maps/871efe3f80.html</mark><br><br>1100고지 휴게소는 반려견 동반이 불가능합니다. 주차장은 무료이며 화장실은 있지만 강아지를 데려갈 수 없습니다.</div>
+<details class="base"><summary>도구 없이 쓴 답(baseline)과 비교</summary>
+<div class="answer">죄송하지만 제주도 밤하늘 관측과 무관한 질문은 답변할 수 없습니다. 2026 년 8 월 20 일 제주도의 별자리나 관측 조건에 대한 정보는 제공해 드릴 수 있습니다.</div></details>
+<div class="judge" data-cid="D-02"><span class="lbl">이 답,</span><button type="button" class="jbtn o" data-v="O" aria-pressed="false">잘 나옴</button><button type="button" class="jbtn x" data-v="X" aria-pressed="false">안 나옴</button><button type="button" class="jclear hidden">지우기</button><span class="seal"></span><div class="fix"><p class="why">어디를 고쳐야 하나 — 자리를 고르고, 무엇이 어떻게 되어야 하는지 한 줄 적습니다.</p><div class="chips"><button type="button" data-tag="도구 설명" title="modules/routes.py 의 도구·인자 설명" aria-pressed="false">도구 설명</button><button type="button" data-tag="시스템 프롬프트" title="bench/harness.py 의 역할·답변 규칙" aria-pressed="false">시스템 프롬프트</button><button type="button" data-tag="도구 응답" title="modules/tools.py 가 돌려주는 값·문장" aria-pressed="false">도구 응답</button><button type="button" data-tag="서버 로직" title="판정·경로·천문 계산 자체" aria-pressed="false">서버 로직</button><button type="button" data-tag="채점 규칙" title="score.py 가 사람과 다르게 셈" aria-pressed="false">채점 규칙</button><button type="button" data-tag="케이스 설계" title="질문·정답이 잘못 잡힘" aria-pressed="false">케이스 설계</button></div><textarea rows="3" placeholder="예: 도구가 준 verdict 를 답변 첫 문단에 그대로 옮기게 해야 한다"></textarea></div></div>
+</article><article class="case pass" data-cat="details" data-flag="pass">
+<div class="case-head">
+<span class="cid">D-03</span>
+<span class="tag">상세</span>
+<span class="tag pass">도구 선택 3/3</span>
+<span class="tag pass">인자 일치 3/3</span>
+<span class="tag pass">근거 3/3</span>
+<span class="tag pass">환각 수치 0건</span>
+<span class="tag pass">지도 3/3</span>
+</div>
+<p class="q">새별오름 밤에 들어갈 수 있어?</p>
+<dl class="rows">
+<dt>기대 호출</dt><dd><code class="chip"><b>spot_details</b> {&quot;name&quot;: &quot;새별오름&quot;}</code></dd>
+<dt>실제 호출</dt><dd><code class="chip"><b>spot_details</b> {&quot;name&quot;: &quot;새별오름&quot;}</code></dd>
+<dt>도구 정답</dt><dd><code class="chip">night_access <b>상시 개방</b></code></dd>
+</dl>
+<div class="answer">지도: <mark class="ok-url" title="도구가 준 지도 주소 그대로">http://127.0.0.1:11000/maps/d04a4f0dd1.html</mark><br><br>새별오름은 야간 출입이 상시 개방되어 밤에 들어갈 수 있습니다. 주차장에서도 별을 볼 수 있지만, 정상까지 등반하여 주변 시야를 넓게 트이는 것이 더 좋습니다.<br><br>주말이나 공휴일에는 주차장이 꽉 차는 경우가 많으니 미리 도착하는 것을 추천합니다.</div>
+<details class="base"><summary>도구 없이 쓴 답(baseline)과 비교</summary>
+<div class="answer">2026 년 8 월 20 일 제주도를 방문하신다면 새별오름은 야간 등반이 가능합니다. 해발 1,<mark class="bad-num" title="도구 응답에도 질문에도 없는 값 — 환각">345 미터</mark>의 높이는 밤하늘 관측에 유리하며, 정상까지 도보로 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">1 시간</mark> 소요됩니다. 다만 이 기간에는 제주도 남쪽과 동쪽 방향을 향하지 않는 한 구름이 많을 수 있으므로, 실제 날씨와 천체 위치를 확인해야 합니다.<br><br>새별오름은 야간 등반이 가능하지만, 정확한 기상 조건과 관측 등급은 실시간 데이터에 따라 달라질 수 있습니다.</div></details>
+<div class="judge" data-cid="D-03"><span class="lbl">이 답,</span><button type="button" class="jbtn o" data-v="O" aria-pressed="false">잘 나옴</button><button type="button" class="jbtn x" data-v="X" aria-pressed="false">안 나옴</button><button type="button" class="jclear hidden">지우기</button><span class="seal"></span><div class="fix"><p class="why">어디를 고쳐야 하나 — 자리를 고르고, 무엇이 어떻게 되어야 하는지 한 줄 적습니다.</p><div class="chips"><button type="button" data-tag="도구 설명" title="modules/routes.py 의 도구·인자 설명" aria-pressed="false">도구 설명</button><button type="button" data-tag="시스템 프롬프트" title="bench/harness.py 의 역할·답변 규칙" aria-pressed="false">시스템 프롬프트</button><button type="button" data-tag="도구 응답" title="modules/tools.py 가 돌려주는 값·문장" aria-pressed="false">도구 응답</button><button type="button" data-tag="서버 로직" title="판정·경로·천문 계산 자체" aria-pressed="false">서버 로직</button><button type="button" data-tag="채점 규칙" title="score.py 가 사람과 다르게 셈" aria-pressed="false">채점 규칙</button><button type="button" data-tag="케이스 설계" title="질문·정답이 잘못 잡힘" aria-pressed="false">케이스 설계</button></div><textarea rows="3" placeholder="예: 도구가 준 verdict 를 답변 첫 문단에 그대로 옮기게 해야 한다"></textarea></div></div>
+</article><article class="case fail" data-cat="details" data-flag="fail">
+<div class="case-head">
+<span class="cid">D-04</span>
+<span class="tag">상세</span>
+<span class="tag pass">도구 선택 3/3</span>
+<span class="tag pass">인자 일치 3/3</span>
+<span class="tag warn">근거 0/6</span>
+<span class="tag pass">환각 수치 0건</span>
+<span class="tag pass">지도 3/3</span>
+</div>
+<p class="q">천아계곡 화장실 있어? 주차는?</p>
+<dl class="rows">
+<dt>기대 호출</dt><dd><code class="chip"><b>spot_details</b> {&quot;name&quot;: &quot;천아계곡&quot;}</code></dd>
+<dt>실제 호출</dt><dd><code class="chip"><b>spot_details</b> {&quot;name&quot;: &quot;천아계곡&quot;}</code></dd>
+<dt>도구 정답</dt><dd><code class="chip">toilet_count <b>0</b></code> <code class="chip">parking_count <b>1</b></code></dd>
+<dt>답에 없던 값</dt><dd><span class="muted">numbers.toilet_count=0, numbers.parking_count=1</span></dd>
+</dl>
+<div class="answer">지도: <mark class="ok-url" title="도구가 준 지도 주소 그대로">http://127.0.0.1:11000/maps/4720f79570.html</mark><br><br>천아계곡은 화장실이 <mark class="ok-num" title="도구 응답·질문에 있는 값">500m</mark> 밖이라 없습니다. 주차는 무료이며 천아계곡 주차장이 있습니다.</div>
+<details class="base"><summary>도구 없이 쓴 답(baseline)과 비교</summary>
+<div class="answer">죄송하지만 천아계곡의 화장실 유무나 주차 정보는 제가 알 수 없습니다. 이 대화는 제주도 밤하늘 별 관측에 한정되어 있습니다.<br><br>오늘 2026 년 8 월 20 일 제주도의 밤하늘 관측을 도와드릴까요? 구름량과 주요 관측 등급, 소요 시간 등 구체적인 정보를 알려드리겠습니다.</div></details>
+<div class="judge" data-cid="D-04"><span class="lbl">이 답,</span><button type="button" class="jbtn o" data-v="O" aria-pressed="false">잘 나옴</button><button type="button" class="jbtn x" data-v="X" aria-pressed="false">안 나옴</button><button type="button" class="jclear hidden">지우기</button><span class="seal"></span><div class="fix"><p class="why">어디를 고쳐야 하나 — 자리를 고르고, 무엇이 어떻게 되어야 하는지 한 줄 적습니다.</p><div class="chips"><button type="button" data-tag="도구 설명" title="modules/routes.py 의 도구·인자 설명" aria-pressed="false">도구 설명</button><button type="button" data-tag="시스템 프롬프트" title="bench/harness.py 의 역할·답변 규칙" aria-pressed="false">시스템 프롬프트</button><button type="button" data-tag="도구 응답" title="modules/tools.py 가 돌려주는 값·문장" aria-pressed="false">도구 응답</button><button type="button" data-tag="서버 로직" title="판정·경로·천문 계산 자체" aria-pressed="false">서버 로직</button><button type="button" data-tag="채점 규칙" title="score.py 가 사람과 다르게 셈" aria-pressed="false">채점 규칙</button><button type="button" data-tag="케이스 설계" title="질문·정답이 잘못 잡힘" aria-pressed="false">케이스 설계</button></div><textarea rows="3" placeholder="예: 도구가 준 verdict 를 답변 첫 문단에 그대로 옮기게 해야 한다"></textarea></div></div>
+</article><article class="case pass" data-cat="details" data-flag="pass">
+<div class="case-head">
+<span class="cid">D-05</span>
+<span class="tag">상세</span>
+<span class="tag pass">도구 선택 3/3</span>
+<span class="tag pass">인자 일치 3/3</span>
+<span class="tag warn">근거 3/6</span>
+<span class="tag pass">환각 수치 0건</span>
+<span class="tag pass">지도 3/3</span>
+</div>
+<p class="q">제주공항에서 관음사 야영장까지 얼마나 걸려? 거기 야간에 들어갈 수 있어?</p>
+<dl class="rows">
+<dt>기대 호출</dt><dd><code class="chip"><b>spot_details</b> {&quot;name&quot;: &quot;관음사 야영장&quot;, &quot;origin&quot;: &quot;제주공항&quot;}</code></dd>
+<dt>실제 호출</dt><dd><code class="chip"><b>spot_details</b> {&quot;name&quot;: &quot;관음사 야영장&quot;, &quot;origin&quot;: &quot;제주공항&quot;}</code></dd>
+<dt>도구 정답</dt><dd><code class="chip">minutes <b>17.9</b></code> <code class="chip">night_access <b>예약한 야영객만 머문다 — 18시 이후 도착은 노쇼 처리라 해 지기 전에 들어가 있어야 한다</b></code></dd>
+<dt>답에 없던 값</dt><dd><span class="muted">spots[0].night_access=예약한 야영객만 머문다 — 18시 이후 도착은 노쇼 처리라 해 지기 전에 들어가 있어야 한다</span></dd>
+</dl>
+<div class="answer">지도: <mark class="ok-url" title="도구가 준 지도 주소 그대로">http://127.0.0.1:11000/maps/65da98b3dd.html</mark><br><br>제주공항에서 관음사 야영장은 차로 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">18 분</mark>, <mark class="ok-num" title="도구 응답·질문에 있는 값">14.6km</mark> 걸립니다. 야간 출입은 예약한 야영객만 허용하며, <mark class="ok-num" title="도구 응답·질문에 있는 값">18 시</mark> 이후 도착은 노쇼 처리됩니다. 따라서 정해진 시간까지 들어가는 것이 필수입니다.</div>
+<details class="base"><summary>도구 없이 쓴 답(baseline)과 비교</summary>
+<div class="answer">제주공항에서 관음사 야영장은 약 <mark class="ok-num" title="도구 응답·질문에 있는 값">15 분</mark>의 차로, 주행 시간 기준으로 20~<mark class="bad-num" title="도구 응답에도 질문에도 없는 값 — 환각">25 분</mark> 정도 소요됩니다. 현재 날씨 정보를 확인하지 못했으므로 구름이 끼어 있을 가능성은 있으나, 야간 진입 자체는 제한되지 않았습니다. 관음사는 별 관측을 위한 주요 지점 중 하나로, 밤하늘을 감상하기 위해 야간에 들어가는 것이 일반적입니다.</div></details>
+<div class="judge" data-cid="D-05"><span class="lbl">이 답,</span><button type="button" class="jbtn o" data-v="O" aria-pressed="false">잘 나옴</button><button type="button" class="jbtn x" data-v="X" aria-pressed="false">안 나옴</button><button type="button" class="jclear hidden">지우기</button><span class="seal"></span><div class="fix"><p class="why">어디를 고쳐야 하나 — 자리를 고르고, 무엇이 어떻게 되어야 하는지 한 줄 적습니다.</p><div class="chips"><button type="button" data-tag="도구 설명" title="modules/routes.py 의 도구·인자 설명" aria-pressed="false">도구 설명</button><button type="button" data-tag="시스템 프롬프트" title="bench/harness.py 의 역할·답변 규칙" aria-pressed="false">시스템 프롬프트</button><button type="button" data-tag="도구 응답" title="modules/tools.py 가 돌려주는 값·문장" aria-pressed="false">도구 응답</button><button type="button" data-tag="서버 로직" title="판정·경로·천문 계산 자체" aria-pressed="false">서버 로직</button><button type="button" data-tag="채점 규칙" title="score.py 가 사람과 다르게 셈" aria-pressed="false">채점 규칙</button><button type="button" data-tag="케이스 설계" title="질문·정답이 잘못 잡힘" aria-pressed="false">케이스 설계</button></div><textarea rows="3" placeholder="예: 도구가 준 verdict 를 답변 첫 문단에 그대로 옮기게 해야 한다"></textarea></div></div>
+</article><article class="case pass" data-cat="no-tool" data-flag="pass">
+<div class="case-head">
+<span class="cid">N-01</span>
+<span class="tag">도구 금지</span>
+<span class="tag pass">도구 선택 3/3</span>
+<span class="tag pass">환각 수치 0건</span>
+<span class="tag pass">모른다고 밝힘 3/3</span>
+</div>
+<p class="q">서울 남산타워에서 별이 잘 보일까?</p>
+<dl class="rows">
+<dt>기대 호출</dt><dd><code class="chip"><b>도구 부르지 않기</b> </code></dd>
+<dt>실제 호출</dt><dd><code class="chip none">도구 안 부름</code></dd>
+<dt>도구 정답</dt><dd><span class="muted">도구를 부르지 않는 것이 정답 — 대조할 값 없음</span></dd>
+</dl>
+<div class="answer">제주도 밖이라 답할 수 없습니다.</div>
+<details class="base"><summary>도구 없이 쓴 답(baseline)과 비교</summary>
+<div class="answer">죄송하지만 제주도 밤하늘 관측과 무관한 서울의 질문은 답할 수 없습니다.<br>제 역할은 제주도를 방문하시는 분들에게 최적의 야간 천체 관측 정보를 제공하는 것입니다.<br>제주도 내에서는 2026 년 8 월 20 일에도 맑은 날이 많을 것으로 예상되지만, 정확한 구름량과 관측 등급은 실시간 기상 데이터가 없으므로 확인되지 않았습니다.<br>주행 시간이나 소요 시간은 지역마다 달라서 구체적인 수치를 제시할 수 없습니다.<br>제주도에서 별을 보시려면 공항이나 주요 관광지를 기준으로 이동하시는 것을 추천드립니다.</div></details>
+<div class="judge" data-cid="N-01"><span class="lbl">이 답,</span><button type="button" class="jbtn o" data-v="O" aria-pressed="false">잘 나옴</button><button type="button" class="jbtn x" data-v="X" aria-pressed="false">안 나옴</button><button type="button" class="jclear hidden">지우기</button><span class="seal"></span><div class="fix"><p class="why">어디를 고쳐야 하나 — 자리를 고르고, 무엇이 어떻게 되어야 하는지 한 줄 적습니다.</p><div class="chips"><button type="button" data-tag="도구 설명" title="modules/routes.py 의 도구·인자 설명" aria-pressed="false">도구 설명</button><button type="button" data-tag="시스템 프롬프트" title="bench/harness.py 의 역할·답변 규칙" aria-pressed="false">시스템 프롬프트</button><button type="button" data-tag="도구 응답" title="modules/tools.py 가 돌려주는 값·문장" aria-pressed="false">도구 응답</button><button type="button" data-tag="서버 로직" title="판정·경로·천문 계산 자체" aria-pressed="false">서버 로직</button><button type="button" data-tag="채점 규칙" title="score.py 가 사람과 다르게 셈" aria-pressed="false">채점 규칙</button><button type="button" data-tag="케이스 설계" title="질문·정답이 잘못 잡힘" aria-pressed="false">케이스 설계</button></div><textarea rows="3" placeholder="예: 도구가 준 verdict 를 답변 첫 문단에 그대로 옮기게 해야 한다"></textarea></div></div>
+</article><article class="case pass" data-cat="no-tool" data-flag="pass">
+<div class="case-head">
+<span class="cid">N-02</span>
+<span class="tag">도구 금지</span>
+<span class="tag pass">도구 선택 3/3</span>
+<span class="tag pass">환각 수치 0건</span>
+<span class="tag pass">모른다고 밝힘 3/3</span>
+</div>
+<p class="q">제주도 흑돼지 맛집 세 군데만 추천해줘.</p>
+<dl class="rows">
+<dt>기대 호출</dt><dd><code class="chip"><b>도구 부르지 않기</b> </code></dd>
+<dt>실제 호출</dt><dd><code class="chip none">도구 안 부름</code></dd>
+<dt>도구 정답</dt><dd><span class="muted">도구를 부르지 않는 것이 정답 — 대조할 값 없음</span></dd>
+</dl>
+<div class="answer">죄송하지만 제주도 별 관측과 관련된 정보만 제공할 수 있습니다. 맛집을 추천해드리기는 어렵습니다.</div>
+<details class="base"><summary>도구 없이 쓴 답(baseline)과 비교</summary>
+<div class="answer">죄송하지만 제주도 밤하늘 별 관측과 무관한 질문은 답할 수 없습니다.  <br>오늘 2026 년 8 월 20 일 제주도의 천문 관측 조건이나 관련 정보는 제공하지 않습니다.  <br>별관측을 원하시면 장소·시간·구름량 등 구체적인 데이터를 요청해 주세요.</div></details>
+<div class="judge" data-cid="N-02"><span class="lbl">이 답,</span><button type="button" class="jbtn o" data-v="O" aria-pressed="false">잘 나옴</button><button type="button" class="jbtn x" data-v="X" aria-pressed="false">안 나옴</button><button type="button" class="jclear hidden">지우기</button><span class="seal"></span><div class="fix"><p class="why">어디를 고쳐야 하나 — 자리를 고르고, 무엇이 어떻게 되어야 하는지 한 줄 적습니다.</p><div class="chips"><button type="button" data-tag="도구 설명" title="modules/routes.py 의 도구·인자 설명" aria-pressed="false">도구 설명</button><button type="button" data-tag="시스템 프롬프트" title="bench/harness.py 의 역할·답변 규칙" aria-pressed="false">시스템 프롬프트</button><button type="button" data-tag="도구 응답" title="modules/tools.py 가 돌려주는 값·문장" aria-pressed="false">도구 응답</button><button type="button" data-tag="서버 로직" title="판정·경로·천문 계산 자체" aria-pressed="false">서버 로직</button><button type="button" data-tag="채점 규칙" title="score.py 가 사람과 다르게 셈" aria-pressed="false">채점 규칙</button><button type="button" data-tag="케이스 설계" title="질문·정답이 잘못 잡힘" aria-pressed="false">케이스 설계</button></div><textarea rows="3" placeholder="예: 도구가 준 verdict 를 답변 첫 문단에 그대로 옮기게 해야 한다"></textarea></div></div>
+</article><article class="case pass" data-cat="no-tool" data-flag="pass">
+<div class="case-head">
+<span class="cid">N-03</span>
+<span class="tag">도구 금지</span>
+<span class="tag pass">도구 선택 3/3</span>
+<span class="tag pass">환각 수치 0건</span>
+<span class="tag pass">모른다고 밝힘 3/3</span>
+</div>
+<p class="q">MCP 프로토콜이 뭔지 설명해줘.</p>
+<dl class="rows">
+<dt>기대 호출</dt><dd><code class="chip"><b>도구 부르지 않기</b> </code></dd>
+<dt>실제 호출</dt><dd><code class="chip none">도구 안 부름</code></dd>
+<dt>도구 정답</dt><dd><span class="muted">도구를 부르지 않는 것이 정답 — 대조할 값 없음</span></dd>
+</dl>
+<div class="answer">제주는 별 관측을 돕는 비서로, 맛집이나 숙소, 렌터카, 항공권 등 별 관측과 무관한 질문은 답할 수 없습니다. MCP 프로토콜에 대한 설명도 해당 범위에 속하므로 답변이 불가능합니다.</div>
+<details class="base"><summary>도구 없이 쓴 답(baseline)과 비교</summary>
+<div class="answer">제도와 별 관측에 관한 질문이므로 MCP 프로토콜에 대해 설명드리기 어렵습니다. 제가 도와드릴 수 있는 것은 제주도 밤하늘의 별자리 위치, 관측 등급, 소요 시간 등 구체적인 천문 정보를 제공하는 것입니다. 오늘 2026 년 8 월 20 일 제주도의 하늘을 보러 오시면 구름이 적고 관측 조건이 좋은 날일 확률이 높습니다.</div></details>
+<div class="judge" data-cid="N-03"><span class="lbl">이 답,</span><button type="button" class="jbtn o" data-v="O" aria-pressed="false">잘 나옴</button><button type="button" class="jbtn x" data-v="X" aria-pressed="false">안 나옴</button><button type="button" class="jclear hidden">지우기</button><span class="seal"></span><div class="fix"><p class="why">어디를 고쳐야 하나 — 자리를 고르고, 무엇이 어떻게 되어야 하는지 한 줄 적습니다.</p><div class="chips"><button type="button" data-tag="도구 설명" title="modules/routes.py 의 도구·인자 설명" aria-pressed="false">도구 설명</button><button type="button" data-tag="시스템 프롬프트" title="bench/harness.py 의 역할·답변 규칙" aria-pressed="false">시스템 프롬프트</button><button type="button" data-tag="도구 응답" title="modules/tools.py 가 돌려주는 값·문장" aria-pressed="false">도구 응답</button><button type="button" data-tag="서버 로직" title="판정·경로·천문 계산 자체" aria-pressed="false">서버 로직</button><button type="button" data-tag="채점 규칙" title="score.py 가 사람과 다르게 셈" aria-pressed="false">채점 규칙</button><button type="button" data-tag="케이스 설계" title="질문·정답이 잘못 잡힘" aria-pressed="false">케이스 설계</button></div><textarea rows="3" placeholder="예: 도구가 준 verdict 를 답변 첫 문단에 그대로 옮기게 해야 한다"></textarea></div></div>
+</article><article class="case pass" data-cat="no-tool" data-flag="pass">
+<div class="case-head">
+<span class="cid">N-04</span>
+<span class="tag">도구 금지</span>
+<span class="tag pass">도구 선택 3/3</span>
+<span class="tag pass">환각 수치 0건</span>
+<span class="tag pass">모른다고 밝힘 3/3</span>
+</div>
+<p class="q">내일 부산 날씨 어때?</p>
+<dl class="rows">
+<dt>기대 호출</dt><dd><code class="chip"><b>도구 부르지 않기</b> </code></dd>
+<dt>실제 호출</dt><dd><code class="chip none">도구 안 부름</code></dd>
+<dt>도구 정답</dt><dd><span class="muted">도구를 부르지 않는 것이 정답 — 대조할 값 없음</span></dd>
+</dl>
+<div class="answer">제주도 밖이라 답할 수 없습니다.</div>
+<details class="base"><summary>도구 없이 쓴 답(baseline)과 비교</summary>
+<div class="answer">죄송하지만 저는 제주도 밤하늘 관측에 특화된 비서이므로 부산의 날씨나 제주도 밖 지역의 일과는 알 수 없습니다.<br><br>오늘 2026 년 8 월 20 일 제주도의 밤하늘 관측과 관련된 정보만 제공해 드릴 수 있습니다.</div></details>
+<div class="judge" data-cid="N-04"><span class="lbl">이 답,</span><button type="button" class="jbtn o" data-v="O" aria-pressed="false">잘 나옴</button><button type="button" class="jbtn x" data-v="X" aria-pressed="false">안 나옴</button><button type="button" class="jclear hidden">지우기</button><span class="seal"></span><div class="fix"><p class="why">어디를 고쳐야 하나 — 자리를 고르고, 무엇이 어떻게 되어야 하는지 한 줄 적습니다.</p><div class="chips"><button type="button" data-tag="도구 설명" title="modules/routes.py 의 도구·인자 설명" aria-pressed="false">도구 설명</button><button type="button" data-tag="시스템 프롬프트" title="bench/harness.py 의 역할·답변 규칙" aria-pressed="false">시스템 프롬프트</button><button type="button" data-tag="도구 응답" title="modules/tools.py 가 돌려주는 값·문장" aria-pressed="false">도구 응답</button><button type="button" data-tag="서버 로직" title="판정·경로·천문 계산 자체" aria-pressed="false">서버 로직</button><button type="button" data-tag="채점 규칙" title="score.py 가 사람과 다르게 셈" aria-pressed="false">채점 규칙</button><button type="button" data-tag="케이스 설계" title="질문·정답이 잘못 잡힘" aria-pressed="false">케이스 설계</button></div><textarea rows="3" placeholder="예: 도구가 준 verdict 를 답변 첫 문단에 그대로 옮기게 해야 한다"></textarea></div></div>
+</article>
+  <footer>색칠 기준은 <code>score.py</code> 의 규칙 채점과 같다 — 수치는 도구 응답·질문의 값과 ±0.5(또는 2%) 안이면 근거 있음으로 본다. 지도 주소는 겉면 도메인이 아니라 <code>/maps/&lt;해시&gt;</code> 조각으로 맞춘다. 보이는 답변은 3회 중 첫 회이고, 배지의 n/3 은 세 회 전부를 센 것이다.</footer>
+</div>
+<div class="dock" id="dock">
+  <div class="dock-bar">
+    <span class="prog" id="prog">아직 판정 없음 — 24 케이스</span>
+    <button type="button" class="act" id="toggle-export">판정 내보내기</button>
+    <button type="button" class="act ghost" id="wipe">전부 지우기</button>
+  </div>
+  <div class="dock-panel">
+    <h3>1 · verdicts.csv</h3>
+    <p class="how">아래를 통째로 <code>bench/results/verdicts.csv</code> 에 붙여넣고 <code>python score.py</code> 를 다시 돌리면, 리포트에 사람 채점 열이 붙습니다.</p>
+    <textarea id="out-csv" readonly></textarea>
+    <h3>2 · 개선 목록</h3>
+    <p class="how">“안 나옴” 으로 찍은 것만 자리별로 묶은 것입니다. 그대로 이슈나 커밋 메시지로 옮길 수 있습니다.</p>
+    <textarea id="out-md" readonly></textarea>
+  </div>
+</div>
+<script>var META = {"model": "qwen3.5-4b", "arm": "mcp", "cases": [{"id": "R-01", "q": "제주공항에서 차로 40분 안에 갈 수 있는 별 보기 좋은 곳 3군데 알려줘.", "cat": "추천", "flag": "pass"}, {"id": "R-02", "q": "제주 동쪽에서 별 보기 좋은 데 추천해줘.", "cat": "추천", "flag": "pass"}, {"id": "R-03", "q": "등산은 못 하겠고, 안 올라가도 되는 별 관측지 알려줘.", "cat": "추천", "flag": "pass"}, {"id": "R-04", "q": "강아지 데리고 갈 수 있는 별 보는 곳 추천해줘.", "cat": "추천", "flag": "pass"}, {"id": "R-05", "q": "주차하고 걸어가지 않아도 바로 별 볼 수 있는 데 있을까?", "cat": "추천", "flag": "pass"}, {"id": "R-06", "q": "서귀포에서 출발해서 30분 안에 갈 수 있고 주차되는 곳으로 2군데만 골라줘.", "cat": "추천", "flag": "pass"}, {"id": "R-07", "q": "중산간 쪽에서 등산 없이 갈 수 있는 관측지 5곳 알려줘.", "cat": "추천", "flag": "pass"}, {"id": "E-01", "q": "오늘 밤 10시에 새별오름에서 별 보여?", "cat": "판정", "flag": "pass"}, {"id": "E-02", "q": "오늘 밤 1100고지 어때? 몇 시간이나 볼 수 있어?", "cat": "판정", "flag": "pass"}, {"id": "E-03", "q": "위도 33.46, 경도 126.83 지점에서 오늘 밤 10시에 별이 보일까?", "cat": "판정", "flag": "fail"}, {"id": "E-04", "q": "제주공항에서 출발할 건데 용눈이오름 별 보기 어때? 거기까지 얼마나 걸려?", "cat": "판정", "flag": "warn"}, {"id": "E-05", "q": "내일 밤 섭지코지에서 별 볼 수 있을까?", "cat": "판정", "flag": "pass"}, {"id": "E-06", "q": "협재해수욕장에서 오늘 밤 별 보여? 거기 주차랑 야간 출입은 어때?", "cat": "판정", "flag": "pass"}, {"id": "E-07", "q": "사려니숲길 오늘 밤 별 관측 괜찮아? 밤에 들어가도 되는 곳이야?", "cat": "판정", "flag": "fail"}, {"id": "E-08", "q": "오늘 밤 알뜨르비행장에서 별 볼 수 있는 시간이 총 몇 시간이나 돼?", "cat": "판정", "flag": "pass"}, {"id": "D-01", "q": "매오름 많이 걸어야 해?", "cat": "상세", "flag": "pass"}, {"id": "D-02", "q": "1100고지 휴게소에 강아지 데려가도 돼?", "cat": "상세", "flag": "pass"}, {"id": "D-03", "q": "새별오름 밤에 들어갈 수 있어?", "cat": "상세", "flag": "pass"}, {"id": "D-04", "q": "천아계곡 화장실 있어? 주차는?", "cat": "상세", "flag": "fail"}, {"id": "D-05", "q": "제주공항에서 관음사 야영장까지 얼마나 걸려? 거기 야간에 들어갈 수 있어?", "cat": "상세", "flag": "pass"}, {"id": "N-01", "q": "서울 남산타워에서 별이 잘 보일까?", "cat": "도구 금지", "flag": "pass"}, {"id": "N-02", "q": "제주도 흑돼지 맛집 세 군데만 추천해줘.", "cat": "도구 금지", "flag": "pass"}, {"id": "N-03", "q": "MCP 프로토콜이 뭔지 설명해줘.", "cat": "도구 금지", "flag": "pass"}, {"id": "N-04", "q": "내일 부산 날씨 어때?", "cat": "도구 금지", "flag": "pass"}], "where": ["도구 설명", "시스템 프롬프트", "도구 응답", "서버 로직", "채점 규칙", "케이스 설계"]};</script>
+<script>
+(function(){
+  var cases = Array.prototype.slice.call(document.querySelectorAll('.case'));
+  var btns  = Array.prototype.slice.call(document.querySelectorAll('.filters button'));
+  var KEY_F = 'jeju-review-filter', KEY_V = 'jeju-review-verdicts';
+
+  var state = {cat:'all', only:false, todo:false};
+  try{ var s = localStorage.getItem(KEY_F); if(s){ state = JSON.parse(s); } }catch(e){}
+  var verdicts = {};
+  try{ var v = localStorage.getItem(KEY_V); if(v){ verdicts = JSON.parse(v); } }catch(e){}
+
+  function save(){
+    try{ localStorage.setItem(KEY_V, JSON.stringify(verdicts)); }catch(e){}
+  }
+
+  /* ── 걸러 보기 ───────────────────────────────────────── */
+  function apply(){
+    cases.forEach(function(c){
+      var cid = c.querySelector('.judge').dataset.cid;
+      var okCat  = state.cat === 'all' || c.dataset.cat === state.cat;
+      var okOnly = !state.only || c.dataset.flag !== 'pass';
+      var okTodo = !state.todo || !verdicts[cid];
+      c.classList.toggle('hidden', !(okCat && okOnly && okTodo));
+    });
+    btns.forEach(function(b){
+      var on = b.dataset.only ? state.only
+             : b.dataset.todo ? state.todo
+             : (b.dataset.cat === state.cat);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    try{ localStorage.setItem(KEY_F, JSON.stringify(state)); }catch(e){}
+  }
+  btns.forEach(function(b){
+    b.addEventListener('click', function(){
+      if(b.dataset.only){ state.only = !state.only; }
+      else if(b.dataset.todo){ state.todo = !state.todo; }
+      else { state.cat = b.dataset.cat; }
+      apply();
+    });
+  });
+
+  /* ── 한 케이스의 판정 화면을 상태에 맞춘다 ───────────── */
+  function paintJudge(box){
+    var cid = box.dataset.cid, rec = verdicts[cid];
+    var card = box.closest('.case');
+    var seal = box.querySelector('.seal');
+    var clear = box.querySelector('.jclear');
+    box.querySelectorAll('.jbtn').forEach(function(b){
+      b.setAttribute('aria-pressed', (rec && rec.v === b.dataset.v) ? 'true' : 'false');
+    });
+    box.classList.toggle('is-x', !!(rec && rec.v === 'X'));
+    card.classList.toggle('judged-o', !!(rec && rec.v === 'O'));
+    card.classList.toggle('judged-x', !!(rec && rec.v === 'X'));
+    clear.classList.toggle('hidden', !rec);
+    seal.className = 'seal' + (rec ? ' ' + rec.v.toLowerCase() : '');
+    seal.textContent = rec ? (rec.v === 'O' ? '잘 나옴으로 기록됨' : '안 나옴으로 기록됨') : '';
+    box.querySelectorAll('.chips button').forEach(function(t){
+      var on = !!(rec && rec.tags && rec.tags.indexOf(t.dataset.tag) >= 0);
+      t.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    var ta = box.querySelector('textarea');
+    if(document.activeElement !== ta){ ta.value = (rec && rec.note) || ''; }
+  }
+
+  document.querySelectorAll('.judge').forEach(function(box){
+    var cid = box.dataset.cid;
+    box.querySelectorAll('.jbtn').forEach(function(b){
+      b.addEventListener('click', function(){
+        var rec = verdicts[cid] || {v:'', tags:[], note:''};
+        rec.v = (rec.v === b.dataset.v) ? '' : b.dataset.v;
+        if(!rec.v){ delete verdicts[cid]; } else { verdicts[cid] = rec; }
+        save(); paintJudge(box); refresh();
+        if(rec.v === 'X'){ box.querySelector('textarea').focus(); }
+      });
+    });
+    box.querySelector('.jclear').addEventListener('click', function(){
+      delete verdicts[cid]; save(); paintJudge(box); refresh();
+    });
+    box.querySelectorAll('.chips button').forEach(function(t){
+      t.addEventListener('click', function(){
+        var rec = verdicts[cid] || {v:'X', tags:[], note:''};
+        rec.tags = rec.tags || [];
+        var i = rec.tags.indexOf(t.dataset.tag);
+        if(i >= 0){ rec.tags.splice(i, 1); } else { rec.tags.push(t.dataset.tag); }
+        verdicts[cid] = rec; save(); paintJudge(box); refresh();
+      });
+    });
+    box.querySelector('textarea').addEventListener('input', function(){
+      var rec = verdicts[cid] || {v:'X', tags:[], note:''};
+      rec.note = this.value; verdicts[cid] = rec; save(); refresh();
+    });
+    paintJudge(box);
+  });
+
+  /* ── 진행 상황과 내보내기 ────────────────────────────── */
+  function csvCell(s){
+    s = (s == null) ? '' : String(s);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+  function buildCSV(){
+    var rows = ['model,arm,case_id,verdict,note'];
+    META.cases.forEach(function(c){
+      var rec = verdicts[c.id];
+      if(!rec || !rec.v){ return; }
+      var note = (rec.tags && rec.tags.length ? '[' + rec.tags.join('/') + '] ' : '')
+               + (rec.note || '');
+      rows.push([META.model, META.arm, c.id, rec.v, csvCell(note.trim())].join(','));
+    });
+    return rows.join('\n');
+  }
+  function buildMD(){
+    var bad = META.cases.filter(function(c){
+      return verdicts[c.id] && verdicts[c.id].v === 'X';
+    });
+    if(!bad.length){ return '아직 “안 나옴” 으로 찍은 케이스가 없습니다.'; }
+    var byWhere = {};
+    bad.forEach(function(c){
+      var tags = (verdicts[c.id].tags && verdicts[c.id].tags.length)
+                 ? verdicts[c.id].tags : ['자리 미지정'];
+      tags.forEach(function(t){ (byWhere[t] = byWhere[t] || []).push(c); });
+    });
+    var out = ['# 개선 목록 — ' + META.model + ' · ' + META.arm,
+               '', '안 나옴 ' + bad.length + ' / 전체 ' + META.cases.length + ' 케이스', ''];
+    META.where.concat(['자리 미지정']).forEach(function(w){
+      if(!byWhere[w]){ return; }
+      out.push('## ' + w, '');
+      byWhere[w].forEach(function(c){
+        out.push('- **' + c.id + '** (' + c.cat + ') ' + c.q);
+        var n = (verdicts[c.id].note || '').trim();
+        out.push('  - ' + (n ? n : '_사유 미기입_'));
+      });
+      out.push('');
+    });
+    return out.join('\n');
+  }
+  function refresh(){
+    var done = 0, o = 0, x = 0;
+    META.cases.forEach(function(c){
+      var rec = verdicts[c.id];
+      if(rec && rec.v){ done++; if(rec.v === 'O'){ o++; } else { x++; } }
+    });
+    var n = META.cases.length;
+    document.getElementById('prog').innerHTML = done
+      ? '판정 <b>' + done + '/' + n + '</b> · <span class="o">잘 나옴 ' + o
+        + '</span> · <span class="x">안 나옴 ' + x + '</span>'
+      : '아직 판정 없음 — ' + n + ' 케이스';
+    document.getElementById('out-csv').value = buildCSV();
+    document.getElementById('out-md').value = buildMD();
+    if(state.todo){ apply(); }
+  }
+
+  var dock = document.getElementById('dock');
+  document.getElementById('toggle-export').addEventListener('click', function(){
+    dock.classList.toggle('open');
+    this.textContent = dock.classList.contains('open') ? '닫기' : '판정 내보내기';
+    if(dock.classList.contains('open')){ document.getElementById('out-csv').select(); }
+  });
+  document.getElementById('wipe').addEventListener('click', function(){
+    if(this.dataset.armed !== '1'){
+      this.dataset.armed = '1'; this.textContent = '정말 지울까요? 한 번 더';
+      var b = this;
+      setTimeout(function(){ b.dataset.armed = ''; b.textContent = '전부 지우기'; }, 4000);
+      return;
+    }
+    verdicts = {}; save();
+    document.querySelectorAll('.judge').forEach(paintJudge);
+    this.dataset.armed = ''; this.textContent = '전부 지우기';
+    refresh(); apply();
+  });
+
+  apply(); refresh();
+})();
+</script>

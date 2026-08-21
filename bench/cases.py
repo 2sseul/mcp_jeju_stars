@@ -150,7 +150,7 @@ CASES = [
         "category": "evaluate",
         "question": "제주공항에서 출발할 건데 용눈이오름 별 보기 어때? 거기까지 얼마나 걸려?",
         "gold_tool": "evaluate_place",
-        "gold_args": {"query": "용눈이오름", "origin": "제주공항", "date": TODAY, "time": "22:00"},
+        "gold_args": {"query": "용눈이오름", "origin": "제주공항", "date": TODAY, "time": "23:00"},
         "required": ["query", "origin"],
         "facts": [
             {"path": "verdict", "kind": "text"},
@@ -162,7 +162,7 @@ CASES = [
         "category": "evaluate",
         "question": "내일 밤 섭지코지에서 별 볼 수 있을까?",
         "gold_tool": "evaluate_place",
-        "gold_args": {"query": "섭지코지", "date": TOMORROW, "time": "22:00"},
+        "gold_args": {"query": "섭지코지", "date": TOMORROW, "time": "23:00"},
         "required": ["query", "date"],
         "facts": [
             {"path": "verdict", "kind": "text"},
@@ -174,7 +174,7 @@ CASES = [
         "category": "evaluate",
         "question": "협재해수욕장에서 오늘 밤 별 보여? 거기 주차랑 야간 출입은 어때?",
         "gold_tool": "evaluate_place",
-        "gold_args": {"query": "협재해수욕장", "date": TODAY, "time": "22:00"},
+        "gold_args": {"query": "협재해수욕장", "date": TODAY, "time": "23:00"},
         "required": ["query"],
         "abstain": True,   # 미등록 — 주차·야간 출입은 확인되지 않았음을 밝혀야 한다
         "facts": [
@@ -187,7 +187,7 @@ CASES = [
         "category": "evaluate",
         "question": "사려니숲길 오늘 밤 별 관측 괜찮아? 밤에 들어가도 되는 곳이야?",
         "gold_tool": "evaluate_place",
-        "gold_args": {"query": "사려니숲길", "date": TODAY, "time": "22:00"},
+        "gold_args": {"query": "사려니숲길", "date": TODAY, "time": "23:00"},
         "required": ["query"],
         "abstain": True,
         "facts": [

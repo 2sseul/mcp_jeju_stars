@@ -23,16 +23,17 @@ MCP 는 **streamable HTTP** 여야 한다. 경로는 루트(`/`) 이고, 같은 
 """
 
 import argparse
+import asyncio
 import sys
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 from fastmcp import FastMCP
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from modules import maps
+from modules import maps, tiles
 from modules.routes import register_routes
 from modules.shared import create_base_app
 
@@ -108,6 +109,29 @@ async def serve_map(name: str):
     if document is None:
         return PlainTextResponse("지도를 찾을 수 없습니다.", status_code=404)
     return HTMLResponse(document)
+
+
+# 배경 타일도 이 서버가 중계한다. 이유와 사본 규칙은 `modules/tiles.py` 에 있다.
+# 지도와 같은 자리에 다는 이유도 같다 — 포트가 하나면 컨테이너 노출도 하나로 끝난다.
+#
+# **스레드로 뺀다.** 사본이 없는 한 장은 공급자에서 1초가 걸리는데, 그동안 이벤트
+# 루프가 멈추면 같은 화면의 나머지 다섯 장도 함께 선다 — 중계를 붙여 놓고 오히려
+# 직접 받던 때보다 느려진다.
+@app.get("/tiles/{layer}/{z}/{x}/{y}", include_in_schema=False)
+async def serve_tile(layer: str, z: int, x: int, y: int):
+    got = await asyncio.to_thread(tiles.fetch, layer, z, x, y)
+    if got is None:
+        # 화면은 이 실패를 세고 있다가 넉 장이 되면 키가 필요 없는 공급자로 갈아탄다
+        # (`core/mapview.py`). 그러니 여기서는 조용히 실패하는 편이 낫다.
+        return PlainTextResponse("타일을 가져오지 못했습니다.", status_code=502)
+    blob, content_type = got
+    return Response(
+        blob,
+        media_type=content_type,
+        # 브라우저도 사본을 쥐게 둔다. 서버 사본은 "누가 열어도 빠르게"를, 이쪽은
+        # "같은 사람이 다시 열면 요청조차 없게"를 맡는다.
+        headers={"Cache-Control": f"public, max-age={tiles.MAX_AGE}"},
+    )
 
 
 app.mount("/", mcp_app)

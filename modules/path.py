@@ -63,6 +63,11 @@ SPOT_PINS = DATA / "candidates" / "spot_pins.jsonl"
 CACHE_DIR      = ROOT / ".cache"
 FORECAST_CACHE = CACHE_DIR / "forecast"
 
+# 배경 타일 사본(`modules/tiles.py`). 예보 캐시와 같은 성격이다 — 외부 응답의 사본이라
+# 지워도 재생성되고, 지운 만큼 공급자를 다시 때린다. 항공사진이라 예보보다 훨씬 오래
+# 유효하고 훨씬 크다(한 장 10~25KB). 커지면 통째로 지우면 된다.
+TILE_CACHE     = CACHE_DIR / "tiles"
+
 # 발표용 산출물(HTML). 저장소에 커밋하지 않는다 — 스크립트로 언제든 재생성한다.
 LIGHT_MAP   = OUTPUTS / "jeju_light_map.html"
 SPOT_REPORT = OUTPUTS / "jeju_spot_report.html"

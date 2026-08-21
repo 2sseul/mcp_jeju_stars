@@ -116,13 +116,20 @@ def _darkness_numbers(site) -> dict | None:
     nums = {
         "sqm": d.sqm,
         "falchi_grade": d.falchi_grade,
-        "falchi_label": d.falchi_label,
+        # 학술 라벨("하늘의 자연스러운 외관 상실")이 아니라 쉬운 말을 싣는다 —
+        # 이 값을 읽는 것이 사람 아니면 작은 모델이고, 실제로 모델이 이 문자열을
+        # 그대로 답에 옮겨 썼다(E-05). 등급 문자(i~vi)는 falchi_grade 에 그대로 있다.
+        "falchi_label": _darkness.plain_label(d.falchi_grade),
         "bortle": d.bortle,
         "artificial_mcd": d.artificial_mcd,
         "light_pollution_ratio": d.ratio,
         "milky_way": d.milky_way,
         "darkness_score": site.score,
-        "darkness_cap": site.cap,
+        # `darkness_cap` 은 응답에 싣지 않는다. 광공해만 봤을 때의 등급 **상한**이라
+        # 최종 판정이 아닌데 값이 "최적"·"양호" 같은 판정 낱말이다. 응답 안에 판정처럼
+        # 보이는 값이 둘이 되자 작은 모델이 엉뚱한 쪽을 집었다 — 도구는 "양호"라고
+        # 했는데 답은 "판정은 '최적'"이라고 썼다(E-01). 그래프 상태에는 그대로 두므로
+        # judge 는 계속 이 값을 받는다(아래 darkness_node 반환값).
         "lamp_nearest_m": site.lamps.nearest_m,
         "lamp_within_100m": site.lamps.near,
         "lamp_within_500m": site.lamps.mid,

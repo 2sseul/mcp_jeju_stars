@@ -36,89 +36,116 @@ from modules import tools
 class RecommendSpotsRequest(BaseModel):
     origin: Optional[str] = Field(
         default=None,
-        description="출발지 지명·주소 (예: '제주공항', '애월읍'). origin_lat/lon 과 택일.",
+        description="출발지 지명·주소 문자열. 예: '제주공항' · '애월읍' · '서귀포시청'. "
+                    "max_drive_minutes 를 쓰려면 이 값이나 origin_lat/lon 이 있어야 한다.",
     )
     origin_lat: Optional[float] = Field(
         default=None,
-        description="출발지 위도. origin_lon 과 함께 줄 때만 쓴다(현재 위치 등).",
+        description="출발지 위도(십진수, 제주 33.19~33.57). "
+                    "origin_lon 과 함께 줄 때만 유효하다.",
     )
-    origin_lon: Optional[float] = Field(default=None, description="출발지 경도.")
+    origin_lon: Optional[float] = Field(
+        default=None, description="출발지 경도(십진수, 제주 126.14~126.98)."
+    )
     max_drive_minutes: Optional[float] = Field(
         default=None,
-        description="이 시간 안에 갈 수 있는 곳만. 출발지가 있어야 동작한다.",
+        description="이 분 안에 도착하는 곳만. 양수(예: 30·40·60). 출발지가 있어야 "
+                    "동작한다. 야간 자유주행 기준으로 정체는 반영하지 않는다.",
     )
     region: Optional[str] = Field(
         default=None,
-        description="'동'·'서'·'남'·'북'·'중산간' 중 하나로 지역을 좁힌다.",
+        description="허용값은 '동'·'서'·'남'·'북'·'중산간' 다섯뿐. '동쪽'·'제주 동부'는 "
+                    "'동'. 그 밖의 지명(예: '애월')은 여기 넣지 말고 origin 으로 넘긴다.",
     )
     no_climb: bool = Field(
         default=False,
-        description="True 면 오르막 산행이 필요한 곳을 뺀다('등산 없는 곳').",
+        description="True 면 오르막 산행이 필요한 곳을 뺀다. "
+                    "'등산 없이'·'안 올라가도 되는' → True. 기본 False.",
     )
     max_walk_minutes: Optional[float] = Field(
         default=None,
-        description="주차 지점에서 관측 지점까지 편도 도보가 이 시간 이하인 곳만. "
-                    "0 을 주면 '주차하고 바로 보는 곳'에 가깝다.",
+        description="주차 지점→관측 지점 편도 도보 상한(분). 예: 0 · 5 · 10. "
+                    "0 은 '주차하고 바로'라는 뜻이고 도보 1분 미만인 곳이 나온다 "
+                    "('걸어가지 않아도'·'차 대고 바로' → 0). 이 조건을 주면 도보 "
+                    "시간이 확인되지 않은 곳은 빠진다.",
     )
     parking_required: bool = Field(
-        default=False, description="True 면 주차장이 확인된 곳만."
+        default=False,
+        description="True 면 주차장이 확인된 곳만. '주차되는 곳' → True. 기본 False.",
     )
     pets: bool = Field(
-        default=False, description="True 면 반려동물 동반이 가능한 곳만."
+        default=False,
+        description="True 면 반려동물 동반 가능한 곳만. '강아지'·'반려견' → True. "
+                    "기본 False. 조건이 붙은 곳(목줄 필수·일부 구역만)도 포함되므로, "
+                    "결과 각 항목의 `pets` 원문을 답에 그대로 옮긴다.",
     )
     date: Optional[str] = Field(
-        default=None, description="판정 기준 날짜 YYYY-MM-DD (생략 시 오늘)."
+        default=None,
+        description="형식 YYYY-MM-DD (예: 2026-08-20). 생략하면 오늘.",
     )
     time: Optional[str] = Field(
         default=None,
-        description="판정 기준 시각 HH:MM 24시간 KST (생략 시 22:00).",
+        description="형식 HH:MM 24시간 KST (예: 23:00). 생략하면 23:00. "
+                    "'밤 10시'→'22:00', '자정'→'23:59'.",
     )
     limit: int = Field(
-        default=3, ge=1, le=10, description="돌려줄 곳 수. 기본 3, 최대 10."
+        default=3, ge=1, le=10,
+        description="돌려줄 곳 수. 정수 1~10, 기본 3. '세 군데'→3, '5곳'→5.",
     )
 
 
 class EvaluatePlaceRequest(BaseModel):
     query: Optional[str] = Field(
         default=None,
-        description="장소 이름·주소 (예: '1100고지', '새별오름', '제주시 애월읍').",
+        description="장소 이름·주소 문자열. 예: '새별오름' · '1100고지' · "
+                    "'협재해수욕장'. lat/lon 과 택일 — 둘 중 하나는 반드시 있어야 한다.",
     )
     lat: Optional[float] = Field(
         default=None,
-        description="위도. lon 과 함께 줄 때만 쓴다. query 대신 좌표로 물을 때.",
+        description="위도(십진수, 제주 33.19~33.57). lon 과 함께 줄 때만 유효.",
     )
-    lon: Optional[float] = Field(default=None, description="경도.")
+    lon: Optional[float] = Field(
+        default=None, description="경도(십진수, 제주 126.14~126.98)."
+    )
     origin: Optional[str] = Field(
         default=None,
-        description="출발지 지명·주소 (예: '제주공항'). 주행시간을 함께 받고 싶을 때.",
+        description="출발지 지명·주소. 주면 주행시간을 함께 답한다. "
+                    "질문에 출발지가 있을 때만 넣는다. 예: '제주공항'.",
     )
     origin_lat: Optional[float] = Field(
-        default=None,
-        description="출발지 위도. origin_lon 과 함께 줄 때만 쓴다(현재 위치 등).",
+        default=None, description="출발지 위도. origin_lon 과 함께 줄 때만."
     )
     origin_lon: Optional[float] = Field(default=None, description="출발지 경도.")
     date: Optional[str] = Field(
         default=None,
-        description="YYYY-MM-DD (생략 시 오늘). 미래 날짜 가능(구름은 예보 지평 ~7일 안).",
+        description="형식 YYYY-MM-DD (예: 2026-08-20). 생략하면 오늘. '내일'이면 "
+                    "오늘에 하루를 더한다. 구름 예보 지평은 약 7일이다.",
     )
     time: Optional[str] = Field(
         default=None,
-        description="HH:MM 24시간 KST. scope='moment' 에서만(생략 시 22:00; "
-                    "date·time 모두 생략 시 현재). scope='night' 이면 무시.",
+        description="형식 HH:MM 24시간 KST (예: 23:00). 생략하면 23:00. "
+                    "scope='moment' 에서만 쓰인다(date·time 모두 생략 시 현재). "
+                    "'밤 10시'→'22:00', '새벽 1시'→'01:00', '자정'→'23:59'. "
+                    "scope='night' 이면 무시.",
     )
     scope: str = Field(
         default="moment",
-        description="'moment'(한 시각) | 'night'(밤 전체 시간 수·등급 분포). 기본 'moment'.",
+        description="'moment' 또는 'night' 둘 중 하나. 기본 'moment'. 한 시각을 "
+                    "물으면 moment, 밤 전체 시간 수를 물으면 night.",
     )
 
 
 class SpotDetailsRequest(BaseModel):
     name: str = Field(
         ...,
-        description="관측지 이름 (예: '새별오름', '매오름'). 띄어쓰기는 달라도 된다.",
+        description="관측지 이름(필수). 검증된 62곳 중 하나. 예: '새별오름' · "
+                    "'매오름' · '1100고지 휴게소' · '천아계곡' · '관음사 야영장'. "
+                    "띄어쓰기는 달라도 된다.",
     )
     origin: Optional[str] = Field(
-        default=None, description="출발지 지명·주소. 주행시간을 함께 받고 싶을 때."
+        default=None,
+        description="출발지 지명·주소. 주면 주행시간을 함께 답한다. "
+                    "질문에 출발지가 있을 때만 넣는다.",
     )
     origin_lat: Optional[float] = Field(
         default=None, description="출발지 위도 (origin_lon 과 함께)."
@@ -132,21 +159,57 @@ def register_routes(app: FastAPI) -> None:
     @app.post(
         "/recommend-spots",
         operation_id="recommend_spots",
-        summary="조건에 맞는 제주 별 관측지를 추천한다 (검증된 63곳 중에서)",
+        summary="제주도 안의 별 관측지를 여러 곳 골라 추천한다 "
+                "(검증된 62곳 중에서 · \"어디로 갈까\")",
     )
-    def recommend_spots(request: RecommendSpotsRequest) -> Dict[str, Any]:
-        """조건에 맞는 제주 별 관측지를 추천한다 (검증된 63곳 중에서).
+    def recommend_spots(
+        request: RecommendSpotsRequest = RecommendSpotsRequest(),
+    ) -> Dict[str, Any]:
+        """제주도 안의 별 관측지를 여러 곳 골라 추천한다 — 추천·찾기·고르기·
+        어디로 갈까·명소·관측지 목록 (recommend · find · where).
 
-        "지금 근처에서 별 보기 좋은 곳", "제주 동쪽에서 추천", "30분 안에 갈 수 있는 곳",
-        "주차장에서 바로 보는 곳", "등산 없는 곳" 같은 질의를 처리한다.
+        [언제] 사용자가 장소를 **지목하지 않고** "어디로 갈까"를 물을 때.
+               사람이 확인한 62곳에서 고른다.
+        [다른 도구와] 한 장소를 지목해 "거기 별 보여?" → evaluate_place.
+                     정해진 곳의 주차·화장실·반려견만 → spot_details.
+        [사전 조건] 없다. **인자를 하나도 안 줘도 부를 수 있다** — 조건이 없으면
+                   오늘 밤 23시 기준 상위 3곳이 나온다. 출발지나 조건을 되묻지 말고
+                   아는 것만 채워 일단 부른다.
+        [다음] 고른 곳의 접근성은 spot_details(name), 하늘 판정은 evaluate_place(query).
 
         출발지를 주면 **실제 도로를 따라간 주행시간**으로 자르고 순위에 반영한다
         (직선거리가 아니다 — 제주는 가운데가 한라산이라 직선거리로 자르면 산 반대편을
         추천하게 된다). 정체는 반영하지 않는 야간 자유주행 기준이다.
 
+        [오류 대처]
+        - max_drive_minutes 는 origin(또는 origin_lat+origin_lon)이 있어야 동작한다.
+        - spots 가 비면 조건이 너무 좁은 것 → 조건을 하나 풀어 다시 부른다.
+          지어내서 채우지 않는다.
+        - verdict 가 "주소 확인 실패" 면 출발지를 못 찾은 것 → 좌표로 다시 부른다.
+
+        [부르지 않는 경우]
+        - **제주도 밖**의 장소·날씨(서울·부산·남산타워 등) → 부르지 말고 "제주 밖이라
+          답할 수 없다"고 답한다. 이 서버는 제주도(위도 33.19~33.57 ·
+          경도 126.14~126.98)만 다룬다.
+        - 별 관측과 무관한 질문(맛집·숙소·렌터카·항공권·일반 상식·용어 설명).
+        - 위 두 경우는 도구를 부르면 **틀린 답**이 된다.
+
+        [예시]
+        "제주공항에서 40분 안에 갈 만한 곳 3군데"
+          → {"origin":"제주공항","max_drive_minutes":40,"limit":3}
+        "제주 동쪽에서 별 보기 좋은 데" → {"region":"동"}
+        "등산 안 하고 강아지랑 갈 수 있는 곳" → {"no_climb":true,"pets":true}
+
         추천 목록은 `spots` 배열에 있고 각 항목에 주행시간(`drive`)·도보
-        (`walk_minutes`)·야간 출입(`night_access`)이 들어 있다.
+        (`walk_minutes`)·구름(`cloud_cover`)·어둡기(`bortle`)·야간 출입
+        (`night_access`)이 들어 있다. **이 값들은 곳마다 다르다** — 한 곳의 구름이나
+        등급을 다른 곳에 갖다 쓰지 않는다. 답에 쓰는 값은 결과에서 그대로 가져오고,
+        결과의 `map_url` 도 함께 옮긴다.
         """
+        # 본문 자체를 선택으로 둔다. 인자가 전부 Optional 이라 MCP 스키마는
+        # `required: []` 로 나가는데, 본문이 필수면 `{}` 로 부른 호출이 422 로 튕긴다
+        # — 스키마가 허락한 호출을 서버가 거절하는 꼴이다. "별 관측지 알려줘"처럼
+        # 조건 없는 질의가 정확히 그 호출을 만든다.
         return tools.recommend_spots(
             origin=request.origin,
             origin_lat=request.origin_lat,
@@ -165,16 +228,40 @@ def register_routes(app: FastAPI) -> None:
     @app.post(
         "/evaluate-place",
         operation_id="evaluate_place",
-        summary="지목한 제주 장소에서 별이 보이는지 판정한다",
+        summary="제주도 안에서 지목한 한 장소에 별이 보이는지 판정한다 "
+                "(\"별 보여?\" · \"관측 가능?\")",
     )
-    def evaluate_place(request: EvaluatePlaceRequest) -> Dict[str, Any]:
-        """지목한 제주 장소에서 별이 보이는지 판정한다.
+    def evaluate_place(
+        request: EvaluatePlaceRequest = EvaluatePlaceRequest(),
+    ) -> Dict[str, Any]:
+        """제주도 안에서 지목한 한 장소에 별이 보이는지 판정한다 — 별 보여?·
+        관측 가능?·어때?·괜찮아?·볼 수 있어? (evaluate · check · visibility).
 
-        "오늘 1100고지에서 별 보여?", "지금 새별오름 가면 별 잘 보일까?" 같은 질의.
-        장소는 이름(`query`)으로 주거나 좌표(`lat`·`lon`)로 준다 — 둘 중 하나면 된다.
+        [언제] 장소를 하나 지목했을 때. 이름(`query`) 또는 좌표(`lat`+`lon`) 중
+               하나로 준다 — 둘 중 하나는 반드시 있어야 한다. 되묻지 말고 질문에서
+               뽑아 넣는다.
+        [다른 도구와] 장소를 지목하지 않은 "어디로 갈까" → recommend_spots.
+                     하늘 말고 주차·화장실·반려견·야간 출입만 → spot_details.
+
+        [부르지 않는 경우]
+        - **제주도 밖**의 장소·날씨(서울·부산·남산타워 등) → 부르지 말고 "제주 밖이라
+          답할 수 없다"고 답한다. 제주 범위(위도 33.19~33.57 · 경도 126.14~126.98)
+          밖은 판정하지 않는다.
+        - 별 관측과 무관한 질문(맛집·숙소·렌터카·일반 상식·용어 설명).
+        - 위 두 경우는 도구를 부르면 **틀린 답**이 된다.
+
+        [오류 대처] `verdict` 가 "주소 확인 실패" 면 지명을 못 찾은 것 →
+        좌표(`lat`·`lon`)로, 또는 더 구체적인 지명으로 다시 부른다. 지어내서
+        답하지 않는다.
+
+        [예시]
+        "오늘 밤 10시에 새별오름에서 별 보여?"
+          → {"query":"새별오름","time":"22:00","scope":"moment"}
+        "오늘 밤 1100고지 몇 시간이나 볼 수 있어?" → {"query":"1100고지","scope":"night"}
+        "위도 33.46, 경도 126.83 지점 지금 어때?" → {"lat":33.46,"lon":126.83}
 
         **등록되지 않은 장소도 판정한다.** 좌표만 알면 날씨·광공해·천문 조건은 똑같이
-        계산된다. 다만 주차·야간 출입·도보 난이도는 검증된 관측지 63곳에만 있으므로,
+        계산된다. 다만 주차·야간 출입·도보 난이도는 검증된 관측지 62곳에만 있으므로,
         미등록 장소는 그 정보가 **확인되지 않았음을 응답에 명시**한다. 접근성까지 알고
         싶으면 `recommend_spots` 로 등록된 곳을 받거나 `spot_details` 로 조회한다.
 
@@ -189,8 +276,13 @@ def register_routes(app: FastAPI) -> None:
         분포·연속으로 트인 창을 집계한다(`scope="night"` 이면 `time` 은 무시된다).
 
         등록된 관측지면 `spots` 에 그 곳의 접근성 요약이 실리고, 출발지를 줬으면
-        `numbers.drive` 에 주행시간·거리가 실린다.
+        `numbers.drive` 에 주행시간·거리가 실린다. 답에 쓰는 값은 결과에서 그대로
+        가져오고, 결과의 `map_url` 도 함께 옮긴다 — 미등록 장소여서 "확인되지
+        않았다"고 답할 때도 지도 주소는 옮긴다.
         """
+        # 여기도 같은 이유로 본문을 선택으로 둔다. `{}` 로 부르면 422 가 아니라
+        # "평가할 장소를 알려주세요" 라는 고정 스키마 응답이 나가야 한다 —
+        # 프로토콜 오류보다 프롬프트형 응답이 모델이 회복할 수 있는 형태다.
         return tools.evaluate_place(
             query=request.query,
             lat=request.lat,
@@ -206,18 +298,39 @@ def register_routes(app: FastAPI) -> None:
     @app.post(
         "/spot-details",
         operation_id="spot_details",
-        summary="검증된 관측지의 주차·도보·야간 출입·반려동물·화장실·주의사항을 조회한다",
+        summary="제주도 안의 검증된 관측지 한 곳의 주차·도보·야간 출입·반려동물·"
+                "화장실·주의사항을 조회한다",
     )
     def spot_details(request: SpotDetailsRequest) -> Dict[str, Any]:
-        """검증된 관측지의 주차·도보·야간 출입·반려동물·화장실·주의사항을 조회한다.
+        """제주도 안의 검증된 관측지 한 곳의 **접근성·편의**를 조회한다 — 주차·화장실·
+        반려견·강아지·야간 출입·도보·등산 난이도·입장료 (details · parking · pets).
 
-        "매오름 많이 걸어야 해?", "강아지랑 갈 수 있어?", "새별오름 밤에 들어갈 수 있어?",
-        "천아계곡까지 가기 어려워?" 같은 질의를 처리한다. 하늘 상태는 답하지 않는다 —
-        그건 `evaluate_place` 소관이다.
+        [언제] 이미 이름이 정해진 곳의 시설·접근성을 물을 때.
+        [다른 도구와] **하늘 상태(구름·별 보이는지)는 답하지 않는다** →
+                     그건 `evaluate_place` 소관이다. 장소를 고르는 것은
+                     `recommend_spots` 소관이다.
+        [사전 조건] `name` 이 검증된 62곳 목록에 있어야 한다(띄어쓰기는 달라도 된다).
+                   이름을 모르면 `recommend_spots` 로 먼저 이름을 받는다.
 
         출발지를 주면 그곳까지의 주행시간도 함께 답한다.
 
-        상세는 `spots` 배열의 한 항목에 전부 들어 있다.
+        [오류 대처]
+        - 이름을 못 찾으면 목록에 없는 곳이다 → `recommend_spots` 로 정확한 이름을
+          받아 다시 부르거나, 하늘만 필요하면 `evaluate_place` 로 넘어간다.
+        - 값이 "확인불가"·빈 값이면 **모르는 것이다.** 답에도 "확인되지 않았다"고
+          쓴다. `pets`·`night_access` 는 자유 문장이라 조건이 붙어 있을 수 있으므로
+          (목줄 필수·일부 구역만·불가) **원문의 조건까지 함께 옮긴다.**
+
+        [부르지 않는 경우] 제주도 밖의 장소, 별 관측과 무관한 질문(맛집·숙소 등).
+
+        [예시]
+        "매오름 많이 걸어야 해?" → {"name":"매오름"}
+        "1100고지 휴게소 강아지 데려가도 돼?" → {"name":"1100고지 휴게소"}
+        "제주공항에서 관음사 야영장까지 얼마나 걸려?"
+          → {"name":"관음사 야영장","origin":"제주공항"}
+
+        상세는 `spots` 배열의 한 항목에 전부 들어 있다. 답에 쓰는 값은 결과에서
+        그대로 가져오고, 결과의 `map_url` 도 함께 옮긴다.
         """
         return tools.spot_details(
             name=request.name,

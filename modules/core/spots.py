@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from dataclasses import dataclass
 from functools import lru_cache
 from itertools import pairwise
@@ -37,6 +38,68 @@ _CLIMB_PREFIX = "등반"
 #: `night_access` 가 이 값이면 야간에 언제든 들어갈 수 있다. 62곳 중 55곳이 여기고,
 #: 나머지 8곳은 전부 조건이 붙은 자유 문장이라 "확인 필요"로 남긴다.
 _ALWAYS_OPEN = "상시 개방"
+
+#: 반려동물 동반 가부. `pets` 원문이 자유 문장이라 파생 축으로 접어 둔다.
+#:
+#: **부분 문자열로 "가능"을 찾으면 안 된다** — "반려견 동반 불가능" 안에 "가능"이
+#: 들어 있어, `"가능" in text` 는 동반 불가인 16곳을 전부 통과시킨다(실제로 그랬다:
+#: "강아지 데리고 갈 수 있는 곳"에 1100고지 휴게소가 추천됐다). 반대로 "반려동물
+#: 동행시 목줄 착용 필수" 3곳은 "가능"이 없다는 이유로 빠졌다.
+#: 그래서 **부정을 먼저 보고**, 그 다음에 긍정을 본다. "확인불가"도 "불가"를 품고
+#: 있으므로 부정보다 앞에서 걸러 낸다.
+_PETS_UNKNOWN = ("확인불가", "확인 불가", "확인되지")
+_PETS_NO = ("불가", "금지", "불허", "안 되", "안되", "안 돼", "안돼", "출입 제한")
+_PETS_YES = ("가능", "허용", "동행시", "동반시")
+
+#: 한 문장 안에 허용과 불가가 같이 오는 경우가 있어 **절 단위로** 가른다.
+#: 예: "한라산은 애견 동반이 안 되지만 1100고지에서 관측은 가능하며, 탐방로는 불가능"
+_PETS_CLAUSE = re.compile(r"[,·]|지만|으나|이나(?=\s)|하나(?=\s)|며\s|\(|\)")
+
+
+def pets_allowed(text: str | None) -> bool | None:
+    """반려동물 동반 가부. True 허용 · False 불가 · None 모름.
+
+    **부분 문자열로 "가능"을 찾으면 안 된다** — "반려견 동반 불가능" 안에 "가능"이
+    들어 있어, `"가능" in text` 는 동반 불가인 16곳을 전부 통과시켰다(실제로 그랬다:
+    "강아지 데리고 갈 수 있는 곳"에 1100고지 휴게소가 추천됐다).
+
+    그렇다고 부정을 무조건 앞세울 수도 없다. 원문에 허용과 불가가 **같이** 오는 곳이
+    있기 때문이다 — "한라산은 애견 동반이 안 되지만 1100고지에서 관측은 가능하며,
+    탐방로는 불가능". 통째로 부정으로 접으면 관측이 되는 곳을 못 내놓는다.
+
+    그래서 **절 단위로 가르고, 허용하는 절이 하나라도 있으면 허용으로 본다.** 대신
+    답에는 언제나 `pets` 원문을 함께 싣는다(`tools._recommend_reasons` 의 `show_pets`,
+    `spot_details` 의 "반려동물:" 줄) — "탐방로는 불가능" 같은 단서를 사람이 읽고
+    판단할 수 있어야 하기 때문이다. 거르는 것과 답하는 것은 다르다(모듈 설명 참조).
+    """
+    t = (text or "").strip()
+    if not t:
+        return None
+    if any(k in t for k in _PETS_UNKNOWN):
+        return None
+
+    saw_no = False
+    for clause in _PETS_CLAUSE.split(t):
+        c = clause.strip()
+        if not c:
+            continue
+        # 절 안에서는 부정이 앞선다 — "동반 불가능" 의 "가능"에 걸리지 않게.
+        if any(k in c for k in _PETS_NO):
+            saw_no = True
+        elif any(k in c for k in _PETS_YES):
+            return True
+    return False if saw_no else None
+
+
+#: "주차하고 바로" 로 치는 도보 시간(분). 아래 값 미만이면 걸어간다고 하지 않는다.
+#:
+#: 이 상수가 없어서 계약이 깨져 있었다. 도구 설명은 `max_walk_minutes=0` 을 "주차하고
+#: 바로 보는 곳"이라고 광고했는데, 필터는 `walk_minutes > 0` 을 전부 잘라냈다. 62곳
+#: 중 도보 0분인 곳은 **하나도 없다**(최소 0.10분). 그래서 0 을 주면 도보 시간을
+#: **모르는 2곳**(관음사 야영장·화순방파제)만 남았다 — 물어본 것과 정반대다.
+#: `tools._walk_phrase` 는 이미 1분 미만을 "주차 후 바로 관측 가능해요"로 말하고
+#: 있었으므로, 거르는 쪽을 말하는 쪽에 맞춘다.
+IMMEDIATE_WALK_MIN = 1.0
 
 #: 방위를 재는 기준점 — 제주 행정구역 범위(`tools._LAT_MIN` 등)의 한가운데.
 #: 한라산 정상을 쓰지 않는 것은, 정상이 섬 중심에서 남쪽으로 치우쳐 있어 북쪽
@@ -465,12 +528,19 @@ def filter_spots(
         if no_climb and s.needs_climb:
             continue
         if max_walk_minutes is not None:
-            # 도보 시간을 모르는 곳은 남긴다. 모르는 것과 오래 걸리는 것은 다르다.
-            if s.walk_minutes is not None and s.walk_minutes > max_walk_minutes:
+            # 0(또는 1분 미만)은 "주차하고 바로"라는 뜻이다. 실측값이 0인 곳은 없으므로
+            # 글자 그대로 받으면 아무 곳도 남지 않는다 — 말하는 쪽과 같은 문턱을 쓴다.
+            limit = max(max_walk_minutes, IMMEDIATE_WALK_MIN)
+            # 도보 시간을 **모르는** 곳은 여기서만 거른다. 일반적으로는 모르는 것과 오래
+            # 걸리는 것이 다르지만, 질문 자체가 "얼마나 걷나"일 때 모르는 곳은 답이 아니다
+            # (반려동물 조건과 같은 판단).
+            if s.walk_minutes is None or s.walk_minutes > limit:
                 continue
         if parking_required and not s.has_parking:
             continue
-        if pets and "가능" not in (s.pets or ""):
+        # 모름(None)도 거른다 — "데려가도 되는 곳"을 물었는데 확인이 안 된 곳을
+        # 내놓으면 답이 아니다. 도보 시간과 반대로 두는 이유는 §위 주석에 있다.
+        if pets and pets_allowed(s.pets) is not True:
             continue
         if always_open and not s.always_open:
             continue

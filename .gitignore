@@ -21,3 +21,7 @@ outputs/
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# FABDEM 표고 원본·격자 — CC BY-NC-SA 라 재배포하지 않는다.
+# scripts/build_elevation_grid.py 로 만든다(배포 컨테이너는 없어도 뜬다).
+data/elevation/

@@ -531,8 +531,7 @@ def main() -> None:
         dead = [(cid, c) for cid, c in codes if c != 200]
         if dead:
             w(f"**받은 지도 주소 {len(codes)}건 중 {len(dead)}건이 열리지 않는다.** "
-              "옮겨져도 사용자에게 닿지 않으므로 전달률과 함께 읽어야 한다.
-")
+              "옮겨져도 사용자에게 닿지 않으므로 전달률과 함께 읽어야 한다.\n")
             w("| 케이스 | HTTP |")
             w("|---|---|")
             for cid, c in dead:

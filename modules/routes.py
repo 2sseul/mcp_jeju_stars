@@ -31,6 +31,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
 from modules import tools
+from modules.core import spots
 
 
 class RecommendSpotsRequest(BaseModel):
@@ -57,6 +58,14 @@ class RecommendSpotsRequest(BaseModel):
         description="허용값은 '동'·'서'·'남'·'북'·'중산간' 다섯뿐. '동쪽'·'제주 동부'는 "
                     "'동'. 그 밖의 지명(예: '애월')은 여기 넣지 말고 origin 으로 넘긴다.",
     )
+    place_type: Optional[str] = Field(
+        default=None,
+        description="장소 유형을 이것 하나로 좁힌다. 허용값은 "
+                    + " · ".join(f"'{k}'" for k in spots.PLACE_TYPES)
+                    + " 뿐이다. '오름 추천해줘'→'오름', '바닷가'·'해변'→'해안', "
+                      "'차 대고 바로 보는 곳'→'주차장', '천문대'→'관측소'. "
+                      "질문에 유형이 없으면 넣지 않는다 — 넣으면 그만큼 후보가 준다.",
+    )
     no_climb: bool = Field(
         default=False,
         description="True 면 오르막 산행이 필요한 곳을 뺀다. "
@@ -78,6 +87,29 @@ class RecommendSpotsRequest(BaseModel):
         description="True 면 반려동물 동반 가능한 곳만. '강아지'·'반려견' → True. "
                     "기본 False. 조건이 붙은 곳(목줄 필수·일부 구역만)도 포함되므로, "
                     "결과 각 항목의 `pets` 원문을 답에 그대로 옮긴다.",
+    )
+    toilet_required: bool = Field(
+        default=False,
+        description="True 면 화장실이 확인된 곳만. '화장실 있는'·'아이랑'·'오래 있을' "
+                    "→ True. 기본 False. 확인되지 않은 곳은 빠지므로 62곳 중 36곳이 "
+                    "남는다.",
+    )
+    campsite: bool = Field(
+        default=False,
+        description="True 면 야영이 가능한 곳만. '캠핑'·'텐트'·'차박하며' → True. "
+                    "기본 False. 세 곳뿐이라 다른 조건과 겹쳐 주면 대개 0이 된다.",
+    )
+    always_open: bool = Field(
+        default=False,
+        description="True 면 야간에 조건 없이 들어갈 수 있는 곳만. '새벽에도'·"
+                    "'아무 때나'·'문 닫는 시간 없는' → True. 기본 False.",
+    )
+    name_contains: Optional[str] = Field(
+        default=None,
+        description="이름에 이 말이 든 곳만 (띄어쓰기는 달라도 된다). "
+                    "'노꼬메 쪽 어디 없어?' → '노꼬메'. **한 곳을 지목한 질문에는 "
+                    "쓰지 않는다** — '새별오름 별 보여?'는 evaluate_place, "
+                    "'거기 주차 돼?'는 spot_details 다.",
     )
     date: Optional[str] = Field(
         default=None,
@@ -198,7 +230,11 @@ def register_routes(app: FastAPI) -> None:
         "제주공항에서 40분 안에 갈 만한 곳 3군데"
           → {"origin":"제주공항","max_drive_minutes":40,"limit":3}
         "제주 동쪽에서 별 보기 좋은 데" → {"region":"동"}
+        "오늘 밤 별 잘 보이는 오름" → {"place_type":"오름"}
         "등산 안 하고 강아지랑 갈 수 있는 곳" → {"no_climb":true,"pets":true}
+        "아이랑 갈 거라 화장실 있는 데" → {"toilet_required":true}
+        "캠핑하면서 별 보고 싶어" → {"campsite":true}
+        "새벽 3시에도 들어갈 수 있는 곳" → {"always_open":true}
 
         추천 목록은 `spots` 배열에 있고 각 항목에 주행시간(`drive`)·도보
         (`walk_minutes`)·구름(`cloud_cover`)·어둡기(`bortle`)·야간 출입
@@ -216,10 +252,15 @@ def register_routes(app: FastAPI) -> None:
             origin_lon=request.origin_lon,
             max_drive_minutes=request.max_drive_minutes,
             region=request.region,
+            place_type=request.place_type,
             no_climb=request.no_climb,
             max_walk_minutes=request.max_walk_minutes,
             parking_required=request.parking_required,
             pets=request.pets,
+            toilet_required=request.toilet_required,
+            campsite=request.campsite,
+            always_open=request.always_open,
+            name_contains=request.name_contains,
             date=request.date,
             time=request.time,
             limit=request.limit,

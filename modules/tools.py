@@ -1026,10 +1026,15 @@ def recommend_spots(
     origin_lon: float | None = None,
     max_drive_minutes: float | None = None,
     region: str | None = None,
+    place_type: str | None = None,
     no_climb: bool = False,
     max_walk_minutes: float | None = None,
     parking_required: bool = False,
     pets: bool = False,
+    toilet_required: bool = False,
+    campsite: bool = False,
+    always_open: bool = False,
+    name_contains: str | None = None,
     date: str | None = None,
     time: str | None = None,
     limit: int = 3,
@@ -1067,13 +1072,31 @@ def recommend_spots(
             as_of=_now_iso(),
         ).to_dict()
 
+    place = (place_type or "").strip() or None
+    if place is not None and place not in spots.PLACE_TYPES:
+        return Response(
+            verdict="입력 오류",
+            reasons=[
+                f"place_type 값을 이해하지 못했습니다 (place_type={place_type!r}). "
+                f"{' · '.join(spots.PLACE_TYPES)} 중 하나로 주세요."
+            ],
+            numbers={},
+            attribution=[],
+            as_of=_now_iso(),
+        ).to_dict()
+
     # 1) 정적 조건으로 후보를 좁힌다 (외부 호출 0회).
     candidates = spots.filter_spots(
         region=(region or "").strip() or None,
+        place_type=place,
         no_climb=no_climb,
         max_walk_minutes=max_walk_minutes,
         parking_required=parking_required,
         pets=pets,
+        toilet_required=toilet_required,
+        campsite=campsite,
+        always_open=always_open,
+        name_contains=(name_contains or "").strip() or None,
     )
     attribution = [spots.source()]
 
@@ -1110,7 +1133,12 @@ def recommend_spots(
         )
         return Response(
             verdict=_recommend_verdict([], empty_conditions),
-            reasons=[_no_candidate_reason(max_drive_minutes, region, no_climb)],
+            reasons=[
+                _no_candidate_reason(
+                    max_drive_minutes, region, place, no_climb,
+                    toilet_required, campsite, always_open, name_contains,
+                )
+            ],
             numbers={"candidates": 0},
             attribution=attribution,
             as_of=_now_iso(),
@@ -1219,7 +1247,14 @@ def recommend_spots(
 
 
 def _no_candidate_reason(
-    max_drive_minutes: float | None, region: str | None, no_climb: bool
+    max_drive_minutes: float | None,
+    region: str | None,
+    place_type: str | None,
+    no_climb: bool,
+    toilet_required: bool = False,
+    campsite: bool = False,
+    always_open: bool = False,
+    name_contains: str | None = None,
 ) -> str:
     """왜 후보가 없는지 — 조건을 되짚어 준다. 어느 조건을 풀지 사용자가 정하게."""
     conds = []
@@ -1227,8 +1262,18 @@ def _no_candidate_reason(
         conds.append(f"주행 {max_drive_minutes:.0f}분 이내")
     if region:
         conds.append(f"{region} 지역")
+    if place_type:
+        conds.append(f"{place_type} 유형")
     if no_climb:
         conds.append("등산 없는 곳")
+    if toilet_required:
+        conds.append("화장실이 확인된 곳")
+    if campsite:
+        conds.append("야영 가능한 곳")
+    if always_open:
+        conds.append("야간 상시 개방")
+    if name_contains and name_contains.strip():
+        conds.append(f"이름에 '{name_contains.strip()}' 이 든 곳")
     if not conds:
         return "조건에 맞는 관측지가 없습니다."
     return (

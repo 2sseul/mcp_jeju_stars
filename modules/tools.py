@@ -397,13 +397,21 @@ def _evaluate_night(
     darkness = result.get("darkness")
     if darkness is not None:
         numbers.update(darkness)
+    # 달은 정적이 아니라 **그 밤의 속성**이라 밤 단위로 한 덩어리를 낸다 — 얼마나
+    # 밝은지·언제 뜨고 지는지·달 없는 시간이 몇 시간인지.
+    if result.get("moon") is not None:
+        numbers["moon"] = result["moon"]
 
     reasons = _night_reasons(summary, window, label)
     # 어둡기 설명(SQM·야간광·가로등) + 은하수 주의 문구. 관측 가능한 밤일 때만.
     if summary is not None and summary.get("observable_hours"):
         reasons.extend(result.get("darkness_reasons", []))
-        if result.get("milky_way_caveat"):
-            reasons.append(result["milky_way_caveat"])
+        # 달빛이 은하수를 깎았으면 광공해 문구 대신 그것을 적는다 — 원인이 다르면
+        # 처방이 다르다(자리를 옮겨라 ↔ 때를 옮겨라). 둘 다 적으면 어느 쪽이 문제인지
+        # 흐려진다.
+        caveat = result.get("moon_caveat") or result.get("milky_way_caveat")
+        if caveat:
+            reasons.append(caveat)
 
     reasons.append(_forecast_caveat(when))
 

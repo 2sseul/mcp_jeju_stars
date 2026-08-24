@@ -585,6 +585,20 @@ const LAYERS = L.control.layers(
   {{ collapsed: false }}).addTo(map);
 L.control.scale({{ imperial:false }}).addTo(map);
 
+// 줌은 **지금 깔린 배경이 갈 수 있는 데까지만** 연다.
+//
+// Leaflet 의 지도 최대 줌은 깔린 겹들 중 가장 큰 값이다. 바닥에 항상 깔아 둔 선
+// 지도가 z20 까지 가므로, 배경이 그보다 낮은 겹으로 바뀌면(Esri 로 갈아탄 뒤 z19)
+// 그 사이에 한 단계가 뜬다 — 위성 겹이 통째로 비워지고 아래 깔린 선 지도가 그대로
+// 드러난다. **배경을 고른 적이 없는데 배경이 바뀐 것처럼 보인다.**
+//
+// 그래서 바탕이 바뀔 때마다 그 겹의 최대 줌으로 지도를 다시 묶는다. 더 당기려 하면
+// 줌 버튼이 서고, 이미 그 너머에 있으면 Leaflet 이 되돌린다. 못 보던 배경이 뜨느니
+// 여기까지라고 말하는 편이 낫다.
+const capZoom = layer => map.setMaxZoom(layer.options.maxZoom);
+capZoom(SAT);
+map.on('baselayerchange', e => capZoom(e.layer));
+
 if (ROADS) {{
   map.on('overlayadd overlayremove', e => {{
     if (e.layer === ROADS && !roadsSyncing) roadsWanted = (e.type === 'overlayadd');
@@ -634,6 +648,8 @@ if (D.fallback) {{
     LAYERS.removeLayer(SAT);
     BACKUP.addTo(map);
     LAYERS.addBaseLayer(BACKUP, '위성사진');
+    // 목록에서 고른 것이 아니라 baselayerchange 가 안 뜬다 — 직접 묶는다.
+    capZoom(BACKUP);
   }});
 }}
 

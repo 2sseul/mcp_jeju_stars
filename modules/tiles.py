@@ -33,9 +33,10 @@
 from __future__ import annotations
 
 import threading
-import urllib.error
-import urllib.request
 from dataclasses import dataclass
+
+import requests
+from requests.adapters import HTTPAdapter
 
 from modules import env, path
 
@@ -88,6 +89,18 @@ _MAGIC = {
     "image/png": b"\x89PNG\r\n\x1a\n",
 }
 
+#: 공급자와의 연결을 이어 쓴다. 한 장마다 TLS 손을 새로 잡으면 0.70초인데 연결을
+#: 재사용하면 0.27초다 — 한 화면 서른 장이면 그 차이가 그대로 쌓인다. 브이월드가
+#: 단일 origin 이라 손 잡는 값이 특히 비싸다.
+#:
+#: 풀은 브라우저가 우리에게 여는 연결 수(여섯)보다 넉넉히 잡는다. 모자라면 초과분은
+#: 연결을 새로 잡아 버려 이 최적화가 조용히 사라진다.
+_session = requests.Session()
+_session.mount(
+    "https://",
+    HTTPAdapter(pool_connections=4, pool_maxsize=16, max_retries=0),
+)
+
 #: 같은 타일을 동시에 두 번 받아 오지 않게 하는 자물쇠. 브라우저가 여는 연결 여섯
 #: 개가 같은 장을 두고 겹치는 일은 드물지만, 지도 두 장이 같은 자리를 그리면 겹친다.
 _locks: dict[tuple[str, int, int, int], threading.Lock] = {}
@@ -123,9 +136,9 @@ def _download(source: Source, z: int, x: int, y: int) -> bytes | None:
     """공급자에게서 한 장. 그림이 아니면 None — 오류 문서를 그림으로 넘기지 않는다."""
     url = source.template.format(key=env.read("VWORLD_API_KEY"), z=z, x=x, y=y)
     try:
-        with urllib.request.urlopen(url, timeout=TIMEOUT_S) as response:
-            blob = response.read()
-    except (urllib.error.URLError, TimeoutError, OSError):
+        response = _session.get(url, timeout=TIMEOUT_S)
+        blob = response.content
+    except (requests.RequestException, OSError):
         return None
     if not blob.startswith(_MAGIC[source.content_type]):
         return None

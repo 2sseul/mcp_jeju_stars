@@ -487,6 +487,35 @@ def source() -> str:
 
 REGIONS: tuple[str, ...] = ("동", "서", "남", "북", "중산간")
 
+#: 장소 유형 묶음 — 데이터의 `type` 을 묻는 말에 맞춰 추린 것.
+#:
+#: 원본 값은 "오름"·"해안/섬"·"평야/역사터"처럼 스물한 가지로 갈라져 있어 그대로
+#: 도구 인자로 내보내면 부르는 쪽이 고를 수 없다. 사람은 "오름 추천해줘"라고 묻지
+#: "해안/평지"라고 묻지 않는다.
+#:
+#: 대조는 **슬래시로 끊은 조각의 완전 일치**다. 부분 문자열로 보면 "관측소/천문공원"이
+#: 공원에 딸려 들어간다. 한 곳이 두 묶음에 들어가는 것은 막지 않는다 — "오름/습지"는
+#: 오름이기도 하다.
+PLACE_TYPES: dict[str, frozenset[str]] = {
+    "오름": frozenset({"오름"}),
+    "해안": frozenset({"해안", "해안도로", "섬", "포구"}),
+    "숲/계곡": frozenset({"숲", "계곡"}),
+    "공원/야영장": frozenset({"공원", "야영장"}),
+    "고지/전망": frozenset({"고지", "전망"}),
+    "관측소": frozenset({"관측소", "천문공원"}),
+    "목장/초지": frozenset({"목장", "초지"}),
+    "주차장": frozenset({"주차장"}),
+    "평지": frozenset({"평지", "평야", "역사터", "저수지"}),
+}
+
+
+def is_kind(spot: "Spot", place_type: str) -> bool:
+    """이 관측지가 그 유형 묶음에 드는가."""
+    tokens = PLACE_TYPES.get(place_type)
+    if tokens is None:
+        return False
+    return any(part.strip() in tokens for part in spot.kind.split("/"))
+
 
 def _normalize(text: str) -> str:
     """이름 비교용 정규화 — 공백·가운뎃점을 지운다.
@@ -522,11 +551,15 @@ def find(query: str) -> Spot | None:
 
 def filter_spots(
     region: str | None = None,
+    place_type: str | None = None,
     no_climb: bool = False,
     max_walk_minutes: float | None = None,
     parking_required: bool = False,
     pets: bool = False,
+    toilet_required: bool = False,
+    campsite: bool = False,
     always_open: bool = False,
+    name_contains: str | None = None,
 ) -> list[Spot]:
     """조건으로 후보를 좁힌다. 주행시간은 여기서 보지 않는다(도로 그래프 소관).
 
@@ -535,6 +568,8 @@ def filter_spots(
     out = []
     for s in all_spots():
         if region and s.region != region:
+            continue
+        if place_type and not is_kind(s, place_type):
             continue
         if no_climb and s.needs_climb:
             continue
@@ -553,7 +588,18 @@ def filter_spots(
         # 내놓으면 답이 아니다. 도보 시간과 반대로 두는 이유는 §위 주석에 있다.
         if pets and pets_allowed(s.pets) is not True:
             continue
+        # 화장실은 **확인된 것만** 남긴다. 밤에 몇 시간 머무는 질문이라 "아마 있을
+        # 것"으로는 답이 되지 않는다(반려동물과 같은 판단).
+        if toilet_required and not s.toilet:
+            continue
+        if campsite and not s.campsite:
+            continue
         if always_open and not s.always_open:
             continue
+        if name_contains:
+            needle = _normalize(name_contains)
+            haystack = _normalize(s.name) + _normalize(s.name_en or "")
+            if needle not in haystack:
+                continue
         out.append(s)
     return out

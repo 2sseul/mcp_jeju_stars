@@ -389,6 +389,62 @@ def assess_site(lat: float, lon: float) -> Site:
     )
 
 
+# --- 그 시각의 하늘 (정적 광공해 + 그때 더해진 밝기) --------------------------
+
+@dataclass(frozen=True)
+class Sky:
+    """**그 시각**의 하늘 — 장소의 정적 광공해 위에 그때 더해진 밝기를 얹은 것.
+
+    지금 더해지는 것은 달빛 하나다(`moon.py`). 이 모듈이 시각을 모른 채로 남을 수
+    있는 것은, 밝기를 **얼마나 더할지**를 밖에서 받기 때문이다 — 여기서는 그것이
+    달빛인지 무엇인지 알 필요가 없다.
+
+    added_mcd:  더해진 밝기(mcd/m²). 0 이면 아래 값들은 정적 판정과 정확히 같다.
+    sqm:        유효 하늘밝기(인공 + 자연 + 더해진 분).
+    milky_way:  유효 밝기로 다시 매긴 은하수 가시성.
+    cap:        유효 밝기로 다시 낸 verdict 등급 상한.
+    dimmed:     더해진 밝기가 실제로 가시성이나 상한을 끌어내렸는가.
+    """
+
+    added_mcd: float
+    sqm: float
+    milky_way: str
+    cap: str
+    dimmed: bool
+
+
+def assess_sky(site: Site, added_mcd: float) -> Sky | None:
+    """정적 판정(Site)에 밝기를 더해 **그 시각**의 하늘을 다시 매긴다.
+
+    SQM(주 기준)이 없으면 None — 정적 판정과 같은 규율이다.
+
+    **새 임계값을 만들지 않는다.** 더해진 밝기를 인공 밝기에 합쳐 기존 사다리
+    (`falchi_of` · `score_of` · `cap_of`)에 그대로 통과시킨다. 그래서 added_mcd 가
+    0 이면 결과가 정적 판정과 **정확히 일치**하고, 더해진 만큼만 등급이 내려간다.
+
+    합친 값에 **Falchi 등급 이름은 붙이지 않는다** — Falchi et al.(2016)의 등급은 인공광
+    분류라 달빛에 그 이름을 쓰면 잘못이다. 여기서 쓰는 것은 등급 이름이 아니라 그 경계가
+    정의하는 **밝기 사다리**이고, 거기서 얻는 것은 은하수 가시성뿐이다. 응답에 싣는
+    `falchi_grade` 는 정적 판정의 값 그대로 둔다.
+    """
+    if site.darkness is None:
+        return None
+
+    effective = site.darkness.artificial_mcd + max(added_mcd, 0.0)
+    sqm = sqm_of(effective)
+    milky_way = _MILKY_WAY[falchi_of(effective)]
+    near_max = site.nightlight.near_max if site.nightlight is not None else 0.0
+    cap = cap_of(score_of(sqm, near_max, site.lamps.nearest_m))
+
+    return Sky(
+        added_mcd=round(added_mcd, 4),
+        sqm=round(sqm, 2),
+        milky_way=milky_way,
+        cap=cap,
+        dimmed=(milky_way != site.darkness.milky_way) or (cap != site.cap),
+    )
+
+
 def describe_site(site: Site) -> list[str]:
     """어둡기 종합을 사람이 읽는 줄들로. 신호마다 한 줄씩, 없는 신호는 건너뛴다."""
     lines: list[str] = []

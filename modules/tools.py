@@ -944,14 +944,44 @@ def _place_map(
     route=None,
     origin: tuple[float, float] | None = None,
     origin_resolved: dict | None = None,
+    alternatives: list[tuple[spots.Spot, routing.Route, float | None]] | None = None,
 ) -> tuple[str | None, list[Marker]]:
     """등록되지 않은 자리의 지도 — 그 점 + 반경 안 편의시설(+ 출발지면 주행 경로).
 
-    도보 경로는 그리지 않는다. 어디에 세우고 어디로 걷는지는 사람이 확인한 곳에만
-    있는 정보라, 없는 선을 그리면 있는 것처럼 보인다.
+    지목한 자리의 도보 경로는 그리지 않는다. 어디에 세우고 어디로 걷는지는 사람이
+    확인한 곳에만 있는 정보라, 없는 선을 그리면 있는 것처럼 보인다.
+
+    `alternatives` 는 말로 권한 **근처의 더 어두운 검증된 관측지**다. 말한 것은 지도에도
+    있어야 한다 — "차로 14분 거리 용눈이오름"이라고 해 놓고 지도에는 성산일출봉 하나만
+    찍혀 있으면, 어느 쪽으로 얼마나 가야 하는지가 안 보이고 지도만 본 사람은 권한 곳이
+    있다는 것조차 모른다. 그쪽은 검증된 곳이라 주차·화장실·도보 경로까지 함께 찍는다 —
+    대안의 쓸모가 바로 그 '확인된 접근성'이라, 점만 찍으면 왜 대안인지가 빠진다.
     """
+    alts = alternatives or []
     amenities = _amenity_markers(lat, lon, NEARBY_M)
-    markers = [Marker(lat, lon, "spot", name, "등록되지 않은 지점"), *amenities]
+
+    # 지목한 자리와 대안을 표지로 가른다. 전부 같은 ★ 이면 지도만 보고는 어디가 물어본
+    # 자리이고 어디가 권한 자리인지 알 수 없다. 물어본 자리는 '?'(확인되지 않음),
+    # 대안은 목록·설명 줄과 같은 번호다.
+    markers = [
+        Marker(lat, lon, "spot", name, "등록되지 않은 지점",
+               glyph="?" if alts else ""),
+        *amenities,
+    ]
+    # 이미 찍은 편의시설을 씨앗으로 넘겨, 대안의 주차·화장실이 그 위에 겹쳐 찍히지
+    # 않게 한다(`_facility_markers` 가 갈래별로 50m 안을 같은 곳으로 본다).
+    placed: dict[str, list[tuple[float, float]]] = {
+        "spot": [(lat, lon), *[(s.lat, s.lon) for s, _, _ in alts]],
+        "parking": [(m.lat, m.lon) for m in amenities if m.kind == "parking"],
+        "toilet": [(m.lat, m.lon) for m in amenities if m.kind == "toilet"],
+    }
+    for i, (spot, _, _) in enumerate(alts, start=1):
+        markers.append(Marker(
+            spot.lat, spot.lon, "spot", f"{i}. {spot.name}", _where(spot),
+            glyph=str(i),
+        ))
+        markers.extend(_facility_markers(spot, placed))
+
     if origin is not None:
         markers.append(_origin_marker(origin, origin_resolved, route))
 
@@ -959,12 +989,24 @@ def _place_map(
     if route is not None:
         facts.insert(0, Fact(f"차 {route.minutes:.0f}분", "drive"))
     facts.append(Fact("등록되지 않은 지점", "warn"))
+    items = [Item(label=name, lat=lat, lon=lon, sub="등록되지 않은 지점",
+                  facts=tuple(facts))]
+
+    for i, (spot, leg, sqm) in enumerate(alts, start=1):
+        # 주행시간은 **지목한 자리에서** 잰 것이다(`_darker_nearby`). 출발지에서 잰
+        # 위 줄의 '차 N분' 과 같은 말로 적으면 어디서부터인지가 섞이므로 앞을 밝힌다.
+        alt_facts = [Fact(f"여기서 차 {leg.minutes:.0f}분", "drive")]
+        if sqm is not None:
+            alt_facts.append(Fact(f"하늘 밝기 {sqm:.2f}", "plain"))
+        alt_facts.extend(_spot_facts(spot))
+        items.append(Item(label=f"{i}. {spot.name}", lat=spot.lat, lon=spot.lon,
+                          sub=_where(spot), facts=tuple(alt_facts)))
 
     return maps.write(
-        title=f"{name} 주변",
+        title=f"{name} 주변" + (f" · 더 어두운 곳 {len(alts)}곳" if alts else ""),
         markers=markers,
-        items=[Item(label=name, lat=lat, lon=lon, sub="등록되지 않은 지점",
-                    facts=tuple(facts))],
+        walk_segments=_walk_layers_of([s for s, _, _ in alts]),
+        items=items,
     ), amenities
 
 
@@ -1478,15 +1520,26 @@ def evaluate_place(
         result["numbers"]["drive"] = route.to_dict()
         result.setdefault("attribution", []).append(routing.SOURCE)
 
+    # 미등록 지점에서 답하지 못한 접근성을, 답할 수 있는 곳으로 메운다. 어두운 곳이
+    # 근처에 없으면 아무 말도 하지 않는다 — 없는 대안을 지어내는 것보다 낫다.
+    #
+    # 지도보다 **먼저** 구한다. 한때 지도를 먼저 그리고 대안을 뒤에 구했는데, 그래서
+    # 말로는 "차로 14분 거리 용눈이오름"이라고 권해 놓고 지도에는 물어본 자리 하나만
+    # 찍혀 나갔다. 지도는 권한 곳까지 담아야 한다.
+    alternatives = (
+        _darker_nearby(p_lat, p_lon, result.get("numbers", {}).get("darkness_score"))
+        if known is None else []
+    )
+
     # 지도 — 등록된 곳은 사람이 확인한 주차·화장실과 도보 경로를, 등록되지 않은 곳은
-    # 반경 안 편의시설만 그린다. 없는 선을 그리면 있는 것처럼 보인다.
+    # 반경 안 편의시설과 위에서 고른 대안을 그린다. 없는 선을 그리면 있는 것처럼 보인다.
     if known is not None:
         result["map_url"] = _spot_map(known, route, origin_pt, origin_resolved)
         amenities = []
     else:
         label = (resolved or {}).get("display_name") or (query or "이 지점")
         result["map_url"], amenities = _place_map(
-            p_lat, p_lon, str(label), route, origin_pt, origin_resolved
+            p_lat, p_lon, str(label), route, origin_pt, origin_resolved, alternatives
         )
         for source in (parking.SOURCE, places.SOURCE, toilet.SOURCE):
             if source not in result.setdefault("attribution", []):
@@ -1541,11 +1594,6 @@ def evaluate_place(
                 "난이도는 확인되지 않았습니다.**"
             )
 
-        # 답하지 못한 접근성을, 답할 수 있는 곳으로 메운다. 어두운 곳이 근처에
-        # 없으면 아무 말도 하지 않는다 — 없는 대안을 지어내는 것보다 낫다.
-        alternatives = _darker_nearby(
-            p_lat, p_lon, result.get("numbers", {}).get("darkness_score")
-        )
         if alternatives:
             reasons.append(_alternatives_reason(alternatives))
             attr = result.setdefault("attribution", [])
@@ -1622,14 +1670,18 @@ def _alternatives_reason(
     rows: list[tuple[spots.Spot, routing.Route, float | None]],
 ) -> str:
     """근처 대안을 한 줄로. 이름·주행시간·어둡기·야간 출입만 — 도보 난이도까지
-    적으면 `spot_details` 를 옮겨 온 것이 된다."""
+    적으면 `spot_details` 를 옮겨 온 것이 된다.
+
+    번호는 지도에 찍힌 번호와 같다(`_place_map`). 이름만 있으면 지도의 두 점 중 어느
+    쪽이 어느 이름인지 다시 눌러 봐야 한다.
+    """
     parts = []
-    for spot, leg, sqm in rows:
+    for i, (spot, leg, sqm) in enumerate(rows, start=1):
         bits = [f"차로 약 {leg.minutes:.0f}분"]
         if sqm is not None:
             bits.append(f"하늘 밝기 {sqm:.2f} (클수록 어두움)")
         bits.append(f"야간 출입 {spot.night_access or '확인 필요'}")
-        parts.append(f"{spot.name}({' · '.join(bits)})")
+        parts.append(f"{i}. {spot.name}({' · '.join(bits)})")
     return (
         "대신 근처에 **이 지점보다 어둡고 접근성이 확인된** 관측지가 있어요 — "
         + ", ".join(parts)

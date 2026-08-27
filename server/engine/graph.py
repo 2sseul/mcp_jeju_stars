@@ -22,6 +22,7 @@ from server.core import lamps as _lamps
 from server.core import moon as _moon
 from server.core import nightlight as _nightlight
 from server.core import tonight as _tonight
+from server.core import weather as _weather
 
 from .state import EngineState
 
@@ -52,6 +53,39 @@ def astro_node(state: EngineState) -> dict:
     }
 
 
+def _round(v: float | None, digits: int) -> float | int | None:
+    """결측을 흘려보내며 반올림한다. digits=0 이면 int 로 되돌린다."""
+    if v is None:
+        return None
+    return round(v) if digits == 0 else round(v, digits)
+
+
+def _weather_numbers(row: dict) -> dict:
+    """기상 행 → numbers 조각. 판정 축(운량·시정)과 참고 축(기온·바람 등)을 함께 편다.
+
+    소비자(LLM)가 보는 키를 한 겹으로 유지한다(`_darkness_numbers` 와 같은 결).
+    하늘 상태 라벨(`sky`)까지 여기서 붙인다 — 코드 숫자만 주면 호출자가 "맑음" 을
+    지어내야 하기 때문이다.
+
+    기온·풍속은 예보 해상도(0.1)에 맞춰 자른다. 부동소수점 원값(23.59749984741211)을
+    그대로 내보내면 없는 정밀도를 있는 것처럼 읽히게 한다.
+    """
+    code = row.get("weather_code")
+    return {
+        "cloud_cover": row.get("cloud_cover"),
+        "visibility_m": row.get("visibility"),
+        "temperature_c": _round(row.get("temperature_c"), 1),
+        "apparent_temperature_c": _round(row.get("apparent_c"), 1),
+        "humidity_pct": _round(row.get("humidity_pct"), 0),
+        "wind_speed_ms": _round(row.get("wind_ms"), 1),
+        "precipitation_probability_pct": _round(
+            row.get("precipitation_probability_pct"), 0
+        ),
+        "weather_code": code,
+        "sky": _weather.sky_label(code),
+    }
+
+
 def weather_node(state: EngineState) -> dict:
     """Open-Meteo → 해당 정시의 총운량·시정.
 
@@ -64,28 +98,42 @@ def weather_node(state: EngineState) -> dict:
         data = open_meteo.fetch(state["lat"], state["lon"], state["when"])
     except Exception:  # noqa: BLE001 — 외부 I/O 경계, 스키마 보장이 우선
         # 값을 None 으로 흘리면 judge 가 "정보를 가져오지 못했어요"로 환원한다.
+        empty = open_meteo.empty_row(state["when"])
         return {
             "cloud": None,
             "visibility": None,
-            "numbers": {
-                "cloud_cover": None,
-                "visibility_m": None,
-            },
+            "weather": empty,
+            "numbers": _weather_numbers(empty),
             "attribution": ["기상: Open-Meteo (조회 실패)"],
         }
 
     cloud = data["cloud_cover"]
     vis = data["visibility"]
-    numbers: dict = {
-        "cloud_cover": cloud,
-        "visibility_m": vis,
-    }
+    numbers: dict = _weather_numbers(data)
     return {
         "cloud": cloud,
         "visibility": vis,
+        "weather": data,
         "numbers": numbers,
         "attribution": ["기상: Open-Meteo (open-meteo.com)"],
     }
+
+
+#: 기상 서술을 붙이는 태양 고도 상태. judge 가 날씨를 보기 시작하는 구간과 같다
+#: (3=시민박명·4=낮 은 하늘이 밝아 이미 '불가'이므로, 기온·바람을 말해 봐야 소음이다).
+_WEATHER_STATES = (0, 1, 2)
+
+
+def comfort_node(state: EngineState) -> dict:
+    """기상값 → 사람이 읽는 기상 문장(기온·체감·바람).
+
+    judge **뒤에** 둔다. 두 가지 이유다.
+    1) 등급에 관여하지 않음을 배치로 못박는다 — judge 는 이 노드의 결과를 보지 못한다.
+    2) reasons 는 노드 순서대로 쌓이므로, 판정 근거가 먼저 오고 참고 정보가 뒤에 온다.
+    """
+    if state.get("state_code") not in _WEATHER_STATES:
+        return {}
+    return {"reasons": _weather.describe(state.get("weather") or {})}
 
 
 def judge_node(state: EngineState) -> dict:
@@ -94,12 +142,15 @@ def judge_node(state: EngineState) -> dict:
     darkness_node·moon_node 가 먼저 돌아야 상한이 채워진다(그래서 엣지가
     darkness → moon → judge 다).
     """
+    w = state.get("weather") or {}
     result = _judge.judge(
         state.get("state_code"),
         state.get("cloud"),
         state.get("visibility"),
         state.get("darkness_cap"),
         state.get("moon_cap"),
+        weather_code=w.get("weather_code"),
+        precip_prob_pct=w.get("precipitation_probability_pct"),
     )
     return {
         "verdict": result.verdict,
@@ -226,6 +277,7 @@ def _build():
     g.add_node("judge", judge_node)
     g.add_node("darkness", darkness_node)
     g.add_node("moon", moon_node)
+    g.add_node("comfort", comfort_node)
     # 어둡기·달빛이 judge 보다 앞이다 — judge 가 그 상한(cap)들을 받아 등급을 정하기
     # 때문. 달빛은 어둡기 위에 얹으므로 darkness 뒤다.
     g.add_edge(START, "astro")
@@ -233,7 +285,9 @@ def _build():
     g.add_edge("weather", "darkness")
     g.add_edge("darkness", "moon")
     g.add_edge("moon", "judge")
-    g.add_edge("judge", END)
+    # 기상 서술(comfort)은 judge 뒤다 — 등급에 관여하지 않음을 배치로 못박는다.
+    g.add_edge("judge", "comfort")
+    g.add_edge("comfort", END)
     return g.compile()
 
 
@@ -317,10 +371,12 @@ def run_tonight(lat: float, lon: float, when: datetime) -> dict:
         caveat = None
         darkness_reasons = ["이 지점은 광공해 격자 밖이거나 데이터가 없어요(해상 등)"]
 
-    def _result(window, summary, moon=None, moon_caveat=None, extra_attr=None) -> dict:
+    def _result(window, summary, moon=None, moon_caveat=None, extra_attr=None,
+                weather=None) -> dict:
         return {
             "window": window,
             "summary": summary,
+            "weather": weather,
             "darkness": darkness,
             "darkness_reasons": darkness_reasons,
             "milky_way_caveat": caveat,
@@ -356,23 +412,34 @@ def run_tonight(lat: float, lon: float, when: datetime) -> dict:
         )
 
     hours = []
+    inside = []
     for row in series:
         t = row["time"]
         if t < start or t >= end:  # 밤 창 밖 정시는 집계에서 제외
             continue
+        inside.append(row)
         state = astro.twilight_state(lat, lon, t)
         # 밤 집계의 매 정시도 순간 판정과 같은 광공해 상한을 받는다(같은 장소이므로).
         # 달빛 상한은 **정시마다 다르다** — 달이 뜬 시간과 진 시간의 등급이 같으면
         # "달이 지고 나면 나아진다"가 집계에 나타나지 않는다.
         result = _judge.judge(
-            state, row["cloud_cover"], row["visibility"], site.cap, moon_caps.get(t)
+            state,
+            row["cloud_cover"],
+            row["visibility"],
+            site.cap,
+            moon_caps.get(t),
+            weather_code=row.get("weather_code"),
+            precip_prob_pct=row.get("precipitation_probability_pct"),
         )
         hours.append(
             _tonight.HourResult(t, result.verdict, result.possible, row["cloud_cover"])
         )
 
+    # 기상 집계는 판정과 **같은 정시 집합**(밤 창 안)을 본다. 창 밖 정시가 섞이면
+    # "밤 기온 최저"가 해 지기 전 값이 되어 실제보다 따뜻하게 읽힌다.
     return _result(
-        _iso_window(start, end), _tonight.summarize(hours), moon_night, moon_caveat
+        _iso_window(start, end), _tonight.summarize(hours), moon_night, moon_caveat,
+        weather=_weather.summarize_night(inside)
     )
 
 

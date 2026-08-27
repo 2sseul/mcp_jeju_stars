@@ -100,6 +100,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
+from server.core import weather as _weather
+
 # --- 임계값 (전부 문헌값, 튜닝 대상 아님) -------------------------------------
 
 #: ESO clear sky. Kerber et al. 2014.
@@ -116,6 +118,10 @@ SPECTROSCOPIC_PCT: float = 50.0
 #: 1 km 는 WMO 의 안개(fog) 정의 경계.
 VISIBILITY_FOG_M: float = 1_000.0
 VISIBILITY_HAZE_M: float = 10_000.0
+
+#: 미국 기상청(NWS) 강수확률(PoP) 표현 대응표에서 "Likely" 가 시작하는 값.
+#: 국가기상기관이 "비가 올 것 같다"고 말하기 시작하는 지점이다. 등급은 안 바꾼다.
+PRECIP_LIKELY_PCT: float = 60.0
 
 # --- 판정 등급 ----------------------------------------------------------------
 
@@ -153,6 +159,32 @@ def _km(m: float) -> str:
 #: 경계 비교용 허용오차. 예보값이 부동소수점이라 정확히 경계값인 입력(30.0 등)이
 #: 표현 오차로 한 단계 아래 등급으로 떨어지는 것을 막는다.
 _EPS: float = 1e-9
+
+
+def _precip_msg(code: int | None, prob: float | None) -> str:
+    """강수로 '불가'가 됐을 때의 사유 문장. 무엇이 내리는지(WMO 라벨)를 밝힌다.
+
+    앞에서 이미 정확한 이름("약한 이슬비")을 불렀으므로 뒤에 "비나 눈이 내리면" 같은
+    일반 서술을 덧붙이지 않는다 — 8월에 눈을 말하게 되고, 같은 말을 두 번 하게 된다.
+    """
+    label = _weather.sky_label(code) or "강수"
+    tail = f" (강수확률 {prob:.0f}%)" if prob is not None else ""
+    return f"{label} 예보라 하늘이 덮여 있어요{tail} — 별은 보기 어려워요"
+
+
+def _precip_risk_msg(code: int | None, prob: float | None) -> str | None:
+    """강수 **예보는 없지만 확률이 높은** 정시의 경고 문장. 등급은 안 바꾼다(5절).
+
+    강수 예보가 있는 정시는 이미 '불가'로 끝났으므로 여기 오지 않는다.
+    """
+    if prob is None or prob < PRECIP_LIKELY_PCT:
+        return None
+    label = _weather.sky_label(code)
+    where = f"지금은 '{label}' 예보지만 " if label else ""
+    return (
+        f"{where}비가 올 가능성이 높아요 (강수확률 {prob:.0f}%) "
+        "— 하늘이 갑자기 닫힐 수 있으니 서둘러 보세요"
+    )
 
 
 def _ladder(pct: float) -> str:
@@ -200,8 +232,10 @@ def judge(
     visibility_m: float | None,
     darkness_cap: str | None = None,
     moon_cap: str | None = None,
+    weather_code: int | None = None,
+    precip_prob_pct: float | None = None,
 ) -> Judgement:
-    """태양 고도 상태·총운량·시정으로 관측 등급을 판정한다.
+    """태양 고도 상태·총운량·강수·시정으로 관측 등급을 판정한다.
 
     Args:
         state: astro.twilight_state 값(0=완전한 밤 ~ 4=낮).
@@ -212,6 +246,9 @@ def judge(
                      제한 없음. 등급을 끌어내리기만 하고 올리지는 않는다.
         moon_cap: 달빛까지 더한 하늘이 정한 등급 **상한**(darkness.assess_sky 의 cap).
                  None 이면 제한 없음. darkness_cap 과 같은 방식으로 끌어내리기만 한다.
+        weather_code: WMO 4677 기상 코드. 51 이상(강수)이면 차폐 축을 '불가'로
+                     끌어내린다 — 총운량과 어긋나도 강수 쪽을 따른다(docstring 2절).
+        precip_prob_pct: 강수확률(%). **등급을 바꾸지 않고** 문구만 더한다(5절).
 
     Returns:
         Judgement(verdict, possible, reasons).
@@ -224,7 +261,13 @@ def judge(
     if sky_verdict == IMPOSSIBLE:
         return Judgement(IMPOSSIBLE, False, [sky_msg])
 
-    # 결측은 '불가' 가 아니라 '알 수 없음' 이다(모듈 docstring 5절).
+    # 강수는 총운량보다 강한 진술이라 결측 검사보다 **먼저** 본다(docstring 6절).
+    if _weather.is_precipitating(weather_code):
+        return Judgement(
+            IMPOSSIBLE, False, [_precip_msg(weather_code, precip_prob_pct)]
+        )
+
+    # 결측은 '불가' 가 아니라 '알 수 없음' 이다(모듈 docstring 6절).
     if cloud_cover is None:
         return Judgement(UNKNOWN, None, [sky_msg, "구름 정보를 가져오지 못했어요"])
 
@@ -259,6 +302,11 @@ def judge(
         reasons.append(f"옅은 안개가 낄 수 있어요 (시야 {_km(visibility_m)})")
     else:
         reasons.append(f"공기가 맑아요 (시야 {_km(visibility_m)})")
+
+    # 강수확률도 등급에 관여하지 않는다 — 높을 때만 경고 한 줄을 더한다(5절).
+    risk = _precip_risk_msg(weather_code, precip_prob_pct)
+    if risk is not None:
+        reasons.append(risk)
 
     # 무언가 실제로 등급을 끌어내렸을 때만 그 사실을 밝힌다 — 하늘·구름은 좋은데
     # 등급이 낮은 이유를 알아야 사용자가 다음 수를 택할 수 있다. **원인에 따라 처방이

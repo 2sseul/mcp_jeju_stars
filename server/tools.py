@@ -42,7 +42,17 @@ from zoneinfo import ZoneInfo
 
 from server import maps
 from server.clients.geocode import geocode
-from server.core import astro, darkness, parking, places, routing, spots, toilet
+from server.core import (
+    astro,
+    darkness,
+    judge,
+    parking,
+    places,
+    routing,
+    spots,
+    toilet,
+    weather,
+)
 from server.core.mapview import Fact, Item, Marker, Walk
 from server.engine import graph
 from server.schema import Response
@@ -320,7 +330,40 @@ def _night_label(when: datetime) -> str:
     return f"{when.month}월 {when.day}일 밤"
 
 
-def _night_verdict(summary: dict | None, window: dict | None, label: str) -> str:
+def _blocked_by(summary: dict, night_weather: dict | None) -> str:
+    """관측 가능 시간이 0인 밤에서 **무엇이 막았는지**를 사실대로 고른다.
+
+    두 값을 세어 있는 것만 말한다 — 어느 쪽이 '주된' 원인인지 비율로 가르지 않는다.
+    가르려면 임계값(몇 % 이상이면 주범인가)이 필요한데 근거가 없기 때문이다.
+
+        구름이 막은 정시  = 값을 받은 정시 중 총운량 > 50%(STB 밖)인 수
+        강수가 막은 정시  = 강수 예보가 있는 정시 수
+
+    비 1시간·흐림 9시간인 밤을 "비 예보로"라고만 하면 원인이 뒤바뀐다(2026-08-30
+    실제 예보가 그랬다). 둘 다면 둘 다 말한다.
+
+    강수는 **실제 종류**로 부른다(`weather.precip_kind`) — "비·눈"으로 뭉뚱그리면
+    8월 제주에 눈 예보를 말하게 된다.
+    """
+    known = summary["total_hours"] - summary["unknown_hours"]
+    cloudy = max(known - summary["spectroscopic_hours"], 0)
+    w = night_weather or {}
+    rainy = w.get("precipitation_hours") or 0
+    kind = w.get("precipitation_kind") or "비"
+
+    if cloudy and rainy:
+        return f"구름과 {kind} 예보로"
+    if rainy:
+        return f"{kind} 예보로"
+    return "구름으로"
+
+
+def _night_verdict(
+    summary: dict | None,
+    window: dict | None,
+    label: str,
+    night_weather: dict | None = None,
+) -> str:
     """밤 집계를 한 줄 결론으로. 3시간 기준으로 가능/불가를 매기지 않는다 —
     관측 가능한 시간 수라는 사실만 문장으로 압축한다(0시간도 '불가'가 아닌 사실)."""
     if window is None:
@@ -332,11 +375,19 @@ def _night_verdict(summary: dict | None, window: dict | None, label: str) -> str
         known = summary["total_hours"] - summary["unknown_hours"]
         if summary["unknown_hours"] and not known:
             return "밤 기상 정보를 가져오지 못했어요"
-        return f"{label}은 구름으로 별 볼 만한 시간이 거의 없어요"
+        # 막은 것이 무엇인지 이름을 맞춘다 — 비 오는 밤에 "구름으로"라고 하면
+        # 우산을 챙길 이유를 못 읽는다.
+        cause = _blocked_by(summary, night_weather)
+        return f"{label}은 {cause} 별 볼 만한 시간이 거의 없어요"
     return f"{label} 약 {n}시간 관측 가능"
 
 
-def _night_reasons(summary: dict | None, window: dict | None, label: str) -> list[str]:
+def _night_reasons(
+    summary: dict | None,
+    window: dict | None,
+    label: str,
+    night_weather: dict | None = None,
+) -> list[str]:
     """밤 집계의 사람이 읽는 근거. 판정이 아니라 시간 수·분포를 그대로 서술한다."""
     if window is None or summary is None:
         return []
@@ -356,10 +407,19 @@ def _night_reasons(summary: dict | None, window: dict | None, label: str) -> lis
         parts = [f"{g} {h}시간" for g, h in by_grade.items()]
         reasons.append("등급별로는 " + ", ".join(parts) + "예요")
 
-    reasons.append(
-        f"구름이 거의 없는 시간(구름 30% 이하) {summary['photometric_hours']}시간, "
-        f"조금 있는 시간(50% 이하) {summary['spectroscopic_hours']}시간"
+    # PTB/STB 는 Xin et al. 정의 그대로 **순수 운량** 기준이라 강수를 모른다. 정의는
+    # 건드리지 않되, 비 오는 밤에 "구름 거의 없는 시간 10시간"으로 읽히지 않게 기준을
+    # 밝힌다 — 등급과 어긋나 보이는 이유가 여기 있기 때문이다.
+    ptb = (
+        f"구름만 따지면 구름 30% 이하 {summary['photometric_hours']}시간, "
+        f"50% 이하 {summary['spectroscopic_hours']}시간이에요"
     )
+    w = night_weather or {}
+    if w.get("precipitation_hours"):
+        # 조사는 '예보' 뒤에 붙인다 — 종류에 받침이 있고 없고("비"/"눈")에 따라
+        # 은/는을 갈라야 하는 자리를 만들지 않는다.
+        ptb += f" ({w.get('precipitation_kind') or '비'} 예보는 안 따진 수치예요)"
+    reasons.append(ptb)
 
     if summary["unknown_hours"]:
         unknown = summary["unknown_hours"]
@@ -401,8 +461,13 @@ def _evaluate_night(
     # 밝은지·언제 뜨고 지는지·달 없는 시간이 몇 시간인지.
     if result.get("moon") is not None:
         numbers["moon"] = result["moon"]
+    # 기상(기온·체감·바람·강수·하늘 상태)은 판정과 무관한 사실이라 관측 가능 시간이
+    # 0이어도 싣는다 — "갈까 말까"를 정하는 건 등급만이 아니다.
+    night_weather = result.get("weather")
+    if night_weather is not None:
+        numbers["weather"] = night_weather
 
-    reasons = _night_reasons(summary, window, label)
+    reasons = _night_reasons(summary, window, label, night_weather)
     # 어둡기 설명(SQM·야간광·가로등) + 은하수 주의 문구. 관측 가능한 밤일 때만.
     if summary is not None and summary.get("observable_hours"):
         reasons.extend(result.get("darkness_reasons", []))
@@ -413,10 +478,14 @@ def _evaluate_night(
         if caveat:
             reasons.append(caveat)
 
+    # 기상 문장(기온·체감·바람·강수)은 판정 근거 뒤에 붙인다 — 순간 평가에서
+    # comfort_node 가 judge 뒤에 오는 것과 같은 자리다.
+    reasons.extend(weather.describe_night(night_weather))
+
     reasons.append(_forecast_caveat(when))
 
     return Response(
-        verdict=_night_verdict(summary, window, label),
+        verdict=_night_verdict(summary, window, label, night_weather),
         reasons=reasons,
         numbers=numbers,
         attribution=result.get("attribution", []),
@@ -1234,10 +1303,15 @@ def recommend_spots(
     rows = []
     for s, final in top:
         row = _spot_row(s, route=routes.get(s.name))
+        nums = final.get("numbers", {})
         row["verdict"] = final.get("verdict") or "불가"
-        row["cloud_cover"] = final.get("numbers", {}).get("cloud_cover")
-        row["darkness_score"] = final.get("numbers", {}).get("darkness_score")
-        row["bortle"] = final.get("numbers", {}).get("bortle")
+        row["cloud_cover"] = nums.get("cloud_cover")
+        # 하늘 상태·기온은 곳마다 다르다(제주는 한라산을 사이에 두고 갈리고, 표고
+        # 차이가 기온을 5도까지 벌린다). 목록에서 바로 비교되도록 곳마다 싣는다.
+        row["sky"] = nums.get("sky")
+        row["temperature_c"] = nums.get("temperature_c")
+        row["darkness_score"] = nums.get("darkness_score")
+        row["bortle"] = nums.get("bortle")
         rows.append(row)
 
     # 지도 — 고른 곳들을 한 장에. 주행 경로는 긋지 않는다(섬 전체로 줌아웃된다).
@@ -1382,6 +1456,13 @@ def _recommend_verdict(rows: list[dict], conditions: str) -> str:
     """
     if not rows:
         return f"{conditions} — 조건에 맞는 관측지를 찾지 못했어요"
+    # 비 오는 밤에는 고른 곳이 전부 '불가'로 나온다. 그때도 "추천드립니다"라고 하면
+    # 목록을 보고 나서야 못 본다는 걸 알게 된다 — 결론에서 먼저 말한다.
+    if all(r.get("verdict") == judge.IMPOSSIBLE for r in rows):
+        return (
+            f"{conditions} — 조건에 맞는 곳 {len(rows)}곳을 찾았지만, "
+            "지금은 어디서도 별을 보기 어려워요"
+        )
     return f"{conditions} — 조건에 맞는 관측지 {len(rows)}곳을 추천드립니다"
 
 

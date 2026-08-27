@@ -54,6 +54,32 @@ _URL = "https://api.open-meteo.com/v1/forecast"
 #: 않으면서 URL 은 안정적이다. **좌표를 격자 칸으로 옮기지는 않는다** — 이유는 `snap`.
 COORD_DECIMALS = 4
 
+#: 요청할 시간별 변수. **순서가 곧 응답의 변수 인덱스**이므로 함부로 섞지 않는다.
+#: 8개다 — Open-Meteo 의 가중 기준(10개 초과)에 걸리지 않아 요금은 2개일 때와 같다.
+_HOURLY: tuple[str, ...] = (
+    "cloud_cover",
+    "visibility",
+    "temperature_2m",
+    "apparent_temperature",
+    "relative_humidity_2m",
+    "wind_speed_10m",
+    "precipitation_probability",
+    "weather_code",
+)
+
+#: Open-Meteo 변수명 → 이 모듈이 돌려주는 키. 단위를 이름에 박아 둔다 — 부르는 쪽이
+#: `wind` 를 km/h 로 읽는 사고를 막는다.
+_KEYS: dict[str, str] = {
+    "cloud_cover": "cloud_cover",
+    "visibility": "visibility",
+    "temperature_2m": "temperature_c",
+    "apparent_temperature": "apparent_c",
+    "relative_humidity_2m": "humidity_pct",
+    "wind_speed_10m": "wind_ms",
+    "precipitation_probability": "precipitation_probability_pct",
+    "weather_code": "weather_code",
+}
+
 #: 캐시 창을 가르는 기준 시각(KST). 밤은 자정을 넘으므로 달력 하루로 자르면 한 밤이
 #: 두 창으로 갈려 호출이 두 배가 된다. 정오에 끊어 한 밤이 한 창에 들어오게 한다.
 _ANCHOR_HOUR = 12
@@ -84,6 +110,16 @@ def _clean(v) -> float | None:
         return None
     f = float(v)
     return None if math.isnan(f) else f
+
+
+def _clean_code(v) -> int | None:
+    """WMO 기상 코드를 int 로. 결측이면 None.
+
+    응답이 float 로 오므로(numpy 배열) 정수로 되돌린다 — 코드는 눈금이 아니라
+    **범주값**이라, 반올림된 소수로 두면 해석표(`core.weather.WMO_LABEL`)에서 빗나간다.
+    """
+    f = _clean(v)
+    return None if f is None else int(round(f))
 
 
 def snap(lat: float, lon: float) -> tuple[float, float]:
@@ -138,27 +174,30 @@ def _fetch_window(lat: float, lon: float, w_start: datetime) -> list[dict]:
     params = {
         "latitude": lat,
         "longitude": lon,
-        "hourly": ["cloud_cover", "visibility"],
+        "hourly": list(_HOURLY),
         "timezone": "Asia/Seoul",
+        # 기상청 표기와 맞춘다(한국 사용자는 풍속을 m/s 로 읽는다). 기본값은 km/h 다.
+        "wind_speed_unit": "ms",
         "start_hour": w_start.strftime("%Y-%m-%dT%H:%M"),
         "end_hour": w_end.strftime("%Y-%m-%dT%H:%M"),
     }
     response = _client.weather_api(_URL, params=params)[0]
     h = response.Hourly()
-    clouds = h.Variables(0).ValuesAsNumpy()
-    viss = h.Variables(1).ValuesAsNumpy()
+    # 변수는 **요청한 순서대로** 인덱스가 매겨진다. 순서가 어긋나면 기온을 습도라고
+    # 부르게 되므로, 이름과 인덱스를 한자리(`_HOURLY`)에서 함께 정한다.
+    series = {name: h.Variables(i).ValuesAsNumpy() for i, name in enumerate(_HOURLY)}
 
     # 응답은 start_hour 부터 Interval(초) 간격이다. 시각축을 창 시작에서 재구성해
     # UTC 오프셋 계산을 피한다(요청이 로컬 정시 기준이므로 그대로 대응된다).
     step = int(h.Interval()) or 3600
     out: list[dict] = []
     cur = w_start
-    for i in range(len(clouds)):
-        out.append({
-            "time": cur,
-            "cloud_cover": _clean(clouds[i]),
-            "visibility": _clean(viss[i]),
-        })
+    for i in range(len(series["cloud_cover"])):
+        row = {"time": cur}
+        for name, key in _KEYS.items():
+            raw = series[name][i]
+            row[key] = _clean_code(raw) if name == "weather_code" else _clean(raw)
+        out.append(row)
         cur = cur + timedelta(seconds=step)
     return out
 
@@ -193,18 +232,29 @@ def fetch_series(lat: float, lon: float, start: datetime, end: datetime) -> list
     return [r for r in rows if start <= r["time"] < end]
 
 
+def empty_row(when: datetime) -> dict:
+    """값이 전부 None 인 행. 조회가 비었거나 실패했을 때 **모양을 지키려고** 쓴다.
+
+    부르는 쪽(engine)이 결측을 손으로 나열하지 않게 한다 — 변수를 늘릴 때마다 빠뜨릴
+    자리가 생기기 때문이다.
+    """
+    row = {"time": when}
+    row.update({key: None for key in _KEYS.values()})
+    return row
+
+
 def fetch(lat: float, lon: float, when: datetime) -> dict:
-    """when 이 속한 정시의 총운량(%)·시정(m)을 반환한다(단일 시각).
+    """when 이 속한 정시의 기상값을 반환한다(단일 시각).
 
     Returns:
-        {"time": datetime, "cloud_cover": float|None, "visibility": float|None}
+        `fetch_series` 의 행 하나와 같은 모양. 값이 없으면 전부 None.
     """
     when = _require_aware(when)
     hour = when.replace(minute=0, second=0, microsecond=0)
     series = fetch_series(lat, lon, hour, hour + timedelta(hours=1))
     if series:
         return series[0]
-    return {"time": hour, "cloud_cover": None, "visibility": None}
+    return empty_row(hour)
 
 
 # --- 검증 ---------------------------------------------------------------------

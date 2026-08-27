@@ -3,7 +3,7 @@
 관측지 추천 · 별이 보이는지 판정 · 접근성 조회. 외부 LLM이 툴콜로 호출.
 fastmcp v2 + LangGraph / uv / Python 3.13 / 온프레미스.
 
-`server/core` 순수함수(astro·judge·tonight·darkness·routing·spots·mapview) · `clients` 네트워크 ·
+`server/core` 순수함수(astro·judge·weather·tonight·darkness·routing·spots·mapview) · `clients` 네트워크 ·
 `engine/graph.py` 조립 · `tools.py` 도구 본체 · `maps.py` 지도 파일·주소 ·
 `app.py` 진입점(등록·전송) ·
 `scripts` 배치 · `data` 정적(.py 없음)
@@ -21,6 +21,9 @@ fastmcp v2 + LangGraph / uv / Python 3.13 / 온프레미스.
 - 거리를 직선거리로 재기 — 한라산이 가운데라 뒤집힌다. `core/routing.py` 를 쓴다
 - 확인 안 된 도보 경로를 지도에 긋기 — 지도는 글보다 강하게 읽힌다 (`decisions.md` §2.31)
 - `_JUNCTION_S` 를 근거 없이 바꾸기 — `scripts/check_route_calibration.py` 로 재보정한다
+- 기온·바람·습도·강수확률로 등급 바꾸기 — 참고 정보다 (`decisions.md` §2.40).
+  **강수 예보(WMO ≥51)만 예외** — 차폐 축의 두 번째 신호로 '불가' cap (§2.41)
+- 하늘 상태(맑음/비)를 `weather.py` 가 문장으로 말하기 — 해석표만 거기 두고 말은 `judge` 가 한다
 
 ## Done
 `uv run ruff check .` F821 0개 · `uv run pytest` ·

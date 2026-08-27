@@ -255,17 +255,25 @@ def test_등급을_모르는_별자리는_고르지_않는다():
     assert C.highlights(got) == []
 
 
-def test_높이_뜬_것과_낮게_뜬_것을_문장부터_가른다():
-    # Given: 천정 근처와 지평선 근처가 섞여 있을 때
-    got = [_fake("백조자리", 79.0, 1.25), _fake("전갈자리", 3.0, 1.06)]
+def test_높이별로_묶어_말한다():
+    # Given: 천정 근처·중간 높이·지평선 근처가 섞여 있을 때
+    got = [
+        _fake("백조자리", 79.0, 1.25),
+        _fake("독수리자리", 45.0, 0.76),
+        _fake("전갈자리", 3.0, 1.06),
+    ]
     lines = C.describe(got)
-    # Then: 두 문장으로 갈린다. 한 줄에 섞으면 지평선에 걸린 것을 천정의 것과
-    #       같은 무게로 읽게 된다
-    assert len(lines) == 2
-    assert "잘 보이는" in lines[0] and "백조자리" in lines[0]
-    assert "낮게" in lines[1] and "전갈자리" in lines[1]
-    # 그리고 낮은 것에는 단정 대신 단서를 붙인다(지형을 실제로 재지 않으므로)
-    assert "가릴 수 있으니" in lines[1]
+    # Then: 세 문장으로 갈린다. 한 줄에 섞으면 지평선에 걸린 것을 천정의 것과 같은
+    #       무게로 읽게 되고, 별자리마다 "(남쪽 79도)"를 붙이면 숫자가 세 번 나온다
+    assert len(lines) == 3
+    assert "거의 머리 위에" in lines[0] and "백조자리(남)" in lines[0]
+    assert "조금 낮은 하늘" in lines[1] and "독수리자리(남)" in lines[1]
+    assert "낮게" in lines[2] and "전갈자리" in lines[2]
+    # 낮은 것은 지평선 문구와 **같은 단위**(팔 뻗은 손)로 높이를 말한다 —
+    # "남동쪽은 주먹 1개까지 가려요"와 견줘 읽을 수 있어야 한다
+    assert "손가락 세 개" in lines[2]
+    # 그리고 단정 대신 단서를 붙인다(지형을 실제로 재지 않으므로)
+    assert "가릴 수 있으니" in lines[2]
 
 
 def test_지평_아래는_아예_말하지_않는다():

@@ -115,20 +115,21 @@ def test_트인_쪽을_먼저_말한다():
 @pytest.mark.parametrize(
     ("deg", "expected"),
     [
-        pytest.param(0.5, "새끼손가락 하나 높이", id="1도_안팎"),
-        pytest.param(1.9, "새끼손가락 하나 높이", id="손가락_경계_직전"),
-        pytest.param(2.0, "손가락 세 개 높이", id="손가락_세개_경계"),
-        pytest.param(6.9, "손가락 세 개 높이", id="주먹_직전"),
-        pytest.param(7.0, "주먹 1개 높이", id="주먹_경계"),
-        pytest.param(18.0, "주먹 2개 높이", id="한라산_급"),
-        pytest.param(33.0, "주먹 3개 높이", id="아주_높은_차폐"),
+        pytest.param(0.5, "새끼손가락 하나", id="1도_안팎"),
+        pytest.param(1.9, "새끼손가락 하나", id="손가락_경계_직전"),
+        pytest.param(2.0, "손가락 세 개", id="손가락_세개_경계"),
+        pytest.param(6.9, "손가락 세 개", id="주먹_직전"),
+        pytest.param(7.0, "주먹 1개", id="주먹_경계"),
+        pytest.param(18.0, "주먹 2개", id="한라산_급"),
+        pytest.param(33.0, "주먹 3개", id="아주_높은_차폐"),
     ],
 )
 def test_각도를_팔_뻗은_손으로_옮긴다(deg, expected):
     # Given: 팔 뻗은 주먹이 약 10도, 손가락 세 개가 약 5도, 새끼손가락이 약 1도다
     #        (NASA/Chandra 표준 재기법 — 키가 달라도 각도는 비슷하다)
     # Then: "18도"는 측량 용어라 관광객이 읽을 말이 아니다. 현장에서 팔을 뻗어
-    #       맞춰 볼 수 있는 말이라야 안내가 된다
+    #       맞춰 볼 수 있는 말이라야 안내가 된다.
+    #       **단위만** 돌려준다 — "높이"·"팔 뻗은" 꾸밈은 부르는 쪽이 붙인다
     assert horizon.hand_span(deg) == expected
 
 

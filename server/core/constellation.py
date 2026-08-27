@@ -61,12 +61,14 @@ from skyfield.api import Star, wgs84
 
 from server import path
 from server.core.ephem import EPH, TS, require_aware
+from server.core.horizon import hand_span
 
 __all__ = [
     "FIRST_MAGNITUDE",
     "HIGH_ALT_DEG",
     "HORIZON_DEG",
     "NELM_BY_BORTLE",
+    "OVERHEAD_DEG",
     "SOURCES",
     "Constellation",
     "assess",
@@ -104,6 +106,11 @@ NELM_BY_BORTLE: dict[int, float] = {
     8: 4.5,
     9: 4.0,
 }
+
+#: 이 고도 위면 "거의 머리 위"다. 천정(90도)에서 30도 안쪽인데, 그 30도는 지평에서
+#: `HIGH_ALT_DEG` 로 쓰는 것과 같은 눈금이다 — 지평에서 30도가 '지형에 안 가리는
+#: 높이'라면, 천정에서 30도는 '고개를 크게 젖혀야 하는 높이'다.
+OVERHEAD_DEG: float = 90.0 - HIGH_ALT_DEG
 
 #: 1등성의 경계. 등급 체계에서 "1등성 이상"으로 묶는 관례값이며, 눈에 먼저 들어오는
 #: 별들이 여기 든다(베가 0.03 · 리겔 0.18 · 데네브 1.25 · 폴룩스 1.14).
@@ -351,18 +358,26 @@ def describe(got: list[Constellation]) -> list[str]:
     if not top:
         return []
 
-    def _where(c: Constellation) -> str:
-        return f"{c.korean}({c.bearing}쪽 {c.altitude_deg:.0f}도)"
-
     lines: list[str] = []
 
-    # 높이 뜬 것과 낮게 뜬 것을 **문장부터 가른다**. 한 줄에 섞으면 지평선에 걸린
-    # 별자리를 천정의 별자리와 같은 무게로 읽게 된다.
-    high = [c for c in top if not c.low]
-    if high:
-        lines.append(
-            "지금 잘 보이는 별자리는 " + " · ".join(_where(c) for c in high) + "예요"
-        )
+    # 높이로 **묶어서** 말한다. 별자리마다 "(북동쪽 81도)"를 붙이면 다섯 개만 나열해도
+    # 숫자가 다섯 번 나오는데, 60도든 81도든 고개를 크게 젖혀야 하는 것은 같다.
+    # 사용자가 정해야 하는 것은 **어느 쪽을 보고 서나**이므로 방위를 괄호에 남긴다.
+    def _names(cs: list[Constellation]) -> str:
+        return "·".join(f"{c.korean}({c.bearing})" for c in cs)
+
+    overhead = [c for c in top if c.altitude_deg >= OVERHEAD_DEG]
+    if overhead:
+        lines.append(f"거의 머리 위에 {_names(overhead)}가 떠 있어요")
+
+    middle = [c for c in top if not c.low and c.altitude_deg < OVERHEAD_DEG]
+    if middle:
+        lines.append(f"조금 낮은 하늘에는 {_names(middle)}가 있어요")
+
+    # 낮게 뜬 것은 **팔 뻗은 손**으로 높이를 말한다 — 지평선 문구와 같은 단위라야
+    # "주먹 2개까지 가려요 / 주먹 3개 높이에 있어요"를 견줘 읽을 수 있다.
+    def _where(c: Constellation) -> str:
+        return f"{c.korean}({c.bearing}·{hand_span(c.altitude_deg)})"
 
     low = [c for c in top if c.low]
     if low:
@@ -376,7 +391,7 @@ def describe(got: list[Constellation]) -> list[str]:
             else "오름·나무에 가릴 수 있으니 그쪽 지평선이 트인 자리에 서세요"
         )
         lines.append(
-            "낮게 떠 있는 것도 있어요 — " + " · ".join(_where(c) for c in low)
-            + ". " + tail
+            "낮게 떠 있는 것도 있어요 — 팔을 뻗어 재면 "
+            + "·".join(_where(c) for c in low) + " 높이예요. " + tail
         )
     return lines

@@ -108,6 +108,10 @@ _HAND: tuple[tuple[float, str], ...] = (
     (7.0, "손가락 세 개"),      # 약 5도
 )
 
+#: `hand_span` 은 **단위만** 돌려준다("주먹 2개"). "높이"·"팔 뻗은" 같은 꾸밈은 부르는
+#: 쪽이 붙인다 — 지평선은 "팔 뻗은 주먹 2개 높이까지 가려요"로 한 번 말하지만, 별자리는
+#: 여럿을 나열하므로("남동·주먹 3개") 매번 붙이면 문장이 꾸밈으로 뒤덮인다.
+
 #: 팔 뻗은 주먹 하나의 각(도).
 FIST_DEG: float = 10.0
 
@@ -119,15 +123,15 @@ OPEN_DEG: float = 1.0
 # --- 순수 계산 ----------------------------------------------------------------
 
 def hand_span(deg: float) -> str:
-    """고도각(도)을 **팔 뻗은 손**으로 옮긴다 — "주먹 2개 높이".
+    """고도각(도)을 **팔 뻗은 손**의 단위로 옮긴다 — "주먹 2개".
 
     현장에서 팔을 뻗어 맞춰 볼 수 있는 말이라야 안내가 된다. 주먹 하나가 10도이므로
     지형 차폐(대개 0~25도)는 주먹 한두 개로 떨어지고, 그보다 낮으면 손가락으로 센다.
     """
     for edge, label in _HAND:
         if deg < edge:
-            return f"{label} 높이"
-    return f"주먹 {max(round(deg / FIST_DEG), 1):.0f}개 높이"
+            return label
+    return f"주먹 {max(round(deg / FIST_DEG), 1):.0f}개"
 
 
 def drop_m(distance_m: float | np.ndarray) -> float | np.ndarray:
@@ -227,7 +231,7 @@ def describe(prof: dict[str, float] | None) -> list[str]:
     if worst[1] < FIST_DEG:
         return [
             f"사방이 거의 트여 있어요 — 가장 높은 {worst[0]}쪽도 팔 뻗은 "
-            f"{hand_span(worst[1])}예요 ({worst[1]:.0f}도)",
+            f"{hand_span(worst[1])} 높이예요 ({worst[1]:.0f}도)",
             _CANOPY_NOTE,
         ]
 
@@ -237,7 +241,7 @@ def describe(prof: dict[str, float] | None) -> list[str]:
     # 각도는 괄호에 남긴다 — 문장은 사람이 읽고, 수치는 `numbers.horizon` 과 함께
     # 호출자가 쓴다. 이 프로젝트가 "총운량 33%"를 괄호로 다는 것과 같은 모양이다.
     line += (
-        f"{worst[0]}쪽은 산이 팔 뻗은 {hand_span(worst[1])}까지 가려요 "
+        f"{worst[0]}쪽은 산이 팔 뻗은 {hand_span(worst[1])} 높이까지 가려요 "
         f"({worst[1]:.0f}도)"
     )
     return [line, _CANOPY_NOTE]

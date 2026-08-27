@@ -3,7 +3,7 @@
 관측지 추천 · 별이 보이는지 판정 · 접근성 조회. 외부 LLM이 툴콜로 호출.
 fastmcp v2 + LangGraph / uv / Python 3.13 / 온프레미스.
 
-`server/core` 순수함수(astro·ephem·judge·weather·moon·constellation·tonight·darkness·routing·spots·mapview) ·
+`server/core` 순수함수(astro·ephem·judge·weather·moon·constellation·horizon·tonight·darkness·routing·spots·mapview) ·
 `clients` 네트워크 ·
 `engine/graph.py` 조립 · `tools.py` 도구 본체 · `maps.py` 지도 파일·주소 ·
 `app.py` 진입점(등록·전송) ·
@@ -27,6 +27,7 @@ fastmcp v2 + LangGraph / uv / Python 3.13 / 온프레미스.
 - 하늘 상태(맑음/비)를 `weather.py` 가 문장으로 말하기 — 해석표만 거기 두고 말은 `judge` 가 한다
 - 별자리 목록을 개수로 자르기 — 1등성(V≤1.5)으로 거른다. "상위 3개"는 근거가 없다 (§2.42)
 - 별 개수("오늘 밤 별 N개") 되살리기 — 폐기했다 (§2.14). 이름과 방향으로 답한다
+- 지형 지평선을 단정으로 말하기 — 격자는 맨땅이라 방풍림·건물이 빠져 있다 (§2.43)
 
 ## Done
 `uv run ruff check .` F821 0개 · `uv run pytest` ·

@@ -39,10 +39,15 @@ IAU 경계의 무게중심을 쓰지 않는다. 큰 별자리일수록 중심이
 `cloud.py` 가 관측 시야를 잡을 때 쓰는 것과 같다("그 아래는 지형/수목에 가려지는 경우가
 많아 제외"). 새 눈금을 만들지 않고 프로젝트 안에서 이미 근거를 밝힌 값을 재사용한다.
 
-**지형을 실제로 재지는 않는다.** 표고 격자로 방위별 지평선을 계산하면 "이 자리에서는
-남쪽이 한라산에 막힌다"까지 답할 수 있지만, 아직 하지 않았다. 그래서 낮게 뜬 별자리는
-단정하지 않고 *가릴 수 있다*고만 말한다 — 확인 안 된 것을 확인된 것처럼 말하지 않는
-규율(`decisions.md` §2.31)과 같은 자리다.
+**지형을 재면 '가릴 수 있다'가 '막혀 있다'가 된다.** `horizon.profile` 이 낸 방위별
+지평선을 넘겨받으면(`assess(..., horizon=...)`), 그 방위의 지평선보다 낮은 별자리는
+`blocked` 가 된다 — 영실입구 주차장은 북동쪽이 한라산에 18도까지 막혀 있어, 그쪽
+15도에 뜬 별자리는 하늘에 있어도 보이지 않는다.
+
+지평선을 안 받으면 예전처럼 *가릴 수 있다*고만 말한다(배포 컨테이너에는 표고 격자가
+없다). 받았더라도 격자는 **맨땅**이라 방풍림·건물은 안 잡히므로, 막히지 않았다고 나온
+방위도 현장은 더 막혀 있을 수 있다 — 확인 안 된 것을 확인된 것처럼 말하지 않는
+규율(`decisions.md` §2.31)이 여전히 적용된다.
 """
 
 from __future__ import annotations
@@ -201,6 +206,7 @@ class Constellation:
     visible_stars: 이 하늘에서 맨눈에 잡히는 별 수(한계등급보다 밝은 것).
     total_stars:   별자리를 이루는 별 수(등급을 아는 것만).
     brightest:     가장 밝은 별의 등급. 없으면 None.
+    horizon_deg:   그 방위의 지형 지평선(도). 안 받았으면 None.
     """
 
     abbr: str
@@ -213,6 +219,20 @@ class Constellation:
     visible_stars: int
     total_stars: int
     brightest: float | None
+    horizon_deg: float | None = None
+
+    @property
+    def blocked(self) -> bool:
+        """지평 위에 있지만 **지형에 가려** 안 보이는가.
+
+        지평선을 안 받았으면 모르는 것이므로 False 다 — 모르는 것을 막혔다고
+        하면 볼 수 있는 별자리를 지워 버린다.
+        """
+        return (
+            self.horizon_deg is not None
+            and self.altitude_deg > HORIZON_DEG
+            and self.altitude_deg < self.horizon_deg
+        )
 
     @property
     def up(self) -> bool:
@@ -229,9 +249,9 @@ class Constellation:
         """이 하늘에서 별자리라고 알아볼 만한가.
 
         가장 밝은 별 하나만 걸리는 것으로는 '별자리가 보인다'고 하지 않는다 —
-        선을 이으려면 별이 둘 이상 필요하다.
+        선을 이으려면 별이 둘 이상 필요하다. 지형에 가린 것도 빠진다.
         """
-        return self.up and self.visible_stars >= 2
+        return self.up and not self.blocked and self.visible_stars >= 2
 
 
 # --- 보조 --------------------------------------------------------------------
@@ -255,6 +275,7 @@ def assess(
     lon: float,
     when: datetime,
     bortle: int | None = None,
+    horizon: dict[str, float] | None = None,
 ) -> list[Constellation]:
     """(lat, lon, when) 에서 본 별자리 전부. 고도 높은 순으로 돌려준다.
 
@@ -263,6 +284,8 @@ def assess(
         when: 관측 시각(tz-aware).
         bortle: 그 하늘의 Bortle 등급. 달빛까지 반영하려면 `darkness.assess_sky` 의
                 값을 넘긴다 — 그러면 달이 뜬 시각에 보이는 별자리가 저절로 줄어든다.
+        horizon: 방위별 지형 지평선(`horizon.profile`). 넘기면 그보다 낮은 별자리가
+                `blocked` 가 된다. 안 넘기면 지형을 모르는 것으로 둔다.
 
     Returns:
         88개(데이터가 있는 것) 전부. 지평 아래인 것도 담아 돌려준다 — 거르는 기준은
@@ -280,6 +303,7 @@ def assess(
     out: list[Constellation] = []
     for i, c in enumerate(_PREPARED):
         mags = c["mags"]
+        bearing = bearing_ko(float(azs[i]))
         out.append(
             Constellation(
                 abbr=c["abbr"],
@@ -288,10 +312,11 @@ def assess(
                 korean=c["korean"],
                 altitude_deg=round(float(alts[i]), 1),
                 azimuth_deg=round(float(azs[i]), 1),
-                bearing=bearing_ko(float(azs[i])),
+                bearing=bearing,
                 visible_stars=sum(1 for m in mags if m <= limit),
                 total_stars=len(mags),
                 brightest=mags[0] if mags else None,
+                horizon_deg=None if horizon is None else horizon.get(bearing),
             )
         )
     out.sort(key=lambda c: c.altitude_deg, reverse=True)
@@ -339,12 +364,19 @@ def describe(got: list[Constellation]) -> list[str]:
             "지금 잘 보이는 별자리는 " + " · ".join(_where(c) for c in high) + "예요"
         )
 
-    # 지형을 실제로 재지 않으므로 단정하지 않고 *가릴 수 있다*고만 말한다
-    # (모듈 docstring).
     low = [c for c in top if c.low]
     if low:
+        # 지형을 쟀느냐에 따라 할 말이 다르다. 쟀으면 여기 남은 것들은 **지형을 이미
+        # 통과한** 별자리다 — 그런데도 "오름에 가릴 수 있어요"라고 하면 방금 한 계산을
+        # 스스로 부정하는 말이 된다. 안 쟀으면 단정하지 않는다(모듈 docstring).
+        measured = any(c.horizon_deg is not None for c in low)
+        tail = (
+            "지형은 넘겼지만 낮아서 나무·건물에는 가릴 수 있어요"
+            if measured
+            else "오름·나무에 가릴 수 있으니 그쪽 지평선이 트인 자리에 서세요"
+        )
         lines.append(
             "낮게 떠 있는 것도 있어요 — " + " · ".join(_where(c) for c in low)
-            + ". 오름·나무에 가릴 수 있으니 그쪽 지평선이 트인 자리에 서세요"
+            + ". " + tail
         )
     return lines

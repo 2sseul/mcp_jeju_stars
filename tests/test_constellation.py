@@ -274,3 +274,62 @@ def test_지평_아래는_아예_말하지_않는다():
     # Then: 목록에도 문장에도 없다 — "남쪽을 보세요"라고 하면 영영 못 볼 것을 시킨다
     assert C.highlights(got) == []
     assert C.describe(got) == []
+
+
+# --- 지형에 가린 것 (decisions.md §2.43) ------------------------------------------
+
+
+def _with_horizon(c: C.Constellation, deg: float | None) -> C.Constellation:
+    from dataclasses import replace
+    return replace(c, horizon_deg=deg)
+
+
+def test_지평선보다_낮으면_가린_것으로_본다():
+    # Given: 북동쪽 18도까지 막힌 자리(영실)에서 그쪽 15도에 뜬 별자리
+    c = _with_horizon(_fake("어떤자리", 15.0, 1.0), 18.0)
+    # Then: 하늘에는 있지만 보이지 않는다 — 목록에서도 빠진다
+    assert c.up
+    assert c.blocked
+    assert not c.naked_eye
+
+
+def test_지평선보다_높으면_가리지_않는다():
+    # Given: 같은 자리에서 20도에 뜬 별자리
+    c = _with_horizon(_fake("어떤자리", 20.0, 1.0), 18.0)
+    # Then: 지형을 넘겼으므로 보인다
+    assert not c.blocked
+    assert c.naked_eye
+
+
+def test_지형을_모르면_막혔다고_하지_않는다():
+    # Given: 표고 격자가 없어 지평선을 못 받은 경우
+    c = _with_horizon(_fake("어떤자리", 3.0, 1.0), None)
+    # Then: 모르는 것을 막혔다고 하면 볼 수 있는 별자리를 지워 버린다
+    assert not c.blocked
+    assert c.naked_eye
+
+
+def test_지평_아래는_가린_것이_아니라_진_것이다():
+    # Given: 이미 진 별자리에 지평선을 주면
+    c = _with_horizon(_fake("어떤자리", -10.0, 1.0), 5.0)
+    # Then: blocked 가 아니다 — 지형이 가린 것과 지구 반대편에 있는 것은 다르다
+    assert not c.up
+    assert not c.blocked
+
+
+def test_지형을_쟀으면_낡은_단서를_말하지_않는다():
+    # Given: 지형을 잰 자리에서 낮게 뜬 별자리가 남아 있을 때
+    #        (남아 있다는 것은 이미 지형을 통과했다는 뜻이다)
+    got = [_with_horizon(_fake("어떤자리", 12.0, 1.0), 5.0)]
+    lines = C.describe(got)
+    # Then: "오름에 가릴 수 있어요"라고 하면 방금 한 계산을 스스로 부정하는 말이 된다
+    assert any("지형은 넘겼지만" in x for x in lines)
+    assert not any("오름·나무에 가릴 수 있으니" in x for x in lines)
+
+
+def test_지형을_안_쟀으면_단정하지_않는다():
+    # Given: 지평선을 못 받은 자리에서 낮게 뜬 별자리
+    got = [_fake("어떤자리", 12.0, 1.0)]
+    lines = C.describe(got)
+    # Then: 확인 안 된 것을 확인된 것처럼 말하지 않는다(§2.31)
+    assert any("가릴 수 있으니" in x for x in lines)

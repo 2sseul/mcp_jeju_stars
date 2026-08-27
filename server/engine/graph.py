@@ -18,6 +18,8 @@ from server.clients import open_meteo
 from server.core import astro
 from server.core import constellation as _constellation
 from server.core import darkness as _darkness
+from server.core import elevation as _elevation
+from server.core import horizon as _horizon
 from server.core import judge as _judge
 from server.core import lamps as _lamps
 from server.core import moon as _moon
@@ -133,6 +135,10 @@ def constellation_node(state: EngineState) -> dict:
 
     한계등급은 **달빛까지 더한** 하늘밝기에서 낸다(`sky_sqm`). 그래서 보름달 밤에는
     잡히는 별이 저절로 줄어든다. 달빛을 못 구했으면 정적 광공해 등급으로 물러선다.
+
+    지형 지평선(`horizon.profile`)도 함께 넘긴다 — 그러면 하늘에 떠 있어도 오름·한라산에
+    가린 별자리가 목록에서 빠진다. 표고 격자가 없는 배포에서는 지평선이 None 이라
+    예전처럼 "가릴 수 있어요"까지만 말한다.
     """
     if state.get("state_code") not in _WEATHER_STATES:
         return {}
@@ -141,8 +147,9 @@ def constellation_node(state: EngineState) -> dict:
     sqm = nums.get("sky_sqm")
     bortle = _darkness.bortle_of(sqm) if sqm is not None else nums.get("bortle")
 
+    prof = _horizon.profile(state["lat"], state["lon"])
     got = _constellation.assess(
-        state["lat"], state["lon"], state["when"], bortle
+        state["lat"], state["lon"], state["when"], bortle, horizon=prof
     )
     # 알아볼 만한 것만 싣는다. 지평 아래·너무 흐린 것까지 실으면 88개가 그대로 나가
     # 호출자가 읽을 것이 아니라 걸러낼 것을 받게 된다.
@@ -156,10 +163,17 @@ def constellation_node(state: EngineState) -> dict:
         }
         for c in got if c.naked_eye
     ]
+    numbers: dict = {"constellations": rows}
+    attribution = list(_constellation.SOURCES)
+    reasons = _constellation.describe(got)
+    if prof is not None:
+        numbers["horizon"] = prof
+        reasons.extend(_horizon.describe(prof))
+        attribution.append(_elevation.SOURCE)
     return {
-        "numbers": {"constellations": rows},
-        "reasons": _constellation.describe(got),
-        "attribution": list(_constellation.SOURCES),
+        "numbers": numbers,
+        "reasons": reasons,
+        "attribution": attribution,
     }
 
 

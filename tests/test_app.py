@@ -14,8 +14,8 @@ import inspect
 
 import pytest
 
-from server import routes, tools
 from app import mcp
+from server import routes, tools
 
 TOOLS = {"recommend_spots", "evaluate_place", "spot_details"}
 

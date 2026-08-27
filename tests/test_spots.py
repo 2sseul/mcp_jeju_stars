@@ -75,17 +75,32 @@ def test_등산_없는_곳_거르기는_등반을_전부_뺀다():
     assert 0 < len(kept) < len(spots.all_spots())
 
 
-def test_도보_시간을_모르는_곳은_거르지_않는다():
+def test_도보를_물었으면_모르는_곳은_답이_아니다():
     # Given: walk_minutes 가 없는 곳이 데이터에 있을 때
     unknown = [s for s in spots.all_spots() if s.walk_minutes is None]
     if not unknown:
         pytest.skip("도보 시간이 없는 관측지가 데이터에 없다")
-    # When: 도보 0분 이하로 좁히면
-    kept = spots.filter_spots(max_walk_minutes=0.0)
-    # Then: 모르는 곳은 남아 있다. 모르는 것과 오래 걸리는 것은 다르다 —
-    #       모른다고 빼 버리면 사용자가 그 곳의 존재조차 못 본다
+    # When: 도보 시간으로 좁히면
+    kept = spots.filter_spots(max_walk_minutes=10.0)
+    # Then: 모르는 곳은 빠진다. 일반적으로는 모르는 것과 오래 걸리는 것이 다르지만,
+    #       **질문 자체가 "얼마나 걷나"** 일 때 모르는 곳은 답이 될 수 없다
+    #       (반려동물 조건과 같은 판단)
     for s in unknown:
-        assert s in kept, s.name
+        assert s not in kept, s.name_ko
+
+
+def test_도보_0분은_주차하고_바로를_뜻한다():
+    # Given: 실측 도보 시간이 정확히 0인 곳은 하나도 없다(최소 0.10분)
+    assert all(
+        s.walk_minutes is None or s.walk_minutes > 0 for s in spots.all_spots()
+    )
+    # When: 도구 설명이 광고하는 대로 0 을 주면
+    kept = spots.filter_spots(max_walk_minutes=0.0)
+    # Then: 빈 목록이 아니라 "주차하고 바로 보는 곳"(1분 미만)이 남는다.
+    #       글자 그대로 0 으로 자르면 물어본 것과 정반대가 된다 — 거르는 쪽을
+    #       말하는 쪽(`tools._walk_phrase`)과 같은 문턱에 맞춘 것이다
+    assert kept
+    assert all(s.walk_minutes <= spots.IMMEDIATE_WALK_MIN for s in kept)
 
 
 def test_거르기_조건을_안_주면_전부_돌려준다():

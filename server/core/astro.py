@@ -15,49 +15,30 @@ skyfield.almanac.dark_twilight_day 의 구간 값(0~4)을 가공 없이 그대�
 직녀성·견우성 같은 밝은 별은 보인다 — 그런 정책은 이 모듈이 아니라 judge()가
 원시 상태값(0~4)을 받아 결정한다. 그래서 여기서는 상태를 깎지 않고 그대로 준다.
 
-날씨·달·별자리 계산은 이 모듈의 소관이 아니다.
+날씨·별자리 계산은 이 모듈의 소관이 아니다 — 달빛은 `moon.py`.
+성표 파일을 여는 곳은 `ephem.py` 한 곳이다(태양과 달이 같은 파일을 읽는다).
 모든 datetime 입출력은 tz-aware(Asia/Seoul) 이다.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
 
 from skyfield import almanac
-from skyfield.api import Loader, wgs84
+from skyfield.api import wgs84
 
-from server import path
-
-if not path.EPHEM.exists():
-    raise FileNotFoundError(f"성표 없음: {path.EPHEM}")
-
-_loader = Loader(str(path.EPHEM.parent))
-_ts = _loader.timescale()
-_eph = _loader("de421.bsp")
+from .ephem import EPH as _eph
+from .ephem import TS as _ts
+from .ephem import require_aware as _require_aware
+from .ephem import span as _span
+from .ephem import to_kst as _to_kst
 
 # --- 상수 및 1회 초기화 -------------------------------------------------------
 
-KST = ZoneInfo("Asia/Seoul")
-
 #: 천체력이 실제로 덮는 날짜 범위. DE421 은 무한하지 않아(대략 1900~2053) 범위 밖
 #: 시각을 계산하면 skyfield 가 EphemerisRangeError 를 던진다. 하드코딩하지 않고
-#: 로드된 파일의 세그먼트에서 직접 읽어, 천체력을 교체해도 값이 따라오게 한다.
-def _ephemeris_span() -> tuple[datetime, datetime]:
-    """로드된 천체력이 덮는 [시작, 끝] 을 KST datetime 으로 돌려준다.
-
-    세그먼트마다 범위가 달라 **교집합**(가장 늦은 시작 ~ 가장 이른 끝)을 취한다.
-    한 세그먼트라도 범위를 벗어나면 계산이 실패하기 때문이다.
-    """
-    lo = max(seg.spk_segment.start_jd for seg in _eph.segments)
-    hi = min(seg.spk_segment.end_jd for seg in _eph.segments)
-    return (
-        _ts.tdb_jd(lo).utc_datetime().astimezone(KST),
-        _ts.tdb_jd(hi).utc_datetime().astimezone(KST),
-    )
-
-
-EPHEM_START, EPHEM_END = _ephemeris_span()
+#: 로드된 파일의 세그먼트에서 읽으므로(`ephem.span`) 천체력을 교체해도 값이 따라온다.
+EPHEM_START, EPHEM_END = _span()
 
 
 def supports(when: datetime) -> bool:
@@ -75,23 +56,13 @@ _NIGHTISH_MAX = 2
 
 
 # --- 내부 헬퍼 ----------------------------------------------------------------
-
-def _require_aware(when: datetime) -> datetime:
-    """tz-aware 인지 검증하고 Asia/Seoul 기준으로 정규화한다."""
-    if when.tzinfo is None or when.tzinfo.utcoffset(when) is None:
-        raise ValueError("when 은 tz-aware(Asia/Seoul) datetime 이어야 합니다.")
-    return when.astimezone(KST)
-
+# 시각 변환·검증은 `ephem.py` 것을 쓴다 — 태양과 달이 같은 규칙을 써야 두 축의
+# 시각이 어긋나지 않는다.
 
 def _twilight_fn(lat: float, lon: float):
     """주어진 좌표에 대한 dark_twilight_day 시간 함수를 만든다."""
     observer = wgs84.latlon(lat, lon)
     return almanac.dark_twilight_day(_eph, observer)
-
-
-def _to_kst(t) -> datetime:
-    """skyfield Time 을 Asia/Seoul tz-aware datetime 으로 변환한다."""
-    return t.utc_datetime().astimezone(KST)
 
 
 def _segments(fn, start: datetime, end: datetime) -> list[tuple[datetime, int]]:

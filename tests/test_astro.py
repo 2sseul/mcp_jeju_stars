@@ -11,12 +11,12 @@ from datetime import datetime, timedelta
 import pytest
 
 from server.core.astro import (
-    KST,
     dark_window,
     next_dark_start,
     night_window,
     twilight_state,
 )
+from server.core.ephem import KST
 
 JEJU_LAT, JEJU_LON = 33.5097, 126.5219
 

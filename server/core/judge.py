@@ -21,6 +21,13 @@ clear sky 를 "운량 10% 미만 AND 투과율 변동 10% 미만" 으로 두 조
 물리량(인공 광원)을 다른 규모로 잰 값이라 합치는 것이 성립하지만, 구름·박명은 성격이
 다른 축이라 여전히 합치지 않는다.
 
+**달빛도 같은 자리에 상한으로 들어온다**(`moon_cap` 인자). 달빛은 광공해와 같은 물리량
+(하늘 배경 밝기)이라 `darkness.assess_sky` 가 둘을 합쳐 상한 하나로 만들어 주지만, 이
+모듈은 두 상한을 따로 받는다 — **어느 쪽이 등급을 깎았는지 문구가 달라야** 하기 때문이다.
+광공해는 "더 어두운 곳으로 가면 나아진다"가 성립하고, 달은 제주 전역에 균일하게 뜨므로
+자리를 옮겨도 소용이 없다(대신 달이 진 뒤나 다른 날짜다). 원인을 뭉뚱그리면 사용자가
+헛걸음한다.
+
 
 1. 어둡기 축
 --------------------------------------------------------------------------
@@ -93,6 +100,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
+from server.core import weather as _weather
+
 # --- 임계값 (전부 문헌값, 튜닝 대상 아님) -------------------------------------
 
 #: ESO clear sky. Kerber et al. 2014.
@@ -110,6 +119,10 @@ SPECTROSCOPIC_PCT: float = 50.0
 VISIBILITY_FOG_M: float = 1_000.0
 VISIBILITY_HAZE_M: float = 10_000.0
 
+#: 미국 기상청(NWS) 강수확률(PoP) 표현 대응표에서 "Likely" 가 시작하는 값.
+#: 국가기상기관이 "비가 올 것 같다"고 말하기 시작하는 지점이다. 등급은 안 바꾼다.
+PRECIP_LIKELY_PCT: float = 60.0
+
 # --- 판정 등급 ----------------------------------------------------------------
 
 OPTIMAL = "최적"
@@ -125,7 +138,7 @@ _BY_RANK = {v: k for k, v in _RANK.items()}
 
 #: 태양 고도 상태 → (등급, 사람이 읽는 하늘 설명). 근거: 모듈 docstring 1절.
 _SKY = {
-    0: (OPTIMAL, "완전한 밤이라 은하수·성운까지 볼 수 있어요"),
+    0: (OPTIMAL, "완전히 어두워져서 은하수까지 볼 수 있어요"),
     1: (GOOD, "하늘이 충분히 어두워 대부분의 별이 보여요"),
     2: (LIMITED, "아직 완전히 어둡진 않지만 밝은 별과 별자리는 보이기 시작해요"),
     3: (IMPOSSIBLE, "해가 진 지 얼마 안 돼 하늘이 밝아요 — 가장 밝은 별·행성만 겨우 보입니다"),
@@ -146,6 +159,32 @@ def _km(m: float) -> str:
 #: 경계 비교용 허용오차. 예보값이 부동소수점이라 정확히 경계값인 입력(30.0 등)이
 #: 표현 오차로 한 단계 아래 등급으로 떨어지는 것을 막는다.
 _EPS: float = 1e-9
+
+
+def _precip_msg(code: int | None, prob: float | None) -> str:
+    """강수로 '불가'가 됐을 때의 사유 문장. 무엇이 내리는지(WMO 라벨)를 밝힌다.
+
+    앞에서 이미 정확한 이름("약한 이슬비")을 불렀으므로 뒤에 "비나 눈이 내리면" 같은
+    일반 서술을 덧붙이지 않는다 — 8월에 눈을 말하게 되고, 같은 말을 두 번 하게 된다.
+    """
+    label = _weather.sky_label(code) or "강수"
+    tail = f" (강수확률 {prob:.0f}%)" if prob is not None else ""
+    return f"{label} 예보라 하늘이 덮여 있어요{tail} — 별은 보기 어려워요"
+
+
+def _precip_risk_msg(code: int | None, prob: float | None) -> str | None:
+    """강수 **예보는 없지만 확률이 높은** 정시의 경고 문장. 등급은 안 바꾼다(5절).
+
+    강수 예보가 있는 정시는 이미 '불가'로 끝났으므로 여기 오지 않는다.
+    """
+    if prob is None or prob < PRECIP_LIKELY_PCT:
+        return None
+    label = _weather.sky_label(code)
+    where = f"지금은 '{label}' 예보지만 " if label else ""
+    return (
+        f"{where}비가 올 가능성이 높아요 (강수확률 {prob:.0f}%) "
+        "— 하늘이 갑자기 닫힐 수 있으니 서둘러 보세요"
+    )
 
 
 def _ladder(pct: float) -> str:
@@ -192,8 +231,11 @@ def judge(
     cloud_cover: float | None,
     visibility_m: float | None,
     darkness_cap: str | None = None,
+    moon_cap: str | None = None,
+    weather_code: int | None = None,
+    precip_prob_pct: float | None = None,
 ) -> Judgement:
-    """태양 고도 상태·총운량·시정으로 관측 등급을 판정한다.
+    """태양 고도 상태·총운량·강수·시정으로 관측 등급을 판정한다.
 
     Args:
         state: astro.twilight_state 값(0=완전한 밤 ~ 4=낮).
@@ -202,6 +244,11 @@ def judge(
         visibility_m: 시정(m). 없으면 None.
         darkness_cap: 광공해가 정한 등급 **상한**(darkness.cap_of 반환값). None 이면
                      제한 없음. 등급을 끌어내리기만 하고 올리지는 않는다.
+        moon_cap: 달빛까지 더한 하늘이 정한 등급 **상한**(darkness.assess_sky 의 cap).
+                 None 이면 제한 없음. darkness_cap 과 같은 방식으로 끌어내리기만 한다.
+        weather_code: WMO 4677 기상 코드. 51 이상(강수)이면 차폐 축을 '불가'로
+                     끌어내린다 — 총운량과 어긋나도 강수 쪽을 따른다(docstring 2절).
+        precip_prob_pct: 강수확률(%). **등급을 바꾸지 않고** 문구만 더한다(5절).
 
     Returns:
         Judgement(verdict, possible, reasons).
@@ -214,7 +261,13 @@ def judge(
     if sky_verdict == IMPOSSIBLE:
         return Judgement(IMPOSSIBLE, False, [sky_msg])
 
-    # 결측은 '불가' 가 아니라 '알 수 없음' 이다(모듈 docstring 5절).
+    # 강수는 총운량보다 강한 진술이라 결측 검사보다 **먼저** 본다(docstring 6절).
+    if _weather.is_precipitating(weather_code):
+        return Judgement(
+            IMPOSSIBLE, False, [_precip_msg(weather_code, precip_prob_pct)]
+        )
+
+    # 결측은 '불가' 가 아니라 '알 수 없음' 이다(모듈 docstring 6절).
     if cloud_cover is None:
         return Judgement(UNKNOWN, None, [sky_msg, "구름 정보를 가져오지 못했어요"])
 
@@ -223,41 +276,55 @@ def judge(
     # 어둡기 축과 차폐 축 중 나쁜 쪽을 따른다.
     verdict = _BY_RANK[max(_RANK[sky_verdict], _RANK[cloud_grade])]
 
-    # 광공해 상한도 같은 방식으로 나쁜 쪽만 취한다 — 끌어내리기만 하고 올리지 않는다.
-    # (구름이 '불가'인데 어두운 장소라고 '양호'로 올라가면 안 된다.)
-    capped = verdict
-    if darkness_cap in _RANK:
-        capped = _BY_RANK[max(_RANK[verdict], _RANK[darkness_cap])]
+    # 광공해·달빛 상한도 같은 방식으로 나쁜 쪽만 취한다 — 끌어내리기만 하고 올리지
+    # 않는다. (구름이 '불가'인데 어두운 장소라고 '양호'로 올라가면 안 된다.)
+    caps = [_RANK[c] for c in (darkness_cap, moon_cap) if c in _RANK]
+    capped = _BY_RANK[max([_RANK[verdict], *caps])]
 
     if capped == IMPOSSIBLE:
         return Judgement(
             IMPOSSIBLE,
             False,
-            [f"구름이 하늘을 덮고 있어요 (총운량 {cloud_cover:.0f}%)"],
+            [f"구름이 하늘을 덮고 있어요 (구름 {cloud_cover:.0f}%)"],
         )
 
-    reasons = [sky_msg, f"{_CLOUD_PHRASE[cloud_grade]} (총운량 {cloud_cover:.0f}%)"]
+    reasons = [sky_msg, f"{_CLOUD_PHRASE[cloud_grade]} (구름 {cloud_cover:.0f}%)"]
 
     # 시정은 등급에 관여하지 않는다 — 참고 정보로만 덧붙인다(docstring 4절).
     if visibility_m is None:
         pass
     elif visibility_m < VISIBILITY_FOG_M:
         reasons.append(
-            f"지상에 안개가 낄 수 있어요 (수평시정 {_km(visibility_m)}) "
+            f"지상에 안개가 낄 수 있어요 (시야 {_km(visibility_m)}) "
             "— 하늘이 열려 있어도 발밑은 뿌옇게 보일 수 있어요"
         )
     elif visibility_m < VISIBILITY_HAZE_M:
-        reasons.append(f"연무가 낄 수 있어요 (수평시정 {_km(visibility_m)})")
+        reasons.append(f"옅은 안개가 낄 수 있어요 (시야 {_km(visibility_m)})")
     else:
-        reasons.append(f"공기 맑음 (수평시정 {_km(visibility_m)})")
+        reasons.append(f"공기가 맑아요 (시야 {_km(visibility_m)})")
 
-    # 광공해가 실제로 등급을 끌어내렸을 때만 그 사실을 밝힌다 — 하늘·구름은 좋은데
-    # 등급이 낮은 이유가 장소에 있음을 알려야 '다른 곳으로'를 택할 수 있다.
+    # 강수확률도 등급에 관여하지 않는다 — 높을 때만 경고 한 줄을 더한다(5절).
+    risk = _precip_risk_msg(weather_code, precip_prob_pct)
+    if risk is not None:
+        reasons.append(risk)
+
+    # 무언가 실제로 등급을 끌어내렸을 때만 그 사실을 밝힌다 — 하늘·구름은 좋은데
+    # 등급이 낮은 이유를 알아야 사용자가 다음 수를 택할 수 있다. **원인에 따라 처방이
+    # 다르므로 문구를 가른다**: 둘레 불빛이면 자리를 옮기고, 달이면 때를 옮긴다.
+    # moon_cap 은 광공해까지 합친 값이라(assess_sky), 그것이 광공해 상한보다 더 나쁠
+    # 때만 달을 원인으로 지목한다.
     if capped != verdict:
-        reasons.append(
-            f"하늘과 날씨는 '{verdict}'이지만 이 지점은 광공해가 있어 "
-            f"'{capped}'까지로 봅니다 — 더 어두운 곳으로 가면 나아져요"
-        )
+        floor = _RANK.get(darkness_cap, -1)
+        if moon_cap in _RANK and _RANK[moon_cap] > max(_RANK[verdict], floor):
+            reasons.append(
+                f"하늘과 날씨는 '{verdict}'이지만 오늘은 달빛이 하늘을 밝혀 "
+                f"'{capped}'까지로 봅니다 — 달이 진 뒤나 그믐 무렵이 나아져요"
+            )
+        else:
+            reasons.append(
+                f"하늘과 날씨는 '{verdict}'이지만 이곳은 둘레 불빛이 있어 "
+                f"'{capped}'까지로 봅니다 — 더 어두운 곳으로 가면 나아져요"
+            )
 
     return Judgement(capped, True, reasons)
 

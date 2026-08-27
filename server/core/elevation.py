@@ -79,6 +79,11 @@ else:
     _NODATA = 0
     SOURCE = "표고: FABDEM (격자 파일 없음 — 값 조회 불가)"
 
+#: 격자 파일이 있는가. 배포 컨테이너에는 표고 격자를 넣지 않으므로(`docs/status.md`),
+#: 격자를 **써도 되고 없어도 되는** 축은 이 값을 보고 물러선다. 반대로 격자가 반드시
+#: 있어야 하는 배치 스크립트는 그냥 부르면 된다 — `at()` 이 안내와 함께 멈춘다.
+HAS_GRID: bool = _GRID is not None
+
 #: 격자 한 칸의 크기(m). 1초각을 위도 33도에서 잰 값 — 남북 약 30.8m.
 CELL_M: float = _SCALE * lamps.KM_PER_DEG * 1000.0
 
@@ -108,6 +113,35 @@ def at(lat: float, lon: float) -> float | None:
         return None
     value = int(_GRID[row, col])
     return None if value == _NODATA else value / 10.0
+
+
+def at_many(lats: np.ndarray, lons: np.ndarray) -> np.ndarray:
+    """여러 좌표의 표고(m)를 **한 번에**. 격자 밖·결측은 NaN.
+
+    `at()` 을 반복해 부르는 것과 값은 같지만, 파이썬 루프 대신 numpy 색인 한 번으로
+    끝난다. 지평선을 재려면 한 지점에서 수만 개를 훑어야 해서(`core/horizon.py`)
+    한 점씩 부르면 초 단위가 걸린다.
+
+    격자를 소유한 이 모듈이 갖는다 — 부르는 쪽이 `_GRID` 를 직접 만지면 격자를
+    바꿀 때 고칠 자리가 흩어진다.
+    """
+    if _GRID is None:
+        raise SystemExit(_MISSING)
+    rows = np.rint((_TOP - lats) / _SCALE).astype(np.int64)
+    cols = np.rint((lons - _LEFT) / _SCALE).astype(np.int64)
+
+    inside = (
+        (rows >= 0) & (rows < _GRID.shape[0])
+        & (cols >= 0) & (cols < _GRID.shape[1])
+    )
+    out = np.full(np.shape(lats), np.nan, dtype=float)
+    if not inside.any():
+        return out
+
+    raw = _GRID[rows[inside], cols[inside]].astype(float)
+    raw[raw == _NODATA] = np.nan
+    out[inside] = raw / 10.0
+    return out
 
 
 def slope_at(lat: float, lon: float) -> float | None:

@@ -18,6 +18,17 @@ DEM_GRID   = DATA / "elevation" / "jeju_dem_grid.npz"
 DEM_RAW    = DATA / "elevation" / "N33E126_FABDEM_V1-2.tif"
 SPOTS      = DATA / "jeju_spots.json"
 
+# 별자리 — 구성(어떤 별들이 그 별자리를 이루나)과 그 별들의 좌표·등급을 합쳐 둔 것.
+# 표고 격자와 달리 **커밋한다**. 두 출처(Stellarium CC BY-SA 4.0 · Hipparcos)가
+# 재배포를 허용하고 크기도 작아서다. 귀속은 파일 안 `meta.sources` 에 함께 실린다.
+# `scripts/build_constellations.py` 가 만든다.
+CONSTELLATIONS = DATA / "constellations" / "constellations.json"
+
+# 마커에 얹는 그림. `icon/` 의 원본을 `scripts/build_icons.py` 가 마커 크기(56px)로
+# 줄여 둔 것이고, 파일 이름이 마커 갈래다(spot·parking·toilet). 지도 HTML 이 이것을
+# 통째로 품고 나가므로(base64) 원본을 그대로 쓸 수 없다 — 셋이 합쳐 3.4MB 다.
+ICONS      = DATA / "icon"
+
 LAMPS_JEJU     = DATA / "streetlight" / "jeju_streetlight.csv"
 LAMPS_SEOGWIPO = DATA / "streetlight" / "seogwipo_streetlight.csv"
 
@@ -62,6 +73,11 @@ SPOT_PINS = DATA / "candidates" / "spot_pins.jsonl"
 # 볼륨으로 잡기 위해서다 — 없는 파일 하나를 볼륨으로 마운트할 수는 없다.
 CACHE_DIR      = ROOT / ".cache"
 FORECAST_CACHE = CACHE_DIR / "forecast"
+
+# 배경 타일 사본(`server/tiles.py`). 예보 캐시와 같은 성격이다 — 외부 응답의 사본이라
+# 지워도 재생성되고, 지운 만큼 공급자를 다시 때린다. 항공사진이라 예보보다 훨씬 오래
+# 유효하고 훨씬 크다(한 장 10~25KB). 커지면 통째로 지우면 된다.
+TILE_CACHE     = CACHE_DIR / "tiles"
 
 # 발표용 산출물(HTML). 저장소에 커밋하지 않는다 — 스크립트로 언제든 재생성한다.
 LIGHT_MAP   = OUTPUTS / "jeju_light_map.html"

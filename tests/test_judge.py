@@ -134,9 +134,10 @@ def test_광공해_상한은_등급을_끌어내린다():
     # Given: 하늘·날씨만 보면 '최적'인 조건에서
     # When: 광공해가 '양호'까지로 상한을 걸면
     result = judge(0, 5.0, 20_000.0, "양호")
-    # Then: 등급이 그 상한으로 내려가고, 이유가 장소에 있음을 밝힌다
+    # Then: 등급이 그 상한으로 내려가고, 이유가 **장소**에 있음을 밝힌다.
+    #       원인마다 처방이 다르다 — 둘레 불빛이면 자리를 옮기고, 달이면 때를 옮긴다
     assert result.verdict == "양호"
-    assert any("광공해" in r for r in result.reasons)
+    assert any("둘레 불빛" in r for r in result.reasons)
 
 
 def test_광공해_상한은_등급을_올리지_못한다():
@@ -163,3 +164,78 @@ def test_알_수_없음은_광공해_상한에_영향받지_않는다():
     result = judge(0, None, 20_000.0, "밝은 별 한정")
     # Then: 여전히 '알 수 없음'이다 — 등급이 아니라 별개 상태이기 때문
     assert result.verdict == UNKNOWN
+
+
+# --- 강수 = 차폐 축의 두 번째 신호 (decisions.md §2.41) -------------------------
+
+
+@pytest.mark.parametrize(
+    ("code", "expected"),
+    [
+        pytest.param(48, OPTIMAL, id="안개48은_강수가_아니라_등급을_안_바꾼다"),
+        pytest.param(51, IMPOSSIBLE, id="이슬비51이_강수_경계"),
+        pytest.param(61, IMPOSSIBLE, id="비"),
+        pytest.param(71, IMPOSSIBLE, id="눈"),
+        pytest.param(95, IMPOSSIBLE, id="뇌우"),
+    ],
+)
+def test_강수_예보는_등급을_불가로_끌어내린다(code, expected):
+    # Given: 총운량은 10%(사다리로는 '최적')인데 강수 코드가 붙었을 때
+    result = judge(0, 10.0, 20_000.0, weather_code=code)
+    # Then: 비가 오려면 하늘이 이미 덮여 있어야 하므로 강수 쪽을 따른다.
+    #       경계는 WMO 4677 의 배열 그대로다 — 48(안개)은 아니고 51(이슬비)부터
+    assert result.verdict == expected
+
+
+def test_강수는_총운량과_어긋나도_강수를_따른다():
+    # Given: 실제로 받은 예보 — 총운량 33%(=밝은 별 한정)에 이슬비(51)가 함께 왔다
+    #        (새별오름 2026-08-27, 예보 격자 안에서 평균된 것으로 보인다)
+    result = judge(0, 33.0, 20_000.0, weather_code=51, precip_prob_pct=77.0)
+    # Then: 나쁜 쪽을 따라 '불가'이고, 무엇이 내리는지·확률까지 사유에 밝힌다
+    assert result.verdict == IMPOSSIBLE
+    assert result.possible is False
+    assert "약한 이슬비" in result.reasons[0]
+    assert "77%" in result.reasons[0]
+
+
+def test_강수는_총운량이_없어도_판정한다():
+    # Given: 총운량이 결측이라 평소라면 '알 수 없음'인데
+    result = judge(0, None, 20_000.0, weather_code=63)
+    # Then: '알 수 없음'이 아니라 '불가'다 — 비가 온다는 예보 자체가
+    #       하늘이 덮였다는 진술이라, 총운량 결측을 이유로 판단을 미룰 게 없다
+    assert result.verdict == IMPOSSIBLE
+
+
+def test_강수는_광공해_달빛_상한보다_우선한다():
+    # Given: 제주에서 가장 어두운 곳(상한 '최적')에 달도 없는데
+    # When: 비가 오면
+    result = judge(0, 5.0, 20_000.0, "최적", "최적", weather_code=65)
+    # Then: '불가'다 — 구름 게이트와 같은 이유로 어둡기가 상쇄하지 못한다
+    assert result.verdict == IMPOSSIBLE
+
+
+@pytest.mark.parametrize(
+    ("prob", "warned"),
+    [
+        pytest.param(59.0, False, id="Likely_직전은_말_안_함"),
+        pytest.param(60.0, True, id="NWS_Likely_경계"),
+        pytest.param(90.0, True, id="Likely_이상"),
+        pytest.param(None, False, id="결측"),
+    ],
+)
+def test_강수확률은_문구만_바꾸고_등급은_안_바꾼다(prob, warned):
+    # Given: 강수 예보는 없고(코드 0=맑음) 확률만 있을 때
+    result = judge(0, 5.0, 20_000.0, weather_code=0, precip_prob_pct=prob)
+    # Then: 등급은 총운량이 정한 그대로다 — 확률로 등급을 내릴 문헌 경계가 없다
+    assert result.verdict == OPTIMAL
+    # 그리고 NWS PoP 표현 대응표의 'Likely'(60%)부터만 경고 문장이 붙는다
+    assert any("가능성이 높아요" in r for r in result.reasons) is warned
+
+
+def test_강수_인자를_안_주면_기존_판정_그대로다():
+    # Given: 강수 정보를 못 받았을 때(엔진이 None 을 흘리는 경로)
+    with_none = judge(0, 33.0, 20_000.0, weather_code=None, precip_prob_pct=None)
+    without = judge(0, 33.0, 20_000.0)
+    # Then: 인자를 아예 안 준 것과 같다 — 새 신호가 없다고 기존 판정이 흔들리지 않는다
+    assert with_none.verdict == without.verdict == LIMITED
+    assert with_none.reasons == without.reasons

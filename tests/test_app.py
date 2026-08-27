@@ -14,8 +14,8 @@ import inspect
 
 import pytest
 
-from server import tools
-from server.app import mcp
+from app import mcp
+from server import routes, tools
 
 TOOLS = {"recommend_spots", "evaluate_place", "spot_details"}
 
@@ -33,14 +33,33 @@ def test_두_도구가_이름_그대로_등록된다():
     assert names == TOOLS
 
 
+#: 도구 이름 → 그 도구의 요청 모델. `FastMCP.from_fastapi` 는 이 모델의 OpenAPI
+#: 문서로 도구 스키마를 만들고, 라우트는 필드를 **이름으로** 판정 함수에 넘긴다.
+REQUEST_MODELS = {
+    "recommend_spots": routes.RecommendSpotsRequest,
+    "evaluate_place": routes.EvaluatePlaceRequest,
+    "spot_details": routes.SpotDetailsRequest,
+}
+
+
 @pytest.mark.parametrize("name", sorted(TOOLS))
-def test_등록된_도구는_tools_의_함수_바로_그것이다(name):
-    # Given: 등록된 도구를 꺼내서
-    tool = _registered()[name]
-    # When: 그 안의 함수를 보면
-    # Then: 래핑·복제본이 아니라 tools 모듈의 함수 **동일 객체**다.
-    #       래퍼를 두면 시그니처·docstring 이 두 곳에 생겨 서로 어긋난다.
-    assert tool.fn is getattr(tools, name)
+def test_요청_모델의_필드는_판정_함수의_인자와_이름이_같다(name):
+    # Given: 라우트가 요청 모델의 필드를 이름으로 골라 판정 함수에 넘길 때
+    fields = set(REQUEST_MODELS[name].model_fields)
+    params = set(inspect.signature(getattr(tools, name)).parameters)
+    # Then: 모델에만 있는 이름이 없다. 어긋나면 서버가 뜨는 순간이 아니라 **그 도구를
+    #       처음 부르는 순간** TypeError 로 드러난다 — 조용히 새는 실패라 계약으로
+    #       못박는다(`server/routes.py` 모듈 docstring)
+    assert fields <= params, f"모델에만 있는 인자: {sorted(fields - params)}"
+
+
+@pytest.mark.parametrize("name", sorted(TOOLS))
+def test_판정_함수는_라우트를_거치지_않고도_부를_수_있다(name):
+    # Given: 등록이 끝난 뒤에도
+    fn = getattr(tools, name)
+    # Then: tools 의 이름은 여전히 평범한 함수다 = FastAPI·MCP 가 판정 함수를
+    #       덮어쓰지 않았다. 이게 깨지면 테스트·스크립트가 SDK 내부 속성에 묶인다
+    assert inspect.isfunction(fn)
 
 
 @pytest.mark.parametrize("name", sorted(TOOLS))

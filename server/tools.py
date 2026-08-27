@@ -1,11 +1,11 @@
 """도구 본체 — 좌표·지명을 받아 고정 스키마 dict 를 돌려주는 **순수 파이썬 함수**.
 
-여기에는 MCP 가 없다. 등록(`@mcp.tool`)과 전송(streamable HTTP)은 `server/app.py`
-소관이고, 이 모듈은 "무엇을 판정하는가"만 안다. 갈라 둔 이유는 둘이다:
+여기에는 MCP 가 없다. 도구의 **계약**(이름·설명·인자)은 `server/routes.py` 의 FastAPI
+라우트가 들고, 전송(streamable HTTP)은 `app.py` 소관이다. 이 모듈은 "무엇을
+판정하는가"만 안다. 갈라 둔 이유는 둘이다:
 
-1. fastmcp v2 의 `@mcp.tool` 은 함수가 아니라 `FunctionTool` 객체를 돌려준다.
-   도구 정의와 판정 로직이 한 파일에 있으면 테스트가 판정을 직접 부를 수 없어
-   `.fn` 같은 SDK 내부 속성에 묶인다.
+1. 도구 정의와 판정 로직이 한 파일에 있으면 테스트가 판정을 직접 부를 수 없어
+   SDK 내부 표현에 묶인다. 여기 함수들은 평범한 파이썬 함수로 남는다.
 2. `core`(순수) · `clients`(네트워크) · `engine`(조립) 과 같은 결 — 전송 계층은
    맨 바깥 한 겹에만 둔다.
 
@@ -20,7 +20,7 @@
 
 등록된 곳과 아닌 곳
 --------------------------------------------------------------------------
-`data/jeju_spots.json` 의 63곳은 사람이 로드뷰·위성으로 확인한 자리다. 그 밖의 좌표도
+`data/jeju_spots.json` 의 62곳은 사람이 로드뷰·위성으로 확인한 자리다. 그 밖의 좌표도
 날씨·광공해·천문 조건은 **똑같이** 판정할 수 있지만 주차·야간 출입·도보 난이도는
 알 수 없다. 그래서 미등록 장소는 관측 가능 여부만 답하고 **접근성은 확인되지 않았음을
 명시한다** — 모르는 것을 아는 척하지 않는다.
@@ -42,8 +42,18 @@ from zoneinfo import ZoneInfo
 
 from server import maps
 from server.clients.geocode import geocode
-from server.core import astro, darkness, parking, places, routing, spots, toilet
-from server.core.mapview import Fact, Item, Marker
+from server.core import (
+    astro,
+    darkness,
+    judge,
+    parking,
+    places,
+    routing,
+    spots,
+    toilet,
+    weather,
+)
+from server.core.mapview import Fact, Item, Marker, Walk
 from server.engine import graph
 from server.schema import Response
 
@@ -88,12 +98,39 @@ def _now_iso() -> str:
 
 # --- 입력 검증 (모두 프롬프트형 응답으로 환원한다) --------------------------------
 
+#: 시각을 안 준 질문("오늘 밤 별 보여?")에 쓰는 기준 시각.
+#: 22:00 이었으나 23:00 으로 옮겼다 — 제주 여름 천문박명이 20:40 께 끝나 22시는
+#: 아직 하늘이 덜 가라앉은 시각이고, 사람이 실제로 별을 보러 나가는 때는 그보다
+#: 늦다. 24:00 은 쓰지 않는다: 날짜가 넘어가 "오늘 밤"이 전날 밤을 가리키게 된다.
+DEFAULT_HOUR = 23
+
+
+def _forecast_caveat(when: datetime) -> str:
+    """예보로 판정했다는 것을 답 끝에 한 줄로 밝힌다.
+
+    구름·시정은 **예보**지 관측값이 아니다. 그런데 응답 문장들이 "양호"·"최적"처럼
+    단정형이라, 그대로 옮기면 사용자에게는 확정된 사실로 읽힌다. 제주는 한라산을
+    사이에 두고 오름과 해안의 하늘이 갈리고(이 측정에서도 같은 시각 같은 섬 안에서
+    구름 9%~99% 가 나왔다) 예보도 자주 갱신된다.
+
+    날짜가 멀수록 세게 말한다 — 오늘 밤과 사흘 뒤를 같은 말로 덧붙이면, 그 말이
+    아무 곳에나 붙는 상투구가 되어 정작 읽어야 할 때 안 읽힌다.
+
+    `spot_details` 에는 붙이지 않는다. 주차·화장실·야간 출입은 예보가 아니라 사람이
+    확인해 둔 값이라 이 주의가 해당하지 않는다.
+    """
+    days = (when.date() - datetime.now(KST).date()).days
+    tail = "며칠 뒤 예보라 더 그래요 — " if days >= 2 else ""
+    return (f"참고로 구름·시정은 예보값이에요. {tail}제주는 오름과 해안 사이에서도 "
+            "하늘이 갈리고 예보가 자주 바뀌니, 떠나기 전에 한 번 더 확인해 보세요")
+
+
 
 def _resolve_when(date: str | None, time: str | None) -> datetime:
     """평가 시각을 KST datetime 으로 만든다.
 
     - date(YYYY-MM-DD) 생략 → 오늘
-    - time(HH:MM, 24시간) 생략 → 22:00
+    - time(HH:MM, 24시간) 생략 → DEFAULT_HOUR(23:00)
     - date·time 모두 생략 → 현재 시각 그대로
     파싱 실패 시 ValueError.
     """
@@ -103,12 +140,12 @@ def _resolve_when(date: str | None, time: str | None) -> datetime:
     y, m, d = (now.year, now.month, now.day) if date is None else (
         int(x) for x in date.split("-")
     )
-    hh, mm = (22, 0) if time is None else (int(x) for x in time.split(":"))
+    hh, mm = (DEFAULT_HOUR, 0) if time is None else (int(x) for x in time.split(":"))
     return datetime(y, m, d, hh, mm, tzinfo=KST)
 
 
 def _resolve_plan_when(date: str | None, time: str | None) -> datetime:
-    """추천이 쓰는 기준 시각. date 생략 → 오늘, time 생략 → 22:00.
+    """추천이 쓰는 기준 시각. date 생략 → 오늘, time 생략 → DEFAULT_HOUR.
 
     `_resolve_when` 과 **한 군데가 다르다**: 둘 다 생략해도 '지금'으로 떨어지지 않는다.
     추천은 "어디로 갈까"를 묻는 도구라 낮에도 부른다. 지금 시각으로 판정하면 오후
@@ -121,7 +158,7 @@ def _resolve_plan_when(date: str | None, time: str | None) -> datetime:
     y, m, d = (now.year, now.month, now.day) if date is None else (
         int(x) for x in date.split("-")
     )
-    hh, mm = (22, 0) if time is None else (int(x) for x in time.split(":"))
+    hh, mm = (DEFAULT_HOUR, 0) if time is None else (int(x) for x in time.split(":"))
     return datetime(y, m, d, hh, mm, tzinfo=KST)
 
 
@@ -251,6 +288,17 @@ def _evaluate_moment(
     reasons = list(final.get("reasons", []))
     nums = final.get("numbers", {})
 
+    # 판정을 **완결된 문장 한 줄**로 산문 맨 앞에 둔다.
+    #
+    # 두 번 틀렸다. (1) "판정: 양호" 라는 딱지만 두었더니 모델이 낱말 "판정"은 가져가면서
+    # 값은 다른 데서 집어 왔다 — `numbers.darkness_cap` 에 "최적" 이 들어 있었기 때문이다
+    # (그 필드는 응답에서 뺐다). (2) 그래서 "판정: 양호 · 구름 20% · 어둡기 4단계" 로
+    # 세 값을 한 줄에 묶었더니, 모델이 **숫자만 집고 등급 낱말은 풀어 썼다** — 그전까지
+    # 잘 옮기던 E-04·E-07 까지 놓치기 시작했다. 숫자는 제 줄에 이미 있으므로 여기서는
+    # 등급 하나만, 인용부호를 붙인 완결 문장으로 둔다. 딱지보다 문장이 옮겨진다.
+    if final.get("verdict"):
+        reasons.insert(0, f"이곳의 관측 조건은 '{final['verdict']}' 입니다")
+
     # 관측 가능하면 오늘 완전히 어두운 시간대를 덤으로 알려준다.
     window = nums.get("dark_window")
     if final.get("possible") and window:
@@ -258,6 +306,8 @@ def _evaluate_moment(
             f"참고로 오늘 완전히 어두운 시간대는 "
             f"{window['start'][11:16]}~{window['end'][11:16]}예요"
         )
+
+    reasons.append(_forecast_caveat(when))
 
     return Response(
         verdict=final.get("verdict") or "불가",
@@ -280,7 +330,40 @@ def _night_label(when: datetime) -> str:
     return f"{when.month}월 {when.day}일 밤"
 
 
-def _night_verdict(summary: dict | None, window: dict | None, label: str) -> str:
+def _blocked_by(summary: dict, night_weather: dict | None) -> str:
+    """관측 가능 시간이 0인 밤에서 **무엇이 막았는지**를 사실대로 고른다.
+
+    두 값을 세어 있는 것만 말한다 — 어느 쪽이 '주된' 원인인지 비율로 가르지 않는다.
+    가르려면 임계값(몇 % 이상이면 주범인가)이 필요한데 근거가 없기 때문이다.
+
+        구름이 막은 정시  = 값을 받은 정시 중 총운량 > 50%(STB 밖)인 수
+        강수가 막은 정시  = 강수 예보가 있는 정시 수
+
+    비 1시간·흐림 9시간인 밤을 "비 예보로"라고만 하면 원인이 뒤바뀐다(2026-08-30
+    실제 예보가 그랬다). 둘 다면 둘 다 말한다.
+
+    강수는 **실제 종류**로 부른다(`weather.precip_kind`) — "비·눈"으로 뭉뚱그리면
+    8월 제주에 눈 예보를 말하게 된다.
+    """
+    known = summary["total_hours"] - summary["unknown_hours"]
+    cloudy = max(known - summary["spectroscopic_hours"], 0)
+    w = night_weather or {}
+    rainy = w.get("precipitation_hours") or 0
+    kind = w.get("precipitation_kind") or "비"
+
+    if cloudy and rainy:
+        return f"구름과 {kind} 예보로"
+    if rainy:
+        return f"{kind} 예보로"
+    return "구름으로"
+
+
+def _night_verdict(
+    summary: dict | None,
+    window: dict | None,
+    label: str,
+    night_weather: dict | None = None,
+) -> str:
     """밤 집계를 한 줄 결론으로. 3시간 기준으로 가능/불가를 매기지 않는다 —
     관측 가능한 시간 수라는 사실만 문장으로 압축한다(0시간도 '불가'가 아닌 사실)."""
     if window is None:
@@ -292,11 +375,19 @@ def _night_verdict(summary: dict | None, window: dict | None, label: str) -> str
         known = summary["total_hours"] - summary["unknown_hours"]
         if summary["unknown_hours"] and not known:
             return "밤 기상 정보를 가져오지 못했어요"
-        return f"{label}은 구름으로 별 볼 만한 시간이 거의 없어요"
+        # 막은 것이 무엇인지 이름을 맞춘다 — 비 오는 밤에 "구름으로"라고 하면
+        # 우산을 챙길 이유를 못 읽는다.
+        cause = _blocked_by(summary, night_weather)
+        return f"{label}은 {cause} 별 볼 만한 시간이 거의 없어요"
     return f"{label} 약 {n}시간 관측 가능"
 
 
-def _night_reasons(summary: dict | None, window: dict | None, label: str) -> list[str]:
+def _night_reasons(
+    summary: dict | None,
+    window: dict | None,
+    label: str,
+    night_weather: dict | None = None,
+) -> list[str]:
     """밤 집계의 사람이 읽는 근거. 판정이 아니라 시간 수·분포를 그대로 서술한다."""
     if window is None or summary is None:
         return []
@@ -316,10 +407,19 @@ def _night_reasons(summary: dict | None, window: dict | None, label: str) -> lis
         parts = [f"{g} {h}시간" for g, h in by_grade.items()]
         reasons.append("등급별로는 " + ", ".join(parts) + "예요")
 
-    reasons.append(
-        f"맑은 시간(총운량 30% 이하) {summary['photometric_hours']}시간, "
-        f"다소 맑은 시간(50% 이하) {summary['spectroscopic_hours']}시간"
+    # PTB/STB 는 Xin et al. 정의 그대로 **순수 운량** 기준이라 강수를 모른다. 정의는
+    # 건드리지 않되, 비 오는 밤에 "구름 거의 없는 시간 10시간"으로 읽히지 않게 기준을
+    # 밝힌다 — 등급과 어긋나 보이는 이유가 여기 있기 때문이다.
+    ptb = (
+        f"구름만 따지면 구름 30% 이하 {summary['photometric_hours']}시간, "
+        f"50% 이하 {summary['spectroscopic_hours']}시간이에요"
     )
+    w = night_weather or {}
+    if w.get("precipitation_hours"):
+        # 조사는 '예보' 뒤에 붙인다 — 종류에 받침이 있고 없고("비"/"눈")에 따라
+        # 은/는을 갈라야 하는 자리를 만들지 않는다.
+        ptb += f" ({w.get('precipitation_kind') or '비'} 예보는 안 따진 수치예요)"
+    reasons.append(ptb)
 
     if summary["unknown_hours"]:
         unknown = summary["unknown_hours"]
@@ -357,16 +457,35 @@ def _evaluate_night(
     darkness = result.get("darkness")
     if darkness is not None:
         numbers.update(darkness)
+    # 달은 정적이 아니라 **그 밤의 속성**이라 밤 단위로 한 덩어리를 낸다 — 얼마나
+    # 밝은지·언제 뜨고 지는지·달 없는 시간이 몇 시간인지.
+    if result.get("moon") is not None:
+        numbers["moon"] = result["moon"]
+    # 기상(기온·체감·바람·강수·하늘 상태)은 판정과 무관한 사실이라 관측 가능 시간이
+    # 0이어도 싣는다 — "갈까 말까"를 정하는 건 등급만이 아니다.
+    night_weather = result.get("weather")
+    if night_weather is not None:
+        numbers["weather"] = night_weather
 
-    reasons = _night_reasons(summary, window, label)
+    reasons = _night_reasons(summary, window, label, night_weather)
     # 어둡기 설명(SQM·야간광·가로등) + 은하수 주의 문구. 관측 가능한 밤일 때만.
     if summary is not None and summary.get("observable_hours"):
         reasons.extend(result.get("darkness_reasons", []))
-        if result.get("milky_way_caveat"):
-            reasons.append(result["milky_way_caveat"])
+        # 달빛이 은하수를 깎았으면 광공해 문구 대신 그것을 적는다 — 원인이 다르면
+        # 처방이 다르다(자리를 옮겨라 ↔ 때를 옮겨라). 둘 다 적으면 어느 쪽이 문제인지
+        # 흐려진다.
+        caveat = result.get("moon_caveat") or result.get("milky_way_caveat")
+        if caveat:
+            reasons.append(caveat)
+
+    # 기상 문장(기온·체감·바람·강수)은 판정 근거 뒤에 붙인다 — 순간 평가에서
+    # comfort_node 가 judge 뒤에 오는 것과 같은 자리다.
+    reasons.extend(weather.describe_night(night_weather))
+
+    reasons.append(_forecast_caveat(when))
 
     return Response(
-        verdict=_night_verdict(summary, window, label),
+        verdict=_night_verdict(summary, window, label, night_weather),
         reasons=reasons,
         numbers=numbers,
         attribution=result.get("attribution", []),
@@ -467,7 +586,7 @@ def _walk_phrase(s: spots.Spot) -> str:
     minutes = s.walk_minutes_safe or s.walk_minutes
     if minutes is None:
         return "도보 시간은 재지 못했어요"
-    if minutes < 1:
+    if minutes < spots.IMMEDIATE_WALK_MIN:
         return "주차 후 바로 관측 가능해요"
     return f"주차장에서 관측지까지 예상 소요시간: 약 {minutes:.0f}분"
 
@@ -695,6 +814,43 @@ _ROCK_WORDS: dict[str, str] = {
 }
 
 
+#: 이보다 완만한 내리막은 방향을 적지 않는다. 3° 에서는 내려가나 올라가나 준비가
+#: 달라지지 않는데, 내리막 19개 중 13개가 거기 걸려 "(내리막)"이 뜻 없이 반복된다.
+#: 밤에 조심해야 하는 내리막은 송악산 전망대의 14° 같은 것이다.
+_DOWNHILL_DEG = 5
+
+
+def _slope_words(seg: spots.WalkSegment) -> str:
+    """구간의 경사 한 조각. 못 잰 구간은 빈 문자열 — 아무것도 적지 않는다.
+
+    **최대를 적는다. 평균이 아니다.** 평균은 양 끝만 보므로 올랐다 내려오면 상쇄된다 —
+    송악산 전망대의 593m 구간은 평균 -0.9° 라 거의 평지처럼 읽히는데 그 안에 14.1°
+    내리막이 들어 있고, 새별오름의 555m 는 평균 8.4° 인데 실제로는 21.4° 까지 선다.
+    밤에 초행으로 오르는 사람이 각오할 것은 그 비탈이지 상쇄된 평균이 아니다.
+
+    평균을 함께 적지 않는 것은 줄이 길어져서만이 아니다. 걷는 데 드는 시간은 이미
+    도막마다의 경사로 따로 계산해(`elevation.walk_minutes`) `도보 N분` 으로 나가므로,
+    평균이 답하던 몫은 그쪽이 더 정확하게 답하고 있다.
+
+    최대를 아직 안 잰 자료는 가진 것을 **평균이라고 밝혀서** 적는다. 평균을 최대인
+    척 내보내면 비탈을 낮춰 말하게 된다.
+    """
+    steep, average = seg.slope_max_deg, seg.slope_deg
+    value = steep if steep is not None else average
+    if value is None:
+        return ""
+
+    degrees = round(abs(value))
+    if degrees == 0:
+        # 재 보니 평평한 것과 아예 안 잰 것은 다른 말이다. 0° 를 그냥 지우면 둘이
+        # 같아 보이고, `-0°` 라고 적으면 읽는 사람이 오타로 읽는다.
+        return "거의 평평함"
+
+    label = "최대 경사" if steep is not None else "평균 경사"
+    down = "(내리막)" if value < 0 and degrees >= _DOWNHILL_DEG else ""
+    return f"{label} {degrees}°{down}"
+
+
 def _segment_note(seg: spots.WalkSegment) -> str:
     """구간을 눌렀을 때 뜨는 한 줄 — 길이가 먼저다.
 
@@ -704,8 +860,8 @@ def _segment_note(seg: spots.WalkSegment) -> str:
     안 보이고, 계단인데 "노면 포장 · 목재계단"이라 적히면 오히려 헷갈린다. 갈래 이름이
     이미 말하는 것은 빼고, 노면은 어떤 땅인지로 풀어 쓴다.
 
-    경사는 원본이 잰 구간만 붙는다(짐작으로 채우지 않는다). 사람이 적어 둔 말이 있으면
-    맨 뒤에 그대로 붙인다.
+    경사는 가장 가파른 데 하나만 적는다 — 무엇을 왜 적는지는 `_slope_words` 에.
+    사람이 적어 둔 말이 있으면 맨 뒤에 그대로 붙인다.
     """
     parts = [f"{seg.metres:.0f}m"]
 
@@ -716,14 +872,9 @@ def _segment_note(seg: spots.WalkSegment) -> str:
             parts.append(extra)
     elif seg.surface:
         parts.append(_SURFACE_WORDS.get(seg.surface, seg.surface))
-    if seg.slope_deg is not None:
-        # 평균은 양 끝만 보므로 올랐다 내려오면 상쇄된다. 구간 안 가장 가파른 창이
-        # 그보다 크면 함께 적는다 — 안 적으면 그 비탈이 통째로 사라진다.
-        steep = seg.slope_max_deg
-        if steep is not None and abs(steep) > abs(seg.slope_deg) + 0.5:
-            parts.append(f"평균 경사 {seg.slope_deg:.0f}° · 최대 {steep:.0f}°")
-        else:
-            parts.append(f"평균 경사 {seg.slope_deg:.0f}°")
+    slope = _slope_words(seg)
+    if slope:
+        parts.append(slope)
 
     # 사람이 그 구간에 적어 둔 말은 **맨 뒤에 그대로** 붙인다. 배점표 낱말로는 담기지
     # 않는 것이 여기 들어간다 — "좌측의 벤치에서 쉬어갈 수 있음", "해충기피제 분사기
@@ -733,11 +884,32 @@ def _segment_note(seg: spots.WalkSegment) -> str:
     return " · ".join(parts)
 
 
-def _walk_layers(spot: spots.Spot) -> list[tuple[list[tuple[float, float]], str, str]]:
-    """도보 구간을 지도가 받는 모양으로."""
+def _walk_layers(spot: spots.Spot, base: int = 0) -> list[Walk]:
+    """도보 구간을 지도가 받는 모양으로.
+
+    `base` 는 경로 번호를 어디서부터 매길지다. 번호는 **지도 한 장 안에서** 유일해야
+    한다 — 여러 곳을 한 장에 그릴 때 각자의 0번 경로가 같은 번호로 들어가면, 서로
+    상관없는 두 산길이 한 줄로 이어져 그 사이 허공에 방향 화살표가 생긴다.
+    """
     return [
-        (list(g.points), g.kind, _segment_note(g)) for g in spot.walk_segments
+        Walk(
+            points=tuple(g.points),
+            kind=g.kind,
+            note=_segment_note(g),
+            route=base + g.route,
+            landmark=g.landmark,
+        )
+        for g in spot.walk_segments
     ]
+
+
+def _walk_layers_of(chosen: list[spots.Spot]) -> list[Walk]:
+    """여러 곳의 도보 구간을 한 장에. 경로 번호가 곳끼리 겹치지 않게 이어 매긴다."""
+    out: list[Walk] = []
+    for spot in chosen:
+        base = out[-1].route + 1 if out else 0
+        out.extend(_walk_layers(spot, base))
+    return out
 
 
 def _origin_marker(
@@ -841,14 +1013,44 @@ def _place_map(
     route=None,
     origin: tuple[float, float] | None = None,
     origin_resolved: dict | None = None,
+    alternatives: list[tuple[spots.Spot, routing.Route, float | None]] | None = None,
 ) -> tuple[str | None, list[Marker]]:
     """등록되지 않은 자리의 지도 — 그 점 + 반경 안 편의시설(+ 출발지면 주행 경로).
 
-    도보 경로는 그리지 않는다. 어디에 세우고 어디로 걷는지는 사람이 확인한 곳에만
-    있는 정보라, 없는 선을 그리면 있는 것처럼 보인다.
+    지목한 자리의 도보 경로는 그리지 않는다. 어디에 세우고 어디로 걷는지는 사람이
+    확인한 곳에만 있는 정보라, 없는 선을 그리면 있는 것처럼 보인다.
+
+    `alternatives` 는 말로 권한 **근처의 더 어두운 검증된 관측지**다. 말한 것은 지도에도
+    있어야 한다 — "차로 14분 거리 용눈이오름"이라고 해 놓고 지도에는 성산일출봉 하나만
+    찍혀 있으면, 어느 쪽으로 얼마나 가야 하는지가 안 보이고 지도만 본 사람은 권한 곳이
+    있다는 것조차 모른다. 그쪽은 검증된 곳이라 주차·화장실·도보 경로까지 함께 찍는다 —
+    대안의 쓸모가 바로 그 '확인된 접근성'이라, 점만 찍으면 왜 대안인지가 빠진다.
     """
+    alts = alternatives or []
     amenities = _amenity_markers(lat, lon, NEARBY_M)
-    markers = [Marker(lat, lon, "spot", name, "등록되지 않은 지점"), *amenities]
+
+    # 지목한 자리와 대안을 표지로 가른다. 전부 같은 ★ 이면 지도만 보고는 어디가 물어본
+    # 자리이고 어디가 권한 자리인지 알 수 없다. 물어본 자리는 '?'(확인되지 않음),
+    # 대안은 목록·설명 줄과 같은 번호다.
+    markers = [
+        Marker(lat, lon, "spot", name, "등록되지 않은 지점",
+               glyph="?" if alts else ""),
+        *amenities,
+    ]
+    # 이미 찍은 편의시설을 씨앗으로 넘겨, 대안의 주차·화장실이 그 위에 겹쳐 찍히지
+    # 않게 한다(`_facility_markers` 가 갈래별로 50m 안을 같은 곳으로 본다).
+    placed: dict[str, list[tuple[float, float]]] = {
+        "spot": [(lat, lon), *[(s.lat, s.lon) for s, _, _ in alts]],
+        "parking": [(m.lat, m.lon) for m in amenities if m.kind == "parking"],
+        "toilet": [(m.lat, m.lon) for m in amenities if m.kind == "toilet"],
+    }
+    for i, (spot, _, _) in enumerate(alts, start=1):
+        markers.append(Marker(
+            spot.lat, spot.lon, "spot", f"{i}. {spot.name}", _where(spot),
+            glyph=str(i),
+        ))
+        markers.extend(_facility_markers(spot, placed))
+
     if origin is not None:
         markers.append(_origin_marker(origin, origin_resolved, route))
 
@@ -856,12 +1058,24 @@ def _place_map(
     if route is not None:
         facts.insert(0, Fact(f"차 {route.minutes:.0f}분", "drive"))
     facts.append(Fact("등록되지 않은 지점", "warn"))
+    items = [Item(label=name, lat=lat, lon=lon, sub="등록되지 않은 지점",
+                  facts=tuple(facts))]
+
+    for i, (spot, leg, sqm) in enumerate(alts, start=1):
+        # 주행시간은 **지목한 자리에서** 잰 것이다(`_darker_nearby`). 출발지에서 잰
+        # 위 줄의 '차 N분' 과 같은 말로 적으면 어디서부터인지가 섞이므로 앞을 밝힌다.
+        alt_facts = [Fact(f"여기서 차 {leg.minutes:.0f}분", "drive")]
+        if sqm is not None:
+            alt_facts.append(Fact(f"하늘 밝기 {sqm:.2f}", "plain"))
+        alt_facts.extend(_spot_facts(spot))
+        items.append(Item(label=f"{i}. {spot.name}", lat=spot.lat, lon=spot.lon,
+                          sub=_where(spot), facts=tuple(alt_facts)))
 
     return maps.write(
-        title=f"{name} 주변",
+        title=f"{name} 주변" + (f" · 더 어두운 곳 {len(alts)}곳" if alts else ""),
         markers=markers,
-        items=[Item(label=name, lat=lat, lon=lon, sub="등록되지 않은 지점",
-                    facts=tuple(facts))],
+        walk_segments=_walk_layers_of([s for s, _, _ in alts]),
+        items=items,
     ), amenities
 
 
@@ -931,37 +1145,26 @@ def recommend_spots(
     origin_lon: float | None = None,
     max_drive_minutes: float | None = None,
     region: str | None = None,
+    place_type: str | None = None,
     no_climb: bool = False,
     max_walk_minutes: float | None = None,
     parking_required: bool = False,
     pets: bool = False,
+    toilet_required: bool = False,
+    campsite: bool = False,
+    always_open: bool = False,
+    name_contains: str | None = None,
     date: str | None = None,
     time: str | None = None,
     limit: int = 3,
 ) -> dict:
     """조건에 맞는 제주 별 관측지를 추천한다 (검증된 63곳 중에서).
 
-    "지금 근처에서 별 보기 좋은 곳", "제주 동쪽에서 추천", "30분 안에 갈 수 있는 곳",
-    "주차장에서 바로 보는 곳", "등산 없는 곳" 같은 질의를 처리한다.
-
     출발지를 주면 **실제 도로를 따라간 주행시간**으로 자르고 순위에 반영한다
     (직선거리가 아니다 — 제주는 가운데가 한라산이라 직선거리로 자르면 산 반대편을
     추천하게 된다). 정체는 반영하지 않는 야간 자유주행 기준이다.
 
-    Args:
-        origin: 출발지 지명·주소 (예: '제주공항', '애월읍'). origin_lat/lon 과 택일.
-        origin_lat: 출발지 위도. origin_lon 과 함께 줄 때만 쓴다(현재 위치 등).
-        origin_lon: 출발지 경도.
-        max_drive_minutes: 이 시간 안에 갈 수 있는 곳만. 출발지가 있어야 동작한다.
-        region: '동'·'서'·'남'·'북'·'중산간' 중 하나로 지역을 좁힌다.
-        no_climb: True 면 오르막 산행이 필요한 곳을 뺀다("등산 없는 곳").
-        max_walk_minutes: 주차 지점에서 관측 지점까지 편도 도보가 이 시간 이하인 곳만.
-            0 을 주면 "주차하고 바로 보는 곳"에 가깝다.
-        parking_required: True 면 주차장이 확인된 곳만.
-        pets: True 면 반려동물 동반이 가능한 곳만.
-        date: 판정 기준 날짜 YYYY-MM-DD (생략 시 오늘).
-        time: 판정 기준 시각 HH:MM 24시간 KST (생략 시 22:00).
-        limit: 돌려줄 곳 수. 기본 3, 최대 10.
+    인자 설명(외부 LLM 이 읽는 계약)은 `server/routes.py` 에 있다 — 한 곳에만 둔다.
 
     Returns:
         고정 스키마 dict. 추천 목록은 `spots` 배열에 있고 각 항목에 주행시간(`drive`)·
@@ -988,13 +1191,31 @@ def recommend_spots(
             as_of=_now_iso(),
         ).to_dict()
 
+    place = (place_type or "").strip() or None
+    if place is not None and place not in spots.PLACE_TYPES:
+        return Response(
+            verdict="입력 오류",
+            reasons=[
+                f"place_type 값을 이해하지 못했습니다 (place_type={place_type!r}). "
+                f"{' · '.join(spots.PLACE_TYPES)} 중 하나로 주세요."
+            ],
+            numbers={},
+            attribution=[],
+            as_of=_now_iso(),
+        ).to_dict()
+
     # 1) 정적 조건으로 후보를 좁힌다 (외부 호출 0회).
     candidates = spots.filter_spots(
         region=(region or "").strip() or None,
+        place_type=place,
         no_climb=no_climb,
         max_walk_minutes=max_walk_minutes,
         parking_required=parking_required,
         pets=pets,
+        toilet_required=toilet_required,
+        campsite=campsite,
+        always_open=always_open,
+        name_contains=(name_contains or "").strip() or None,
     )
     attribution = [spots.source()]
 
@@ -1031,7 +1252,12 @@ def recommend_spots(
         )
         return Response(
             verdict=_recommend_verdict([], empty_conditions),
-            reasons=[_no_candidate_reason(max_drive_minutes, region, no_climb)],
+            reasons=[
+                _no_candidate_reason(
+                    max_drive_minutes, region, place, no_climb,
+                    toilet_required, campsite, always_open, name_contains,
+                )
+            ],
             numbers={"candidates": 0},
             attribution=attribution,
             as_of=_now_iso(),
@@ -1077,10 +1303,15 @@ def recommend_spots(
     rows = []
     for s, final in top:
         row = _spot_row(s, route=routes.get(s.name))
+        nums = final.get("numbers", {})
         row["verdict"] = final.get("verdict") or "불가"
-        row["cloud_cover"] = final.get("numbers", {}).get("cloud_cover")
-        row["darkness_score"] = final.get("numbers", {}).get("darkness_score")
-        row["bortle"] = final.get("numbers", {}).get("bortle")
+        row["cloud_cover"] = nums.get("cloud_cover")
+        # 하늘 상태·기온은 곳마다 다르다(제주는 한라산을 사이에 두고 갈리고, 표고
+        # 차이가 기온을 5도까지 벌린다). 목록에서 바로 비교되도록 곳마다 싣는다.
+        row["sky"] = nums.get("sky")
+        row["temperature_c"] = nums.get("temperature_c")
+        row["darkness_score"] = nums.get("darkness_score")
+        row["bortle"] = nums.get("bortle")
         rows.append(row)
 
     # 지도 — 고른 곳들을 한 장에. 주행 경로는 긋지 않는다(섬 전체로 줌아웃된다).
@@ -1113,13 +1344,14 @@ def recommend_spots(
     map_url = maps.write(
         title=f"관측지 추천 {len(rows)}곳",
         markers=markers,
-        walk_segments=[layer for s, _ in top for layer in _walk_layers(s)],
+        walk_segments=_walk_layers_of([s for s, _ in top]),
         items=items,
     )
 
-    reasons = _recommend_reasons(top, routes)
+    reasons = _recommend_reasons(top, routes, show_pets=pets)
     if map_url:
-        reasons.append(f"고른 곳들을 지도로 봤어요 → {map_url}")
+        reasons.append(f"지도(고른 곳 전부): {map_url}")
+    reasons.append(_forecast_caveat(when))
 
     return Response(
         verdict=_recommend_verdict(rows, conditions),
@@ -1139,7 +1371,14 @@ def recommend_spots(
 
 
 def _no_candidate_reason(
-    max_drive_minutes: float | None, region: str | None, no_climb: bool
+    max_drive_minutes: float | None,
+    region: str | None,
+    place_type: str | None,
+    no_climb: bool,
+    toilet_required: bool = False,
+    campsite: bool = False,
+    always_open: bool = False,
+    name_contains: str | None = None,
 ) -> str:
     """왜 후보가 없는지 — 조건을 되짚어 준다. 어느 조건을 풀지 사용자가 정하게."""
     conds = []
@@ -1147,8 +1386,18 @@ def _no_candidate_reason(
         conds.append(f"주행 {max_drive_minutes:.0f}분 이내")
     if region:
         conds.append(f"{region} 지역")
+    if place_type:
+        conds.append(f"{place_type} 유형")
     if no_climb:
         conds.append("등산 없는 곳")
+    if toilet_required:
+        conds.append("화장실이 확인된 곳")
+    if campsite:
+        conds.append("야영 가능한 곳")
+    if always_open:
+        conds.append("야간 상시 개방")
+    if name_contains and name_contains.strip():
+        conds.append(f"이름에 '{name_contains.strip()}' 이 든 곳")
     if not conds:
         return "조건에 맞는 관측지가 없습니다."
     return (
@@ -1207,22 +1456,58 @@ def _recommend_verdict(rows: list[dict], conditions: str) -> str:
     """
     if not rows:
         return f"{conditions} — 조건에 맞는 관측지를 찾지 못했어요"
+    # 비 오는 밤에는 고른 곳이 전부 '불가'로 나온다. 그때도 "추천드립니다"라고 하면
+    # 목록을 보고 나서야 못 본다는 걸 알게 된다 — 결론에서 먼저 말한다.
+    if all(r.get("verdict") == judge.IMPOSSIBLE for r in rows):
+        return (
+            f"{conditions} — 조건에 맞는 곳 {len(rows)}곳을 찾았지만, "
+            "지금은 어디서도 별을 보기 어려워요"
+        )
     return f"{conditions} — 조건에 맞는 관측지 {len(rows)}곳을 추천드립니다"
 
 
-def _recommend_reasons(judged: list, routes: dict) -> list[str]:
-    """추천 목록을 사람이 읽는 줄들로. 곳마다 왜 골랐는지 한 덩어리씩."""
+def _recommend_reasons(judged: list, routes: dict, show_pets: bool = False) -> list[str]:
+    """추천 목록을 사람이 읽는 줄들로. 곳마다 왜 골랐는지 한 덩어리씩.
+
+    **수치를 이 문장들 안에 넣는다.** 구름·등급은 `spots[]` 에도 실리지만, 이 응답을
+    읽는 쪽이 작은 모델일 때 구조화 배열은 잘 안 읽히고 산문만 읽힌다. 실제로
+    측정에서 모델이 곳 이름만 옮기고 숫자는 전부 흘렸다 — 숫자가 문장 안에 있어야
+    인용된다. `spots[]` 는 그대로 두므로 프로그램이 읽는 쪽은 달라지지 않는다.
+
+    `why` 는 판정 줄에서 떼어 뒤로 뺐다. 한 줄에 등급·구름·이유가 같이 있으면 이유가
+    길어 숫자가 문장 끝으로 밀린다.
+
+    `show_pets` — 반려동물 조건으로 걸러 달라고 했을 때만 각 곳의 `pets` 원문을 함께
+    싣는다. 거르기는 파생 축(`spots.pets_allowed`)이 하지만, 답에는 원문이 실려야
+    사용자가 "목줄 필수" 같은 단서를 볼 수 있다. 조건으로 안 물었을 때까지 붙이면
+    줄만 길어지므로 물었을 때만 붙인다.
+    """
     lines: list[str] = []
     for i, (s, final) in enumerate(judged, start=1):
         leg = routes.get(s.name)
-        head = f"{i}. {s.name} ({s.region}·{s.kind})"
+        nums = final.get("numbers", {})
+        # 곳마다의 수치를 **이름 줄에 붙인다.** 아래 별도 줄에 두었더니 모델이 세 곳을
+        # "모두 구름이 적고 밤하늘이 어둡며" 로 뭉개고 숫자를 통째로 흘렸다(R-02·03·
+        # 05·07). 이름은 언제나 옮겨지므로, 숫자를 이름에 붙이면 같이 딸려 온다.
+        bits = []
         if leg is not None:
-            head += f" — 차로 약 {leg.minutes:.0f}분 / {leg.km:.0f}km"
-        lines.append(head)
-        lines.append(f"   판정: {final.get('verdict') or '불가'} · {s.why}")
+            bits.append(f"차로 약 {leg.minutes:.0f}분 / {leg.km:.0f}km")
+        cloud = nums.get("cloud_cover")
+        if cloud is not None:
+            bits.append(f"구름 {cloud:.0f}%")
+        bortle = nums.get("bortle")
+        if bortle is not None:
+            bits.append(f"어둡기 {bortle}단계")
+        bits.append(f"판정 {final.get('verdict') or '불가'}")
+        lines.append(f"{i}. {s.name} ({s.region}·{s.kind}) — " + " · ".join(bits))
+
         lines.append("   " + _walk_phrase(s))
+        if show_pets and s.pets:
+            lines.append(f"   반려동물: {s.pets}")
         if s.night_access:
             lines.append(f"   야간 출입: {s.night_access}")
+        if s.why:
+            lines.append(f"   고른 이유: {s.why}")
     return lines
 
 
@@ -1257,17 +1542,7 @@ def evaluate_place(
     장소에서 답할 수 있는 접근성은 이 주행시간까지이고, 주차·야간 출입은 여전히
     모른다. 실제 도로 기준이며 정체는 반영하지 않는다(야간 자유주행).
 
-    Args:
-        query: 장소 이름·주소 (예: '1100고지', '새별오름', '제주시 애월읍').
-        lat: 위도. lon 과 함께 줄 때만 쓴다. query 대신 좌표로 물을 때.
-        lon: 경도.
-        origin: 출발지 지명·주소 (예: '제주공항'). 주행시간을 함께 받고 싶을 때.
-        origin_lat: 출발지 위도. origin_lon 과 함께 줄 때만 쓴다(현재 위치 등).
-        origin_lon: 출발지 경도.
-        date: YYYY-MM-DD (생략 시 오늘). 미래 날짜 가능(구름은 예보 지평 ~7일 안).
-        time: HH:MM 24시간 KST. scope="moment" 에서만(생략 시 22:00; date·time 모두
-            생략 시 현재). scope="night" 이면 무시.
-        scope: "moment"(한 시각) | "night"(밤 전체 시간 수·등급 분포). 기본 "moment".
+    인자 설명(외부 LLM 이 읽는 계약)은 `server/routes.py` 에 있다 — 한 곳에만 둔다.
 
     Returns:
         고정 스키마 dict. 등록된 관측지면 `spots` 에 그 곳의 접근성 요약이 실리고,
@@ -1326,15 +1601,26 @@ def evaluate_place(
         result["numbers"]["drive"] = route.to_dict()
         result.setdefault("attribution", []).append(routing.SOURCE)
 
+    # 미등록 지점에서 답하지 못한 접근성을, 답할 수 있는 곳으로 메운다. 어두운 곳이
+    # 근처에 없으면 아무 말도 하지 않는다 — 없는 대안을 지어내는 것보다 낫다.
+    #
+    # 지도보다 **먼저** 구한다. 한때 지도를 먼저 그리고 대안을 뒤에 구했는데, 그래서
+    # 말로는 "차로 14분 거리 용눈이오름"이라고 권해 놓고 지도에는 물어본 자리 하나만
+    # 찍혀 나갔다. 지도는 권한 곳까지 담아야 한다.
+    alternatives = (
+        _darker_nearby(p_lat, p_lon, result.get("numbers", {}).get("darkness_score"))
+        if known is None else []
+    )
+
     # 지도 — 등록된 곳은 사람이 확인한 주차·화장실과 도보 경로를, 등록되지 않은 곳은
-    # 반경 안 편의시설만 그린다. 없는 선을 그리면 있는 것처럼 보인다.
+    # 반경 안 편의시설과 위에서 고른 대안을 그린다. 없는 선을 그리면 있는 것처럼 보인다.
     if known is not None:
         result["map_url"] = _spot_map(known, route, origin_pt, origin_resolved)
         amenities = []
     else:
         label = (resolved or {}).get("display_name") or (query or "이 지점")
         result["map_url"], amenities = _place_map(
-            p_lat, p_lon, str(label), route, origin_pt, origin_resolved
+            p_lat, p_lon, str(label), route, origin_pt, origin_resolved, alternatives
         )
         for source in (parking.SOURCE, places.SOURCE, toilet.SOURCE):
             if source not in result.setdefault("attribution", []):
@@ -1384,16 +1670,11 @@ def evaluate_place(
             )
         else:
             reasons.append(
-                "이 위치는 검증된 관측지 목록에 없어요. 하늘 상태(날씨·광공해·박명)는 "
+                "이 위치는 검증된 관측지 목록에 없어요. 하늘 상태(날씨·둘레 불빛·어둡기)는 "
                 "위와 같이 판정했지만 **주차 가능 여부·야간 출입·진입로 상태·도보 "
                 "난이도는 확인되지 않았습니다.**"
             )
 
-        # 답하지 못한 접근성을, 답할 수 있는 곳으로 메운다. 어두운 곳이 근처에
-        # 없으면 아무 말도 하지 않는다 — 없는 대안을 지어내는 것보다 낫다.
-        alternatives = _darker_nearby(
-            p_lat, p_lon, result.get("numbers", {}).get("darkness_score")
-        )
         if alternatives:
             reasons.append(_alternatives_reason(alternatives))
             attr = result.setdefault("attribution", [])
@@ -1406,7 +1687,7 @@ def evaluate_place(
             )
 
     if result.get("map_url"):
-        reasons.append(f"경로와 주변을 지도로 봤어요 → {result['map_url']}")
+        reasons.append(f"지도(경로와 주변): {result['map_url']}")
 
     return result
 
@@ -1470,14 +1751,18 @@ def _alternatives_reason(
     rows: list[tuple[spots.Spot, routing.Route, float | None]],
 ) -> str:
     """근처 대안을 한 줄로. 이름·주행시간·어둡기·야간 출입만 — 도보 난이도까지
-    적으면 `spot_details` 를 옮겨 온 것이 된다."""
+    적으면 `spot_details` 를 옮겨 온 것이 된다.
+
+    번호는 지도에 찍힌 번호와 같다(`_place_map`). 이름만 있으면 지도의 두 점 중 어느
+    쪽이 어느 이름인지 다시 눌러 봐야 한다.
+    """
     parts = []
-    for spot, leg, sqm in rows:
+    for i, (spot, leg, sqm) in enumerate(rows, start=1):
         bits = [f"차로 약 {leg.minutes:.0f}분"]
         if sqm is not None:
-            bits.append(f"SQM {sqm:.2f}")
+            bits.append(f"하늘 밝기 {sqm:.2f} (클수록 어두움)")
         bits.append(f"야간 출입 {spot.night_access or '확인 필요'}")
-        parts.append(f"{spot.name}({' · '.join(bits)})")
+        parts.append(f"{i}. {spot.name}({' · '.join(bits)})")
     return (
         "대신 근처에 **이 지점보다 어둡고 접근성이 확인된** 관측지가 있어요 — "
         + ", ".join(parts)
@@ -1509,11 +1794,7 @@ def spot_details(name: str, origin: str | None = None,
 
     출발지를 주면 그곳까지의 주행시간도 함께 답한다.
 
-    Args:
-        name: 관측지 이름 (예: '새별오름', '매오름'). 띄어쓰기는 달라도 된다.
-        origin: 출발지 지명·주소. 주행시간을 함께 받고 싶을 때.
-        origin_lat: 출발지 위도 (origin_lon 과 함께).
-        origin_lon: 출발지 경도.
+    인자 설명(외부 LLM 이 읽는 계약)은 `server/routes.py` 에 있다 — 한 곳에만 둔다.
 
     Returns:
         고정 스키마 dict. 상세는 `spots` 배열의 한 항목에 전부 들어 있다.
@@ -1583,7 +1864,7 @@ def spot_details(name: str, origin: str | None = None,
     for c in hit.cautions:
         reasons.append(f"주의: {c}")
     if map_url:
-        reasons.append(f"주차 자리와 걷는 길을 지도로 봤어요 → {map_url}")
+        reasons.append(f"지도(주차 자리와 걷는 길): {map_url}")
 
     return Response(
         verdict=f"{hit.name} 접근성 정보예요",

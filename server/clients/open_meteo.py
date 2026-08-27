@@ -22,9 +22,9 @@ judge() 가 소비하는 값만 꺼내 반환한다:
 `requests-cache` 는 **URL 이 같아야** 캐시가 맞는다. 그래서 부르는 쪽의 좌표·시각을
 그대로 URL 에 실으면 캐시가 거의 안 맞는다. 두 축을 정규화한다:
 
-1. **좌표를 모델 격자에 맞춘다**(`GRID_LAT_DEG`·`GRID_LON_DEG`). Open-Meteo 는 어차피
-   격자 칸으로 스냅해서 답하므로(응답이 쓴 칸 좌표를 돌려준다) **결과가 바뀌지 않고**
-   캐시 항목만 합쳐진다. 관측지 63곳이 격자 37칸으로 접힌다.
+1. **좌표의 자릿수만 자른다**(`snap`). 칸으로 옮기지는 **않는다** — Open-Meteo 가
+   요청 지점의 고도를 보고 칸을 고르기 때문에, 미리 옮기면 값이 달라진다(자세한 것은
+   `snap` 의 설명). 넷째 자리는 약 11m 라 칸 선택을 안 바꾸면서 URL 은 안정적이다.
 2. **시각을 하루 창으로 넓힌다**(`_window_of`). 정시 하나만 물으면 시각마다 URL 이
    달라져 "22시"와 "23시"가 각각 외부 호출이 된다. 한 창을 받아 두고 필요한 정시만
    잘라 쓰면, 같은 칸·같은 밤에 대한 모든 질의가 **호출 한 번**을 나눠 쓴다.
@@ -50,11 +50,35 @@ KST = ZoneInfo("Asia/Seoul")
 
 _URL = "https://api.open-meteo.com/v1/forecast"
 
-#: 예보 모델의 격자 간격(도). 응답이 실제로 쓴 칸 좌표를 돌려주므로 실측으로 확인했다
-#: — 제주 안 6개 좌표를 물어 돌아온 칸이 위도 0.05° · 경도 0.0625° 간격이었다.
-#: 요청을 이 칸에 맞춰도 **같은 칸이 나오므로 값이 바뀌지 않는다**.
-GRID_LAT_DEG = 0.05
-GRID_LON_DEG = 0.0625
+#: 요청 좌표를 자를 소수 자릿수. 넷째 자리는 약 11m 라 Open-Meteo 의 칸 선택을 바꾸지
+#: 않으면서 URL 은 안정적이다. **좌표를 격자 칸으로 옮기지는 않는다** — 이유는 `snap`.
+COORD_DECIMALS = 4
+
+#: 요청할 시간별 변수. **순서가 곧 응답의 변수 인덱스**이므로 함부로 섞지 않는다.
+#: 8개다 — Open-Meteo 의 가중 기준(10개 초과)에 걸리지 않아 요금은 2개일 때와 같다.
+_HOURLY: tuple[str, ...] = (
+    "cloud_cover",
+    "visibility",
+    "temperature_2m",
+    "apparent_temperature",
+    "relative_humidity_2m",
+    "wind_speed_10m",
+    "precipitation_probability",
+    "weather_code",
+)
+
+#: Open-Meteo 변수명 → 이 모듈이 돌려주는 키. 단위를 이름에 박아 둔다 — 부르는 쪽이
+#: `wind` 를 km/h 로 읽는 사고를 막는다.
+_KEYS: dict[str, str] = {
+    "cloud_cover": "cloud_cover",
+    "visibility": "visibility",
+    "temperature_2m": "temperature_c",
+    "apparent_temperature": "apparent_c",
+    "relative_humidity_2m": "humidity_pct",
+    "wind_speed_10m": "wind_ms",
+    "precipitation_probability": "precipitation_probability_pct",
+    "weather_code": "weather_code",
+}
 
 #: 캐시 창을 가르는 기준 시각(KST). 밤은 자정을 넘으므로 달력 하루로 자르면 한 밤이
 #: 두 창으로 갈려 호출이 두 배가 된다. 정오에 끊어 한 밤이 한 창에 들어오게 한다.
@@ -88,16 +112,39 @@ def _clean(v) -> float | None:
     return None if math.isnan(f) else f
 
 
-def snap(lat: float, lon: float) -> tuple[float, float]:
-    """좌표를 예보 모델 격자 칸의 중심으로 맞춘다.
+def _clean_code(v) -> int | None:
+    """WMO 기상 코드를 int 로. 결측이면 None.
 
-    Open-Meteo 는 어차피 격자로 스냅해서 답하므로 **값이 바뀌지 않는다**. 바뀌는 것은
-    URL 이고, 그래서 같은 칸 안의 여러 관측지가 캐시 한 항목을 나눠 쓰게 된다.
+    응답이 float 로 오므로(numpy 배열) 정수로 되돌린다 — 코드는 눈금이 아니라
+    **범주값**이라, 반올림된 소수로 두면 해석표(`core.weather.WMO_LABEL`)에서 빗나간다.
     """
-    return (
-        round(lat / GRID_LAT_DEG) * GRID_LAT_DEG,
-        round(lon / GRID_LON_DEG) * GRID_LON_DEG,
-    )
+    f = _clean(v)
+    return None if f is None else int(round(f))
+
+
+def snap(lat: float, lon: float) -> tuple[float, float]:
+    """캐시 키가 흔들리지 않게 좌표의 자릿수만 자른다. **칸으로 옮기지 않는다.**
+
+    한때 여기서 좌표를 격자 칸(0.05°×0.0625°) 중심으로 옮겼다. "Open-Meteo 가 어차피
+    격자로 스냅해서 답하니 값은 안 바뀌고 캐시만 합쳐진다"는 전제였는데, **틀렸다.**
+
+    Open-Meteo 는 요청 지점의 **고도와 육지 여부**를 보고 칸을 고른다(`cell_selection`
+    기본값 `land`). 그래서 좌표를 미리 옮기면 고도 조회 자체가 다른 지점에서 일어나
+    **다른 칸이 선택된다.** 62곳을 전부 재 보니 6곳에서 값이 갈렸다:
+
+        1100고지 휴게소      참값 77%  스냅 19%   (고도 1124m → 878m)
+        제주마방목지 관측지1   참값 99%  스냅 49%   (고도  625m → 446m)
+        제주마방목지 관측지2   참값 99%  스냅 49%   (고도  628m → 446m)
+        제주공천포전지훈련센터  참값 34%  스냅 60%   (고도   62m → 177m)
+
+    하필 산 위 관측지가 크게 틀렸다 — 별 보기 가장 좋은 자리들이다. 구름은 판정을
+    좌우하는 축이라(`core/judge`) 이 오차가 그대로 "양호/불가"를 뒤집는다.
+
+    그래서 옮기지 않고 자릿수만 자른다. 소수 넷째 자리는 약 11m 라 칸 선택을 바꾸지
+    않으면서 URL 은 안정적이다. 캐시 항목이 37 → 62 로 늘지만, 변수 2개·하루 창이라
+    비용은 무시할 만하다. **맞는 값이 먼저다.**
+    """
+    return (round(lat, COORD_DECIMALS), round(lon, COORD_DECIMALS))
 
 
 def _window_of(when: datetime) -> datetime:
@@ -127,27 +174,30 @@ def _fetch_window(lat: float, lon: float, w_start: datetime) -> list[dict]:
     params = {
         "latitude": lat,
         "longitude": lon,
-        "hourly": ["cloud_cover", "visibility"],
+        "hourly": list(_HOURLY),
         "timezone": "Asia/Seoul",
+        # 기상청 표기와 맞춘다(한국 사용자는 풍속을 m/s 로 읽는다). 기본값은 km/h 다.
+        "wind_speed_unit": "ms",
         "start_hour": w_start.strftime("%Y-%m-%dT%H:%M"),
         "end_hour": w_end.strftime("%Y-%m-%dT%H:%M"),
     }
     response = _client.weather_api(_URL, params=params)[0]
     h = response.Hourly()
-    clouds = h.Variables(0).ValuesAsNumpy()
-    viss = h.Variables(1).ValuesAsNumpy()
+    # 변수는 **요청한 순서대로** 인덱스가 매겨진다. 순서가 어긋나면 기온을 습도라고
+    # 부르게 되므로, 이름과 인덱스를 한자리(`_HOURLY`)에서 함께 정한다.
+    series = {name: h.Variables(i).ValuesAsNumpy() for i, name in enumerate(_HOURLY)}
 
     # 응답은 start_hour 부터 Interval(초) 간격이다. 시각축을 창 시작에서 재구성해
     # UTC 오프셋 계산을 피한다(요청이 로컬 정시 기준이므로 그대로 대응된다).
     step = int(h.Interval()) or 3600
     out: list[dict] = []
     cur = w_start
-    for i in range(len(clouds)):
-        out.append({
-            "time": cur,
-            "cloud_cover": _clean(clouds[i]),
-            "visibility": _clean(viss[i]),
-        })
+    for i in range(len(series["cloud_cover"])):
+        row = {"time": cur}
+        for name, key in _KEYS.items():
+            raw = series[name][i]
+            row[key] = _clean_code(raw) if name == "weather_code" else _clean(raw)
+        out.append(row)
         cur = cur + timedelta(seconds=step)
     return out
 
@@ -182,18 +232,29 @@ def fetch_series(lat: float, lon: float, start: datetime, end: datetime) -> list
     return [r for r in rows if start <= r["time"] < end]
 
 
+def empty_row(when: datetime) -> dict:
+    """값이 전부 None 인 행. 조회가 비었거나 실패했을 때 **모양을 지키려고** 쓴다.
+
+    부르는 쪽(engine)이 결측을 손으로 나열하지 않게 한다 — 변수를 늘릴 때마다 빠뜨릴
+    자리가 생기기 때문이다.
+    """
+    row = {"time": when}
+    row.update({key: None for key in _KEYS.values()})
+    return row
+
+
 def fetch(lat: float, lon: float, when: datetime) -> dict:
-    """when 이 속한 정시의 총운량(%)·시정(m)을 반환한다(단일 시각).
+    """when 이 속한 정시의 기상값을 반환한다(단일 시각).
 
     Returns:
-        {"time": datetime, "cloud_cover": float|None, "visibility": float|None}
+        `fetch_series` 의 행 하나와 같은 모양. 값이 없으면 전부 None.
     """
     when = _require_aware(when)
     hour = when.replace(minute=0, second=0, microsecond=0)
     series = fetch_series(lat, lon, hour, hour + timedelta(hours=1))
     if series:
         return series[0]
-    return {"time": hour, "cloud_cover": None, "visibility": None}
+    return empty_row(hour)
 
 
 # --- 검증 ---------------------------------------------------------------------

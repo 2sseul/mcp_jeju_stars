@@ -429,7 +429,7 @@ def test_추천은_낮에_물어도_밤_기준으로_판정한다(_no_weather):
     # Then: 지금이 아니라 밤이다. "어디로 갈까"는 낮에도 묻는 질문이라, 지금 시각으로
     #       판정하면 오후 네 시에 물었을 때 전부 '불가'가 나온다 — 그건 하늘이 아니라
     #       질문을 잘못 읽은 것이다
-    assert hour == 22
+    assert hour == tools.DEFAULT_HOUR
 
 
 def test_추천_문구에_요청한_조건이_들어간다(_no_weather):
@@ -452,7 +452,7 @@ def test_조건이_없으면_시각만_적는다(_no_weather):
     verdict = recommend_spots(date="2026-08-20", limit=1)["verdict"]
     # When: 결론을 보면
     # Then: 없는 조건을 지어내지 않고 기준 시각만 말한다
-    assert "8월 20일 밤 22시 기준" in verdict
+    assert f"8월 20일 밤 {tools.DEFAULT_HOUR}시 기준" in verdict
     assert "지역" not in verdict
 
 
@@ -527,3 +527,45 @@ def test_기준_어둡기가_없으면_대안을_말하지_않는다():
     # Then: 아무 말도 하지 않는다. 기준 없이 고른 "근처의 어두운 곳"은 여기보다
     #       밝을 수 있고, 길찾기까지 헛돈다.
     assert rows == []
+
+
+# --- 관측 0시간인 밤에서 '무엇이 막았나' (decisions.md §2.41) --------------------
+
+
+def _summary(total: int, stb: int, unknown: int = 0) -> dict:
+    """밤 집계의 일부만 채운 대역. `_blocked_by` 가 보는 세 값만 있으면 된다."""
+    return {"total_hours": total, "unknown_hours": unknown, "spectroscopic_hours": stb}
+
+
+@pytest.mark.parametrize(
+    ("total", "stb", "rain", "kind", "expected"),
+    [
+        # 구름은 밤새 괜찮았는데(STB=10) 비가 막은 밤 — 2026-08-27 실제 예보
+        pytest.param(10, 10, 10, "비", "비 예보로", id="비만"),
+        # 흐림 10시간에 비는 1시간뿐 — 2026-08-30 실제 예보.
+        # 여기서 "비 예보로"라고만 하면 원인이 뒤바뀐다
+        pytest.param(10, 0, 1, "비", "구름과 비 예보로", id="구름이_주고_비도_섞임"),
+        pytest.param(10, 1, 10, "비", "구름과 비 예보로", id="둘_다_많음"),
+        pytest.param(10, 0, 0, None, "구름으로", id="구름만"),
+        # 종류를 그대로 부른다 — 8월에 "비·눈"이라고 뭉뚱그리지 않는다
+        pytest.param(10, 10, 10, "눈", "눈 예보로", id="겨울_눈"),
+        pytest.param(10, 10, 10, "비·눈", "비·눈 예보로", id="비도_눈도_오는_밤"),
+    ],
+)
+def test_밤이_막힌_원인을_사실대로_고른다(total, stb, rain, kind, expected):
+    # Given: 관측 가능 0시간인 밤의 집계와 강수 시간 수·종류가 주어졌을 때
+    # When: 결론 문장의 원인을 고르면
+    got = tools._blocked_by(
+        _summary(total, stb),
+        {"precipitation_hours": rain, "precipitation_kind": kind},
+    )
+    # Then: 있는 것만 말한다 — 비율로 '주범'을 가르지 않는다(근거 임계값이 없다)
+    assert got == expected
+
+
+def test_기상값이_없으면_구름으로_돌린다():
+    # Given: 기상 집계를 못 만든 밤(조회 실패 등)
+    # When: 원인을 고르면
+    got = tools._blocked_by(_summary(10, 0), None)
+    # Then: 강수를 아는 척하지 않고 구름으로만 말한다
+    assert got == "구름으로"

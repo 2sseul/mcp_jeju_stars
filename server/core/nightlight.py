@@ -133,15 +133,19 @@ def assess(lat: float, lon: float) -> NightLight | None:
 # --- 표현 헬퍼 (문구) ---------------------------------------------------------
 
 def describe(n: NightLight) -> str:
-    """야간광을 사람이 읽는 한 줄로. '없음'을 어둡다고 단정하지 않는다."""
+    """야간광을 사람이 읽는 한 줄로. '없음'을 어둡다고 단정하지 않는다.
+
+    단위(nW·cm⁻²·sr⁻¹)는 문장에서 뺐다 — 사용자가 알아듣지 못하는 말이라
+    작은 모델이 그대로 옮기면 답이 읽히지 않는다. 값 자체는 `numbers` 에
+    그대로 남아 있으므로 필요한 쪽은 거기서 읽는다.
+    """
     if n.near_max < NOISE_FLOOR:
         if n.wide_max >= NOISE_FLOOR:
             return (
-                f"위성 야간광으로 보면 {NEAR_KM:g}km 안은 조용하지만 "
-                f"{WIDE_KM:g}km 안에 밝은 곳이 있어요 (최대 {n.wide_max:g})"
+                f"인공위성으로 내려다보면 {NEAR_KM:g}km 안은 어둡지만 "
+                f"{WIDE_KM:g}km 안에 밝은 곳이 있어요 (밝기 {n.wide_max:g})"
             )
-        return f"위성 야간광으로는 {WIDE_KM:g}km 안에 잡히는 밝은 광원이 없어요"
+        return f"인공위성에 잡히는 밝은 불빛이 {WIDE_KM:g}km 안에 없어요"
     return (
-        f"위성 야간광 기준 {NEAR_KM:g}km 안 최대 {n.near_max:g}"
-        f"nW·cm⁻²·sr⁻¹ 의 광원이 있어요"
+        f"{NEAR_KM:g}km 안에 불빛이 있어요 (위성이 잰 밝기 {n.near_max:g})"
     )

@@ -134,9 +134,10 @@ def test_광공해_상한은_등급을_끌어내린다():
     # Given: 하늘·날씨만 보면 '최적'인 조건에서
     # When: 광공해가 '양호'까지로 상한을 걸면
     result = judge(0, 5.0, 20_000.0, "양호")
-    # Then: 등급이 그 상한으로 내려가고, 이유가 장소에 있음을 밝힌다
+    # Then: 등급이 그 상한으로 내려가고, 이유가 **장소**에 있음을 밝힌다.
+    #       원인마다 처방이 다르다 — 둘레 불빛이면 자리를 옮기고, 달이면 때를 옮긴다
     assert result.verdict == "양호"
-    assert any("광공해" in r for r in result.reasons)
+    assert any("둘레 불빛" in r for r in result.reasons)
 
 
 def test_광공해_상한은_등급을_올리지_못한다():

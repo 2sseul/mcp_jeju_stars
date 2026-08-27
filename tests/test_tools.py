@@ -429,7 +429,7 @@ def test_추천은_낮에_물어도_밤_기준으로_판정한다(_no_weather):
     # Then: 지금이 아니라 밤이다. "어디로 갈까"는 낮에도 묻는 질문이라, 지금 시각으로
     #       판정하면 오후 네 시에 물었을 때 전부 '불가'가 나온다 — 그건 하늘이 아니라
     #       질문을 잘못 읽은 것이다
-    assert hour == 22
+    assert hour == tools.DEFAULT_HOUR
 
 
 def test_추천_문구에_요청한_조건이_들어간다(_no_weather):
@@ -452,7 +452,7 @@ def test_조건이_없으면_시각만_적는다(_no_weather):
     verdict = recommend_spots(date="2026-08-20", limit=1)["verdict"]
     # When: 결론을 보면
     # Then: 없는 조건을 지어내지 않고 기준 시각만 말한다
-    assert "8월 20일 밤 22시 기준" in verdict
+    assert f"8월 20일 밤 {tools.DEFAULT_HOUR}시 기준" in verdict
     assert "지역" not in verdict
 
 

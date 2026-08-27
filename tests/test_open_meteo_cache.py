@@ -24,35 +24,50 @@ def _at(hour: int, day: int = 20) -> datetime:
 # --- 좌표 정규화 ----------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    ("lat", "lon", "cell"),
-    [
-        # 실측으로 확인한 대응 — 요청 좌표를 주면 Open-Meteo 가 이 칸으로 답했다.
-        pytest.param(33.3663, 126.3576, (33.35, 126.3750), id="새별오름"),
-        pytest.param(33.3763, 126.3676, (33.40, 126.3750), id="새별오름+0.01"),
-        pytest.param(33.3963, 126.3876, (33.40, 126.3750), id="새별오름+0.03"),
-        pytest.param(33.3820, 126.4200, (33.40, 126.4375), id="천아계곡"),
-        pytest.param(33.4589, 126.9408, (33.45, 126.9375), id="성산일출봉"),
-        pytest.param(33.2541, 126.5601, (33.25, 126.5625), id="서귀포시청"),
-    ],
-)
-def test_좌표는_모델이_실제로_쓴_격자_칸으로_맞춰진다(lat, lon, cell):
-    # Given: 관측지 좌표가 주어졌을 때
-    # When: 격자에 맞추면
-    got = open_meteo.snap(lat, lon)
-    # Then: Open-Meteo 가 그 좌표에 대해 실제로 돌려준 칸과 같다.
-    #       같아야 **값이 바뀌지 않으면서** 캐시만 합쳐진다 — 다르면 다른 칸의
-    #       예보를 그 장소의 예보인 양 답하게 된다
-    assert got == pytest.approx(cell, abs=1e-9)
+#: docstring 이 인용한 실측 사례 — 좌표를 칸으로 옮겼더니 고도가 달라져 운량이
+#: 뒤집혔던 곳들이다. 여기가 다시 옮겨지면 "양호/불가"가 통째로 갈린다.
+MOUNTAIN_SPOTS = [
+    pytest.param(33.357770, 126.462456, id="1100고지 휴게소(1124m)"),
+    pytest.param(33.427227, 126.604424, id="제주마방목지 관측지1(625m)"),
+    pytest.param(33.425863, 126.603694, id="제주마방목지 관측지2(628m)"),
+    pytest.param(33.276713, 126.639298, id="제주공천포전지훈련센터(62m)"),
+]
+
+#: 소수 넷째 자리는 위도로 약 11m. 이 안쪽이면 Open-Meteo 의 칸 선택
+#: (`cell_selection=land`, 고도·육지 판정)이 바뀌지 않는다.
+ELEVEN_M_DEG = 1e-4
 
 
-def test_같은_칸의_두_지점은_같은_요청이_된다():
-    # Given: 5km 격자 안에 함께 들어가는 두 지점이
-    a = open_meteo.snap(33.3763, 126.3676)
-    b = open_meteo.snap(33.3963, 126.3876)
-    # When: 정규화되면
-    # Then: 같은 좌표가 된다 = 외부 호출을 하나로 나눠 쓴다
+@pytest.mark.parametrize(("lat", "lon"), MOUNTAIN_SPOTS)
+def test_좌표를_칸으로_옮기지_않는다(lat, lon):
+    # Given: 산 위 관측지처럼 고도가 칸 선택을 좌우하는 좌표가 주어졌을 때
+    got_lat, got_lon = open_meteo.snap(lat, lon)
+    # Then: 자릿수만 잘릴 뿐 11m 넘게 움직이지 않는다.
+    #       한때 격자 칸(0.05°×0.0625°) 중심으로 옮겼는데, Open-Meteo 는 요청 지점의
+    #       **고도**를 보고 칸을 고르므로 옮기면 다른 칸이 선택됐다 — 1100고지가
+    #       고도 1124m→878m 로 읽혀 운량이 참값 77% 대신 19% 로 나왔다
+    assert abs(got_lat - lat) <= ELEVEN_M_DEG
+    assert abs(got_lon - lon) <= ELEVEN_M_DEG
+
+
+@pytest.mark.parametrize(("lat", "lon"), MOUNTAIN_SPOTS)
+def test_같은_지점을_다시_물으면_같은_키가_된다(lat, lon):
+    # Given: 같은 지점을 미세하게 다른 부동소수점으로 두 번 물었을 때
+    #        (지오코딩·계산 경로가 다르면 끝자리가 흔들린다)
+    a = open_meteo.snap(lat, lon)
+    b = open_meteo.snap(lat + 1e-9, lon - 1e-9)
+    # Then: 같은 좌표로 잘려 URL 이 흔들리지 않는다 = 캐시가 맞는다
     assert a == b
+
+
+def test_11m_보다_멀면_따로_묻는다():
+    # Given: 마방목지의 두 관측지처럼 가깝지만 고도가 다른 지점들이
+    a = open_meteo.snap(33.427227, 126.604424)
+    b = open_meteo.snap(33.425863, 126.603694)
+    # When: 정규화되면
+    # Then: 여전히 다른 좌표다 — 합치면 한쪽 고도로 두 곳을 답하게 된다.
+    #       캐시 항목이 늘어도 **맞는 값이 먼저다**
+    assert a != b
 
 
 def test_먼_두_지점은_합쳐지지_않는다():

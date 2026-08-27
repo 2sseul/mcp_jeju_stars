@@ -10,8 +10,8 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from server.core.ephem import KST
 from server.core.astro import (
-    KST,
     dark_window,
     next_dark_start,
     night_window,

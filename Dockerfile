@@ -105,4 +105,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
     CMD python -c "import os,socket; socket.create_connection(('127.0.0.1', int(os.environ['MCP_PORT'])), 2).close()"
 
-CMD ["python", "-m", "server.app"]
+CMD ["python", "app.py", "--host", "0.0.0.0"]

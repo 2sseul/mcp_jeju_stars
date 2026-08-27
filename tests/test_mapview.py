@@ -19,10 +19,15 @@ from server.core.mapview import Marker
 
 SPOT = Marker(33.3663, 126.3576, "spot", "새별오름", "오름")
 PARK = Marker(33.3651, 126.3611, "parking", "새별오름 주차장", "무료")
-WALK = [(33.3651, 126.3611), (33.3658, 126.3595), (33.3663, 126.3576)]
-#: (점렬, 갈래, 설명) — 지도는 갈래로 색을 가르고, 눌렀을 때 설명을 띄운다.
-WALK_DIRT = [(WALK, "흙길", "120m · 노면 거의 흙")]
-WALK_MIXED = [(WALK, "흙길", "120m"), (WALK[:2], "계단", "60m · 목재계단")]
+WALK = ((33.3651, 126.3611), (33.3658, 126.3595), (33.3663, 126.3576))
+#: 지도는 갈래로 색을 가르고, 눌렀을 때 설명을 띄운다. 조각은 **원래 한 줄이던 길**을
+#: 노면별로 자른 것이라 같은 `route` 를 쓴다 — 화살표가 자른 자리를 무시하고 길 전체에
+#: 고르게 얹히려면 그래야 한다.
+WALK_DIRT = [mapview.Walk(WALK, "흙길", "120m · 노면 거의 흙")]
+WALK_MIXED = [
+    mapview.Walk(WALK, "흙길", "120m"),
+    mapview.Walk(WALK[:2], "계단", "60m · 목재계단"),
+]
 
 
 def _payload(document: str) -> dict:
@@ -87,7 +92,7 @@ def test_범례는_실제로_그린_갈래만_싣는다():
 def test_점이_둘_미만인_구간은_아예_빠진다():
     # Given: 점이 하나뿐인 구간이 주어졌을 때
     data = _payload(
-        mapview.render("한 점", [SPOT], walk_segments=[([(33.36, 126.35)], "흙길", "")])
+        mapview.render("한 점", [SPOT], walk_segments=[mapview.Walk(((33.36, 126.35),), "흙길")])
     )
     # When: 데이터를 보면
     # Then: 선이 될 수 없으므로 담지 않는다 — 담아 두면 범례에만 갈래가 뜬다
@@ -120,8 +125,8 @@ def test_구간을_누르면_길이가_뜬다():
 
 def test_모르는_갈래는_쉬운_색으로_칠하지_않는다():
     # Given: 구간 정보가 없어 갈래를 못 정한 경로에서
-    data = _payload(mapview.render("모름", [SPOT], walk_segments=[(WALK, "모름", "")]))
-    paved = mapview.render("포장길", [SPOT], walk_segments=[(WALK, "포장길", "")])
+    data = _payload(mapview.render("모름", [SPOT], walk_segments=[mapview.Walk(WALK, "모름")]))
+    paved = mapview.render("포장길", [SPOT], walk_segments=[mapview.Walk(WALK, "포장길")])
     known = _payload(paved)
     # When: 색을 보면
     # Then: 가장 쉬운 갈래(포장)와 다른 색이다 — 모르는 길을 쉬운 색으로 칠하면
@@ -190,7 +195,7 @@ def test_위성_최대_실사진_줌을_넘겨_당기지_않는다():
     # Then: 실사진 줌이 최대 줌보다 작다 — 같거나 크면 없는 줌을 그대로 요청해
     #       화면이 회색으로 빈다. 늘려 보여주는 쪽이 비어 보이는 것보다 낫다
     assert data["sat"]["maxNative"] < data["sat"]["maxZoom"]
-    assert "maxNativeZoom: D.sat.maxNative" in document
+    assert "maxNativeZoom: t.maxNative" in document
 
 
 def test_위성_공급자를_밖에서_갈아끼울_수_있다():

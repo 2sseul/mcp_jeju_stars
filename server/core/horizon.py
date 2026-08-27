@@ -63,10 +63,12 @@ from server.core import elevation
 __all__ = [
     "BEARINGS",
     "EARTH_R_M",
+    "FIST_DEG",
     "MAX_KM",
     "MIN_M",
     "OPEN_DEG",
     "drop_m",
+    "hand_span",
     "profile",
 ]
 
@@ -94,12 +96,39 @@ BEARINGS: tuple[str, ...] = ("북", "북동", "동", "남동", "남", "남서", 
 #: 통째로 놓친다. 45/9 = 5도 간격이다.
 RAYS_PER_BEARING: int = 9
 
+#: 팔을 뻗었을 때 손이 하늘에서 가리는 각. 아마추어 관측의 표준 재기법이고
+#: (NASA/Chandra "Scales and Angular Measurement"), 키가 달라도 팔 길이와 손 크기가
+#: 함께 자라 각도는 사람마다 비슷하다.
+#:
+#: **각도를 말로 옮기는 데 쓴다.** "지형이 18도까지 가려요"는 측량 용어라 관광객이
+#: 읽을 말이 아니다 — 이 프로젝트가 Bortle 을 "어둡기 4단계(8단계 중)"로 푸는 것과
+#: 같은 자리다. 주먹은 그 자리에서 팔을 뻗어 맞춰 볼 수 있다.
+_HAND: tuple[tuple[float, str], ...] = (
+    (2.0, "새끼손가락 하나"),   # 약 1도
+    (7.0, "손가락 세 개"),      # 약 5도
+)
+
+#: 팔 뻗은 주먹 하나의 각(도).
+FIST_DEG: float = 10.0
+
 #: 이 값 아래면 '트여 있다'고 본다. 격자 해상도(30m)와 수직 오차를 감안하면 1도 미만의
 #: 지평선은 지형이라기보다 잡음이다 — 30m 앞에서 0.5m 차이가 1도다.
 OPEN_DEG: float = 1.0
 
 
 # --- 순수 계산 ----------------------------------------------------------------
+
+def hand_span(deg: float) -> str:
+    """고도각(도)을 **팔 뻗은 손**으로 옮긴다 — "주먹 2개 높이".
+
+    현장에서 팔을 뻗어 맞춰 볼 수 있는 말이라야 안내가 된다. 주먹 하나가 10도이므로
+    지형 차폐(대개 0~25도)는 주먹 한두 개로 떨어지고, 그보다 낮으면 손가락으로 센다.
+    """
+    for edge, label in _HAND:
+        if deg < edge:
+            return f"{label} 높이"
+    return f"주먹 {max(round(deg / FIST_DEG), 1):.0f}개 높이"
+
 
 def drop_m(distance_m: float | np.ndarray) -> float | np.ndarray:
     """거리 d 에서 지구 곡면이 내려가는 높이(m). d² / 2R."""
@@ -170,6 +199,13 @@ def profile(lat: float, lon: float) -> dict[str, float] | None:
 
 # --- 서술 --------------------------------------------------------------------
 
+#: 격자가 맨땅이라는 사실과 **그래서 어떻게 하면 되는지**를 함께 말한다. 나무는 몇 걸음
+#: 옮기면 피하지만 오름은 못 피한다 — 그것이 지형만 재는 이유이기도 하다.
+_CANOPY_NOTE = (
+    "지형만 잰 값이에요 — 방풍림·건물은 안 들어가 있지만, 그건 몇 걸음 옮겨 "
+    "피할 수 있는 것들이라 자리를 조금씩 바꿔 보세요"
+)
+
 def describe(prof: dict[str, float] | None) -> list[str]:
     """지평선을 사람이 읽는 문장으로. 못 쟀으면 빈 목록.
 
@@ -186,12 +222,22 @@ def describe(prof: dict[str, float] | None) -> list[str]:
     if worst[1] < OPEN_DEG:
         return ["사방 지평선이 트여 있어요 — 어느 쪽 하늘이든 낮게 뜬 별까지 보입니다"]
 
+    # 주먹 하나도 안 가리면 '가려요'가 과장이다. 용눈이오름은 가장 높은 쪽이 3도라
+    # 사실상 트인 자리인데, 그것을 "북서쪽은 가려요"라고 하면 없는 흠을 만든다.
+    if worst[1] < FIST_DEG:
+        return [
+            f"사방이 거의 트여 있어요 — 가장 높은 {worst[0]}쪽도 팔 뻗은 "
+            f"{hand_span(worst[1])}예요 ({worst[1]:.0f}도)",
+            _CANOPY_NOTE,
+        ]
+
     line = ""
     if open_ways:
         line += "하늘이 트인 쪽은 " + "·".join(open_ways) + "쪽이에요. "
-    line += f"{worst[0]}쪽은 지형이 {worst[1]:.0f}도까지 가려요"
-    return [
-        line,
-        "지형만 잰 값이에요 — 방풍림·건물은 안 들어가 있지만, 그건 몇 걸음 옮겨 "
-        "피할 수 있는 것들이라 자리를 조금씩 바꿔 보세요",
-    ]
+    # 각도는 괄호에 남긴다 — 문장은 사람이 읽고, 수치는 `numbers.horizon` 과 함께
+    # 호출자가 쓴다. 이 프로젝트가 "총운량 33%"를 괄호로 다는 것과 같은 모양이다.
+    line += (
+        f"{worst[0]}쪽은 산이 팔 뻗은 {hand_span(worst[1])}까지 가려요 "
+        f"({worst[1]:.0f}도)"
+    )
+    return [line, _CANOPY_NOTE]

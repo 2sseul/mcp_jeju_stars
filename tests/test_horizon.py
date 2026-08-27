@@ -109,7 +109,42 @@ def test_트인_쪽을_먼저_말한다():
     # Then: 첫 문장이 트인 방위로 시작한다 — 관측자가 정해야 하는 것은
     #       "어디가 막혔나"보다 "어디를 보고 서나"다
     assert lines[0].startswith("하늘이 트인 쪽은")
-    assert "북동쪽은 지형이" in lines[0]
+    assert "북동쪽은" in lines[0]
+
+
+@pytest.mark.parametrize(
+    ("deg", "expected"),
+    [
+        pytest.param(0.5, "새끼손가락 하나 높이", id="1도_안팎"),
+        pytest.param(1.9, "새끼손가락 하나 높이", id="손가락_경계_직전"),
+        pytest.param(2.0, "손가락 세 개 높이", id="손가락_세개_경계"),
+        pytest.param(6.9, "손가락 세 개 높이", id="주먹_직전"),
+        pytest.param(7.0, "주먹 1개 높이", id="주먹_경계"),
+        pytest.param(18.0, "주먹 2개 높이", id="한라산_급"),
+        pytest.param(33.0, "주먹 3개 높이", id="아주_높은_차폐"),
+    ],
+)
+def test_각도를_팔_뻗은_손으로_옮긴다(deg, expected):
+    # Given: 팔 뻗은 주먹이 약 10도, 손가락 세 개가 약 5도, 새끼손가락이 약 1도다
+    #        (NASA/Chandra 표준 재기법 — 키가 달라도 각도는 비슷하다)
+    # Then: "18도"는 측량 용어라 관광객이 읽을 말이 아니다. 현장에서 팔을 뻗어
+    #       맞춰 볼 수 있는 말이라야 안내가 된다
+    assert horizon.hand_span(deg) == expected
+
+
+def test_주먹_하나도_안_가리면_트였다고_말한다():
+    # Given: 용눈이오름은 가장 높은 쪽도 3도라 사실상 트인 자리다
+    lines = horizon.describe(_profile("용눈이오름"))
+    # Then: "북서쪽은 가려요"라고 하면 없는 흠을 만든다
+    assert lines[0].startswith("사방이 거의 트여 있어요")
+    assert "가려요" not in lines[0]
+
+
+def test_각도는_괄호에_남긴다():
+    # Given: 문장은 사람이 읽고, 수치는 호출자(LLM)가 쓴다
+    lines = horizon.describe(_profile("영실입구 주차장"))
+    # Then: 이 프로젝트가 "총운량 33%"를 괄호로 다는 것과 같은 모양이다
+    assert "(18도)" in lines[0]
 
 
 def test_지형만_잰_값이고_나무는_피할_수_있다고_말한다():

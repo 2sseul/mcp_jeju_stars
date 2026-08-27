@@ -16,6 +16,7 @@ from langgraph.graph import END, START, StateGraph
 
 from server.clients import open_meteo
 from server.core import astro
+from server.core import constellation as _constellation
 from server.core import darkness as _darkness
 from server.core import judge as _judge
 from server.core import lamps as _lamps
@@ -122,6 +123,44 @@ def weather_node(state: EngineState) -> dict:
 #: 기상 서술을 붙이는 태양 고도 상태. judge 가 날씨를 보기 시작하는 구간과 같다
 #: (3=시민박명·4=낮 은 하늘이 밝아 이미 '불가'이므로, 기온·바람을 말해 봐야 소음이다).
 _WEATHER_STATES = (0, 1, 2)
+
+
+def constellation_node(state: EngineState) -> dict:
+    """별자리 → 지금 하늘 어디에 무엇이 있는가. **등급은 바꾸지 않는다.**
+
+    judge 뒤에 둔다(`comfort_node` 와 같은 이유). 하늘이 밝은 시간대(시민박명·낮)에는
+    아무것도 내지 않는다 — 안 보이는 별자리를 나열해 봐야 소음이다.
+
+    한계등급은 **달빛까지 더한** 하늘밝기에서 낸다(`sky_sqm`). 그래서 보름달 밤에는
+    잡히는 별이 저절로 줄어든다. 달빛을 못 구했으면 정적 광공해 등급으로 물러선다.
+    """
+    if state.get("state_code") not in _WEATHER_STATES:
+        return {}
+
+    nums = state.get("numbers", {})
+    sqm = nums.get("sky_sqm")
+    bortle = _darkness.bortle_of(sqm) if sqm is not None else nums.get("bortle")
+
+    got = _constellation.assess(
+        state["lat"], state["lon"], state["when"], bortle
+    )
+    # 알아볼 만한 것만 싣는다. 지평 아래·너무 흐린 것까지 실으면 88개가 그대로 나가
+    # 호출자가 읽을 것이 아니라 걸러낼 것을 받게 된다.
+    rows = [
+        {
+            "name": c.korean,
+            "bearing": c.bearing,
+            "altitude_deg": c.altitude_deg,
+            "low": c.low,
+            "brightest": c.brightest,
+        }
+        for c in got if c.naked_eye
+    ]
+    return {
+        "numbers": {"constellations": rows},
+        "reasons": _constellation.describe(got),
+        "attribution": list(_constellation.SOURCES),
+    }
 
 
 def comfort_node(state: EngineState) -> dict:
@@ -278,6 +317,7 @@ def _build():
     g.add_node("darkness", darkness_node)
     g.add_node("moon", moon_node)
     g.add_node("comfort", comfort_node)
+    g.add_node("constellation", constellation_node)
     # 어둡기·달빛이 judge 보다 앞이다 — judge 가 그 상한(cap)들을 받아 등급을 정하기
     # 때문. 달빛은 어둡기 위에 얹으므로 darkness 뒤다.
     g.add_edge(START, "astro")
@@ -286,7 +326,10 @@ def _build():
     g.add_edge("darkness", "moon")
     g.add_edge("moon", "judge")
     # 기상 서술(comfort)은 judge 뒤다 — 등급에 관여하지 않음을 배치로 못박는다.
-    g.add_edge("judge", "comfort")
+    # judge 뒤에 참고 축 둘이 붙는다 — 무엇이 보이나(별자리), 뭘 입나(기상).
+    # 둘 다 등급에 관여하지 않으므로 judge 는 이들의 결과를 보지 못한다.
+    g.add_edge("judge", "constellation")
+    g.add_edge("constellation", "comfort")
     g.add_edge("comfort", END)
     return g.compile()
 

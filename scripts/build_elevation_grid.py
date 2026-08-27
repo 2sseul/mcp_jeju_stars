@@ -64,12 +64,17 @@ predictor 2 · 오버뷰 2/4/8) `tifffile` 로 읽을 때 `imagecodecs` 가 필�
 
 from __future__ import annotations
 
+import sys
 import urllib.request
 
 import numpy as np
 import tifffile
 
 from server import path
+
+# Windows 콘솔(cp949)에서 한글·기호가 깨지지 않도록 UTF-8로 출력한다.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 #: 제주가 드는 1도 x 1도 타일.
 TILE = "N33E126_FABDEM_V1-2"

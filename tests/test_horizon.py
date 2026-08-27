@@ -112,11 +112,13 @@ def test_트인_쪽을_먼저_말한다():
     assert "북동쪽은 지형이" in lines[0]
 
 
-def test_지형만_잰_값임을_밝힌다():
+def test_지형만_잰_값이고_나무는_피할_수_있다고_말한다():
     # Given: 격자는 맨땅(FABDEM)이라 방풍림·건물이 빠져 있다
     lines = horizon.describe(_profile("새별오름"))
-    # Then: 그 사실을 문장으로 남긴다 — 안 밝히면 "안 막혔다"가 확인된 사실처럼 읽힌다
+    # Then: 빠졌다는 사실과 **어떻게 하면 되는지**를 함께 말한다. 나무는 몇 걸음
+    #       옮기면 피하지만 오름은 못 피한다 — 그래서 지형만 재는 것이다
     assert any("방풍림" in x for x in lines)
+    assert any("몇 걸음 옮겨" in x for x in lines)
 
 
 def test_못_쟀으면_아무_말도_하지_않는다():

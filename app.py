@@ -68,7 +68,9 @@ mcp = FastMCP.from_fastapi(
 
 응답에는 사람이 읽는 결론(verdict)·근거(reasons)와 함께 수치(numbers)·출처
 (attribution)가 따로 실립니다. 수치는 지어내지 말고 numbers 를 그대로 인용하세요.
-경로 지도가 있으면 map_url 로 나갑니다.""",
+경로 지도가 있으면 map_url 로 나갑니다. **지도 링크는 한 답에 하나만** 옮기세요 —
+도구를 여러 번 불렀어도 답이 결국 말하는 곳의 지도 하나만 남기고, reasons 의
+"지도(…)" 줄과 map_url 은 같은 주소이니 두 번 적지 않습니다.""",
 )
 
 

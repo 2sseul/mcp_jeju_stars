@@ -62,6 +62,7 @@ from skyfield.api import Star, wgs84
 from modules import path
 from modules.core.ephem import EPH, TS, require_aware
 from modules.core.horizon import FIST_NOTE_TAIL, hand_span
+from modules.core.judge import CLEAR_PCT, PHOTOMETRIC_PCT
 
 __all__ = [
     "FIRST_MAGNITUDE",
@@ -414,8 +415,28 @@ def highlights(got: list[Constellation]) -> list[Constellation]:
     return picked
 
 
+def _seen_lead(cloud_cover: float | None) -> str:
+    """'볼 수 있어요' 를 구름만큼 물린다.
+
+    이 축은 하늘밝기와 지형만 본다 — 구름은 모른다. 그래서 하늘의 절반이 덮인 밤에도
+    "볼 수 있어요" 라고 단정하면, 같은 답 안에서 판정('밝은 별 한정')과 어긋난다.
+
+    경계는 `judge` 의 차폐 사다리를 그대로 쓴다(ESO clear sky 10% · Xin et al. PTB
+    30%). 이 축이 새 임계값을 만들면 두 축이 서로 다른 구름을 말하게 된다.
+    """
+    if cloud_cover is None or cloud_cover <= CLEAR_PCT:
+        return "볼 수 있어요"
+    if cloud_cover <= PHOTOMETRIC_PCT:
+        return "구름 사이로 볼 수 있어요"
+    return "구름이 비켜 주면 볼 수 있어요"
+
+
 def describe(
-    got: list[Constellation], *, brief: bool = False, explain_fist: bool = True
+    got: list[Constellation],
+    *,
+    brief: bool = False,
+    explain_fist: bool = True,
+    cloud_cover: float | None = None,
 ) -> list[str]:
     """별자리를 **보이느냐 마느냐**로 끊어 말한다. 볼 것이 없으면 빈 목록.
 
@@ -435,6 +456,8 @@ def describe(
     Args:
         brief: 판정이 '불가'인 밤이면 True. 한 줄만 낸다.
         explain_fist: '주먹'이 몇 도인지 여기서 알려 줄지. 지평선 축과 나눠 쓴다.
+        cloud_cover: 그 시각의 총운량(%). 받으면 "볼 수 있어요" 를 그만큼 물린다 —
+                     이 축은 구름을 모르므로, 모르는 채로 단정하지 않기 위해서다.
     """
     top = highlights(got)
 
@@ -457,7 +480,7 @@ def describe(
 
     lines: list[str] = []
     if up:
-        lines.append(f"볼 수 있어요 — {_names(up)}")
+        lines.append(f"{_seen_lead(cloud_cover)} — {_names(up)}")
 
     if low:
         # 낮게 뜬 것만 높이를 붙인다 — 여기서는 높이가 곧 '보이느냐'라서다.

@@ -184,7 +184,11 @@ def constellation_node(state: EngineState) -> dict:
     # 까지 말하면, 정작 사용자가 읽어야 할 "오늘은 어렵다"가 안내 더미에 묻힌다.
     # 수치(`numbers`)는 그대로 다 싣는다 — 줄이는 것은 **말**이지 사실이 아니다.
     brief = state.get("possible") is False
-    reasons = _constellation.describe(got, brief=brief)
+    # 구름을 함께 넘긴다. 이 축은 구름을 모르는데, 모른 채로 "볼 수 있어요" 라고 하면
+    # 같은 답 안에서 판정('밝은 별 한정')과 어긋난다 — 아는 만큼만 말하게 한다.
+    reasons = _constellation.describe(
+        got, brief=brief, cloud_cover=state.get("cloud")
+    )
 
     if prof is not None:
         numbers["horizon"] = prof

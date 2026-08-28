@@ -165,10 +165,20 @@ def constellation_node(state: EngineState) -> dict:
     ]
     numbers: dict = {"constellations": rows}
     attribution = list(_constellation.SOURCES)
-    reasons = _constellation.describe(got)
+
+    # 판정이 '불가'인 밤이면 문장을 한 줄로 줄인다. 비 오는 밤에 "동쪽은 산에 가려요"
+    # 까지 말하면, 정작 사용자가 읽어야 할 "오늘은 어렵다"가 안내 더미에 묻힌다.
+    # 수치(`numbers`)는 그대로 다 싣는다 — 줄이는 것은 **말**이지 사실이 아니다.
+    brief = state.get("possible") is False
+    reasons = _constellation.describe(got, brief=brief)
+
     if prof is not None:
         numbers["horizon"] = prof
-        reasons.extend(_horizon.describe(prof))
+        # '주먹'이 몇 도인지는 한 답에 한 번만 나온다 — 별자리 쪽이 이미 말했으면
+        # 지평선은 설명 없이 단위만 쓴다.
+        if not brief:
+            said_fist = any(c.low for c in _constellation.highlights(got))
+            reasons.extend(_horizon.describe(prof, explain_fist=not said_fist))
         attribution.append(_elevation.SOURCE)
     return {
         "numbers": numbers,

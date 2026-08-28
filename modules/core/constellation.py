@@ -61,7 +61,7 @@ from skyfield.api import Star, wgs84
 
 from modules import path
 from modules.core.ephem import EPH, TS, require_aware
-from modules.core.horizon import hand_span
+from modules.core.horizon import FIST_NOTE, span_with_deg
 
 __all__ = [
     "FIRST_MAGNITUDE",
@@ -348,17 +348,21 @@ def highlights(got: list[Constellation]) -> list[Constellation]:
     return picked
 
 
-def describe(got: list[Constellation]) -> list[str]:
+def describe(
+    got: list[Constellation], *, brief: bool = False, explain_fist: bool = True
+) -> list[str]:
     """별자리 목록을 사람이 읽는 문장으로. 볼 것이 없으면 빈 목록.
 
     **판정하지 않는다.** 어느 별자리가 어느 쪽 몇 도에 있다는 사실만 말한다 —
     등급은 `judge` 소관이고, 이 축은 등급을 바꾸지 않는다(`weather` 와 같은 자리).
+
+    Args:
+        brief: 판정이 '불가'인 밤이면 True. 한 줄만 낸다 — 아래 설명 참고.
+        explain_fist: '주먹'이 몇 도인지 여기서 알려 줄지. 지평선 축과 나눠 쓴다.
     """
     top = highlights(got)
     if not top:
         return []
-
-    lines: list[str] = []
 
     # 높이로 **묶어서** 말한다. 별자리마다 "(북동쪽 81도)"를 붙이면 다섯 개만 나열해도
     # 숫자가 다섯 번 나오는데, 60도든 81도든 고개를 크게 젖혀야 하는 것은 같다.
@@ -367,31 +371,46 @@ def describe(got: list[Constellation]) -> list[str]:
         return "·".join(f"{c.korean}({c.bearing})" for c in cs)
 
     overhead = [c for c in top if c.altitude_deg >= OVERHEAD_DEG]
+    middle = [c for c in top if not c.low and c.altitude_deg < OVERHEAD_DEG]
+    low = [c for c in top if c.low]
+
+    # 비·구름으로 '불가'인 밤에는 "어느 쪽을 보고 서세요"가 쓸모없는 안내다 — 그 밤에
+    # 사용자가 정할 것은 방향이 아니라 갈지 말지다. 그렇다고 통째로 지우면 "오늘은
+    # 어떤 하늘이냐"에 답하지 못하므로, 한 줄로 줄여 남긴다.
+    if brief:
+        head = (overhead or middle or low)[:3]
+        return [f"하늘이 열린다면 {_names(head)}를 볼 수 있는 밤이에요"]
+
+    lines: list[str] = []
     if overhead:
         lines.append(f"거의 머리 위에 {_names(overhead)}가 떠 있어요")
-
-    middle = [c for c in top if not c.low and c.altitude_deg < OVERHEAD_DEG]
     if middle:
         lines.append(f"조금 낮은 하늘에는 {_names(middle)}가 있어요")
 
-    # 낮게 뜬 것은 **팔 뻗은 손**으로 높이를 말한다 — 지평선 문구와 같은 단위라야
-    # "주먹 2개까지 가려요 / 주먹 3개 높이에 있어요"를 견줘 읽을 수 있다.
-    def _where(c: Constellation) -> str:
-        return f"{c.korean}({c.bearing}·{hand_span(c.altitude_deg)})"
-
-    low = [c for c in top if c.low]
     if low:
+        # 낮게 뜬 것은 **팔 뻗은 손**으로 높이를 말한다 — 지평선 문구와 같은 단위라야
+        # "주먹 2개까지 가려요 / 주먹 2개 높이에 있어요"를 견줘 읽을 수 있다.
+        # 한 별자리를 한 마디로 끊는다("목동자리는 북서쪽 주먹 2개(20도)") — 방위와
+        # 높이를 괄호 하나에 몰아넣으면 읽는 쪽이 매번 풀어야 한다.
+        def _one(c: Constellation) -> str:
+            return (
+                f"{c.korean}는 {c.bearing}쪽 {span_with_deg(c.altitude_deg)}"
+            )
+
         # 지형을 쟀느냐에 따라 할 말이 다르다. 쟀으면 여기 남은 것들은 **지형을 이미
         # 통과한** 별자리다 — 그런데도 "오름에 가릴 수 있어요"라고 하면 방금 한 계산을
         # 스스로 부정하는 말이 된다. 안 쟀으면 단정하지 않는다(모듈 docstring).
         measured = any(c.horizon_deg is not None for c in low)
         tail = (
-            "지형은 넘겼지만 낮아서 나무·건물에는 가릴 수 있어요"
+            "산에는 안 가리는 높이지만 나무·건물에는 걸릴 수 있으니, 그쪽이 트인 자리에 서세요"
             if measured
-            else "오름·나무에 가릴 수 있으니 그쪽 지평선이 트인 자리에 서세요"
+            else "오름·나무에 가리기 쉬우니 그쪽 지평선이 트인 자리에 서세요"
         )
         lines.append(
-            "낮게 떠 있는 것도 있어요 — 팔을 뻗어 재면 "
-            + "·".join(_where(c) for c in low) + " 높이예요. " + tail
+            "낮게 떠 있는 것도 있어요 — "
+            + (FIST_NOTE if explain_fist else "")
+            + ", ".join(_one(c) for c in low)
+            + " 높이예요. "
+            + tail
         )
     return lines

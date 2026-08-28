@@ -134,6 +134,21 @@ def hand_span(deg: float) -> str:
     return f"주먹 {max(round(deg / FIST_DEG), 1):.0f}개"
 
 
+def span_with_deg(deg: float) -> str:
+    """손 단위에 각도를 괄호로 붙인다 — "주먹 2개(20도)".
+
+    손가락 단위(7도 미만)에는 붙이지 않는다. 3.4도를 "손가락 세 개(3도)"라고 쓰면
+    반올림한 정수가 실제보다 정밀해 보이고, 그 높이에서는 각도 자체가 쓸모가 없다.
+    """
+    label = hand_span(deg)
+    return f"{label}({deg:.0f}도)" if deg >= _HAND[-1][0] else label
+
+
+#: '주먹'이 몇 도인지 한 번만 알려 준다. 처음 가는 사람에게 "주먹 2개"는 그 자체로는
+#: 아무 높이도 아니다 — 그렇다고 나올 때마다 붙이면 문장이 설명으로 뒤덮인다.
+FIST_NOTE: str = "팔을 뻗어 쥔 주먹 하나가 약 10도인데, "
+
+
 def drop_m(distance_m: float | np.ndarray) -> float | np.ndarray:
     """거리 d 에서 지구 곡면이 내려가는 높이(m). d² / 2R."""
     return distance_m * distance_m / (2.0 * EARTH_R_M)
@@ -203,45 +218,49 @@ def profile(lat: float, lon: float) -> dict[str, float] | None:
 
 # --- 서술 --------------------------------------------------------------------
 
-#: 격자가 맨땅이라는 사실과 **그래서 어떻게 하면 되는지**를 함께 말한다. 나무는 몇 걸음
-#: 옮기면 피하지만 오름은 못 피한다 — 그것이 지형만 재는 이유이기도 하다.
-_CANOPY_NOTE = (
-    "지형만 잰 값이에요 — 방풍림·건물은 안 들어가 있지만, 그건 몇 걸음 옮겨 "
-    "피할 수 있는 것들이라 자리를 조금씩 바꿔 보세요"
-)
+#: 격자가 맨땅이라는 사실. 트여 있다고 말할 때만 붙인다 — 막힌 쪽을 말할 때는 이미
+#: '가려요'라고 했으므로 덧붙일 것이 없다. 한 줄을 따로 쓰지 않고 괄호로 접는다.
+_CANOPY_NOTE = " (나무·건물은 안 잰 값이에요)"
 
-def describe(prof: dict[str, float] | None) -> list[str]:
-    """지평선을 사람이 읽는 문장으로. 못 쟀으면 빈 목록.
+
+def describe(prof: dict[str, float] | None, *, explain_fist: bool = True) -> list[str]:
+    """지평선을 사람이 읽는 **한 줄**로. 못 쟀으면 빈 목록.
 
     **트인 쪽을 먼저 말한다.** 관측자가 정해야 하는 것은 "어디가 막혔나"보다
     "어디를 보고 서나"이기 때문이다. 막힌 쪽은 가장 심한 하나만 덧붙인다 —
     여덟 방위를 다 읊으면 정작 서야 할 방향이 묻힌다(수치는 `numbers` 에 다 있다).
+
+    Args:
+        explain_fist: '주먹'이 몇 도인지 여기서 알려 줄지. 별자리 축이 먼저 말했으면
+                      False 로 받아 같은 설명을 두 번 하지 않는다.
     """
     if not prof:
         return []
 
     open_ways = [k for k, v in prof.items() if v < OPEN_DEG]
-    worst = max(prof.items(), key=lambda kv: kv[1])
+    worst_way, worst_deg = max(prof.items(), key=lambda kv: kv[1])
+    fist = FIST_NOTE if explain_fist else ""
 
-    if worst[1] < OPEN_DEG:
-        return ["사방 지평선이 트여 있어요 — 어느 쪽 하늘이든 낮게 뜬 별까지 보입니다"]
+    if worst_deg < OPEN_DEG:
+        return [
+            "사방 지평선이 트여 있어요 — 어느 쪽 하늘이든 낮게 뜬 별까지 보입니다"
+            + _CANOPY_NOTE
+        ]
 
     # 주먹 하나도 안 가리면 '가려요'가 과장이다. 용눈이오름은 가장 높은 쪽이 3도라
     # 사실상 트인 자리인데, 그것을 "북서쪽은 가려요"라고 하면 없는 흠을 만든다.
-    if worst[1] < FIST_DEG:
+    if worst_deg < FIST_DEG:
         return [
-            f"사방이 거의 트여 있어요 — 가장 높은 {worst[0]}쪽도 팔 뻗은 "
-            f"{hand_span(worst[1])} 높이예요 ({worst[1]:.0f}도)",
-            _CANOPY_NOTE,
+            f"사방이 거의 트여 있어요 — 가장 높은 {worst_way}쪽도 "
+            f"{span_with_deg(worst_deg)} 높이예요" + _CANOPY_NOTE
         ]
 
-    line = ""
-    if open_ways:
-        line += "하늘이 트인 쪽은 " + "·".join(open_ways) + "쪽이에요. "
     # 각도는 괄호에 남긴다 — 문장은 사람이 읽고, 수치는 `numbers.horizon` 과 함께
     # 호출자가 쓴다. 이 프로젝트가 "총운량 33%"를 괄호로 다는 것과 같은 모양이다.
-    line += (
-        f"{worst[0]}쪽은 산이 팔 뻗은 {hand_span(worst[1])} 높이까지 가려요 "
-        f"({worst[1]:.0f}도)"
+    blocked = (
+        f"{fist}{worst_way}쪽은 산에 {span_with_deg(worst_deg)}까지 가려서 "
+        "그쪽 낮은 별은 보기 어려워요"
     )
-    return [line, _CANOPY_NOTE]
+    if open_ways:
+        return ["하늘이 트인 쪽은 " + "·".join(open_ways) + "쪽이에요 — " + blocked]
+    return [blocked]

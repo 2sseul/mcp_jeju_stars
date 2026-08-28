@@ -148,6 +148,9 @@ def span_with_deg(deg: float) -> str:
 #: 아무 높이도 아니다 — 그렇다고 나올 때마다 붙이면 문장이 설명으로 뒤덮인다.
 FIST_NOTE: str = "팔을 뻗어 쥔 주먹 하나가 약 10도인데, "
 
+#: 같은 설명을 문장 **끝**에 다는 꼴. 앞에 끼우면 목록이 길 때 기준이 이름들에 묻힌다.
+FIST_NOTE_TAIL: str = " · 팔 뻗은 주먹 하나가 약 10도예요"
+
 
 def drop_m(distance_m: float | np.ndarray) -> float | np.ndarray:
     """거리 d 에서 지구 곡면이 내려가는 높이(m). d² / 2R."""

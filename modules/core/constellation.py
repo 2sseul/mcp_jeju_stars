@@ -61,7 +61,7 @@ from skyfield.api import Star, wgs84
 
 from modules import path
 from modules.core.ephem import EPH, TS, require_aware
-from modules.core.horizon import FIST_NOTE, span_with_deg
+from modules.core.horizon import FIST_NOTE_TAIL, hand_span
 
 __all__ = [
     "FIRST_MAGNITUDE",
@@ -256,6 +256,11 @@ class Constellation:
         )
 
     @property
+    def hidden(self) -> bool:
+        """지형에 가려 못 보는가 — 그것만 아니면 알아봤을 것."""
+        return self.blocked and self.visible_stars >= _MIN_LINE_STARS
+
+    @property
     def lost(self) -> bool:
         """달이 없었다면 알아봤을 텐데 오늘은 못 알아보는가.
 
@@ -409,108 +414,76 @@ def highlights(got: list[Constellation]) -> list[Constellation]:
     return picked
 
 
-def _moonlight_lines(got: list[Constellation]) -> list[str]:
-    """달빛이 이 하늘에서 **무엇을 지웠는지**. 견줄 하늘을 안 받았으면 빈 목록.
-
-    두 가지를 따로 말한다 — 뭉치면 둘 다 틀린 말이 된다.
-
-        잔별이 묻힌다      별자리는 그대로 보이는데 사이가 비어 간다. 보름달 밤에
-                          실제로 일어나는 일이고, 은하수가 사라지는 것이 이것이다.
-        별자리가 넘어간다   선 별까지 묻혀 알아볼 수 없게 된다. 어두운 별로만 이뤄진
-                          별자리(현미경자리 같은)에서만 일어난다.
-
-    **비율을 등급으로 옮기지 않는다.** "절반만 보여요" 같은 말에는 근거가 되는 경계가
-    없다 — 센 수를 그대로 준다. 이 프로젝트가 운량을 "33%"로 주는 것과 같은 자리다.
-    """
-    up = [c for c in got if c.up and not c.blocked and c.visible_sky_dark is not None]
-    if not up:
-        return []
-
-    now = sum(c.visible_sky for c in up)
-    dark = sum(c.visible_sky_dark or 0 for c in up)
-    lines: list[str] = []
-
-    if now < dark:
-        lines.append(
-            f"달빛에 잔별이 묻혀요 — 달이 없는 밤이면 이 하늘에 별 {dark:,}개가 "
-            f"잡히는데 오늘은 {now:,}개예요. 은하수와 어두운 별부터 사라집니다"
-        )
-
-    lost = [c for c in got if c.lost]
-    if lost:
-        # 고도 높은 순으로 온다(assess 가 그렇게 정렬한다). 앞의 셋만 말한다 — 여덟
-        # 개를 읊으면 '무엇을 볼 수 있나'가 '무엇을 못 보나'에 묻힌다.
-        names = "·".join(c.korean for c in lost[:3])
-        more = f" 외 {len(lost) - 3}개" if len(lost) > 3 else ""
-        lines.append(f"오늘 하늘에선 알아보기 어려운 것도 있어요 — {names}{more}")
-
-    return lines
-
-
 def describe(
     got: list[Constellation], *, brief: bool = False, explain_fist: bool = True
 ) -> list[str]:
-    """별자리 목록을 사람이 읽는 문장으로. 볼 것이 없으면 빈 목록.
+    """별자리를 **보이느냐 마느냐**로 끊어 말한다. 볼 것이 없으면 빈 목록.
 
-    **판정하지 않는다.** 어느 별자리가 어느 쪽 몇 도에 있다는 사실만 말한다 —
+    **판정하지 않는다.** 어느 별자리가 어느 쪽에 있고 보이느냐는 사실만 말한다 —
     등급은 `judge` 소관이고, 이 축은 등급을 바꾸지 않는다(`weather` 와 같은 자리).
 
+    한 줄이 한 가지 답을 한다.
+
+        볼 수 있어요            고도 30도 위 — 서서 고개만 들면 된다
+        낮아서 놓치기 쉬워요     떠 있지만 낮다 — 그쪽이 트여야 보인다
+        안 보여요               달빛에 묻혔거나 지형에 가렸다(괄호에 이유)
+
+    센 수(`visible_sky` 등)는 문장에 넣지 않는다. "달이 없으면 2,443개인데 오늘은
+    725개" 는 사실이지만, 갈지 말지를 정하는 사람이 읽을 말은 아니다 — 수치는
+    `numbers` 에 그대로 실어 호출자가 쓰게 둔다.
+
     Args:
-        brief: 판정이 '불가'인 밤이면 True. 한 줄만 낸다 — 아래 설명 참고.
+        brief: 판정이 '불가'인 밤이면 True. 한 줄만 낸다.
         explain_fist: '주먹'이 몇 도인지 여기서 알려 줄지. 지평선 축과 나눠 쓴다.
     """
     top = highlights(got)
-    if not top:
-        return []
 
-    # 높이로 **묶어서** 말한다. 별자리마다 "(북동쪽 81도)"를 붙이면 다섯 개만 나열해도
-    # 숫자가 다섯 번 나오는데, 60도든 81도든 고개를 크게 젖혀야 하는 것은 같다.
     # 사용자가 정해야 하는 것은 **어느 쪽을 보고 서나**이므로 방위를 괄호에 남긴다.
+    # 고도는 `numbers` 에 있다 — 문장에 숫자를 다섯 번 넣을 이유가 없다.
     def _names(cs: list[Constellation]) -> str:
         return "·".join(f"{c.korean}({c.bearing})" for c in cs)
 
-    overhead = [c for c in top if c.altitude_deg >= OVERHEAD_DEG]
-    middle = [c for c in top if not c.low and c.altitude_deg < OVERHEAD_DEG]
+    if not top:
+        return []
+
+    up = [c for c in top if not c.low]
     low = [c for c in top if c.low]
 
     # 비·구름으로 '불가'인 밤에는 "어느 쪽을 보고 서세요"가 쓸모없는 안내다 — 그 밤에
     # 사용자가 정할 것은 방향이 아니라 갈지 말지다. 그렇다고 통째로 지우면 "오늘은
     # 어떤 하늘이냐"에 답하지 못하므로, 한 줄로 줄여 남긴다.
     if brief:
-        head = (overhead or middle or low)[:3]
-        return [f"하늘이 열린다면 {_names(head)}를 볼 수 있는 밤이에요"]
+        return [f"하늘이 열린다면 {_names((up or low)[:3])}를 볼 수 있는 밤이에요"]
 
     lines: list[str] = []
-    if overhead:
-        lines.append(f"거의 머리 위에 {_names(overhead)}가 떠 있어요")
-    if middle:
-        lines.append(f"조금 낮은 하늘에는 {_names(middle)}가 있어요")
-    lines.extend(_moonlight_lines(got))
+    if up:
+        lines.append(f"볼 수 있어요 — {_names(up)}")
 
     if low:
-        # 낮게 뜬 것은 **팔 뻗은 손**으로 높이를 말한다 — 지평선 문구와 같은 단위라야
-        # "주먹 2개까지 가려요 / 주먹 2개 높이에 있어요"를 견줘 읽을 수 있다.
-        # 한 별자리를 한 마디로 끊는다("목동자리는 북서쪽 주먹 2개(20도)") — 방위와
-        # 높이를 괄호 하나에 몰아넣으면 읽는 쪽이 매번 풀어야 한다.
-        def _one(c: Constellation) -> str:
-            return (
-                f"{c.korean}는 {c.bearing}쪽 {span_with_deg(c.altitude_deg)}"
-            )
+        # 낮게 뜬 것만 높이를 붙인다 — 여기서는 높이가 곧 '보이느냐'라서다.
+        names = "·".join(
+            f"{c.korean}({c.bearing}·{hand_span(c.altitude_deg)})" for c in low
+        )
+        note = FIST_NOTE_TAIL if explain_fist else ""
+        lines.append(f"낮아서 놓치기 쉬워요 — {names}{note}")
 
-        # 지형을 쟀느냐에 따라 할 말이 다르다. 쟀으면 여기 남은 것들은 **지형을 이미
-        # 통과한** 별자리다 — 그런데도 "오름에 가릴 수 있어요"라고 하면 방금 한 계산을
-        # 스스로 부정하는 말이 된다. 안 쟀으면 단정하지 않는다(모듈 docstring).
-        measured = any(c.horizon_deg is not None for c in low)
-        tail = (
-            "산에는 안 가리는 높이지만 나무·건물에는 걸릴 수 있으니, 그쪽이 트인 자리에 서세요"
-            if measured
-            else "오름·나무에 가리기 쉬우니 그쪽 지평선이 트인 자리에 서세요"
-        )
-        lines.append(
-            "낮게 떠 있는 것도 있어요 — "
-            + (FIST_NOTE if explain_fist else "")
-            + ", ".join(_one(c) for c in low)
-            + " 높이예요. "
-            + tail
-        )
+    # 못 보는 것은 **이유를 괄호에** 단다. 달빛은 날짜를 바꾸면 되고 지형은 자리를
+    # 옮겨야 하니, 사용자가 할 수 있는 일이 다르다.
+    #
+    # 지형에 가린 것은 **원래 짚어 줬을 것**만 말한다. 지평선 언저리에는 늘 무언가
+    # 걸쳐 있어서 다 세면 조각가자리·망원경자리 같은 이름이 예닐곱 개씩 나오는데,
+    # 그것들은 지형이 없어도 안내에 안 나왔을 별자리다 — 없던 아쉬움을 만든다.
+    # 달빛에 묻힌 것은 밝기와 무관하게 다 말한다. 날짜를 바꾸면 볼 수 있어서다.
+    gone = [(c, "달빛") for c in got if c.lost]
+    gone += [
+        (c, "지형") for c in got
+        if c.hidden and c.brightest is not None and c.brightest <= FIRST_MAGNITUDE
+    ]
+    if gone:
+        # 밝은 것부터 — 이름을 알아볼 만한 것이 앞에 와야 잘린 뒤가 아쉽지 않다.
+        gone.sort(key=lambda p: p[0].brightest if p[0].brightest is not None else 99)
+        shown = "·".join(f"{c.korean}({why})" for c, why in gone[:3])
+        more = f" 외 {len(gone) - 3}개" if len(gone) > 3 else ""
+        lines.append(f"안 보여요 — {shown}{more}")
+
     return lines

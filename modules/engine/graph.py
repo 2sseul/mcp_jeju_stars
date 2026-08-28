@@ -145,11 +145,15 @@ def constellation_node(state: EngineState) -> dict:
 
     nums = state.get("numbers", {})
     sqm = nums.get("sky_sqm")
-    bortle = _darkness.bortle_of(sqm) if sqm is not None else nums.get("bortle")
+    # 정적 광공해만 본 등급. 달빛이 무엇을 지웠는지 말하려면 지우기 전 하늘이 있어야
+    # 한다 — 달이 안 떴으면 두 값이 같아서 비교 문장이 저절로 사라진다.
+    bortle_dark = nums.get("bortle")
+    bortle = _darkness.bortle_of(sqm) if sqm is not None else bortle_dark
 
     prof = _horizon.profile(state["lat"], state["lon"])
     got = _constellation.assess(
-        state["lat"], state["lon"], state["when"], bortle, horizon=prof
+        state["lat"], state["lon"], state["when"], bortle,
+        horizon=prof, bortle_dark=bortle_dark,
     )
     # 알아볼 만한 것만 싣는다. 지평 아래·너무 흐린 것까지 실으면 88개가 그대로 나가
     # 호출자가 읽을 것이 아니라 걸러낼 것을 받게 된다.
@@ -160,10 +164,20 @@ def constellation_node(state: EngineState) -> dict:
             "altitude_deg": c.altitude_deg,
             "low": c.low,
             "brightest": c.brightest,
+            # 이 하늘에서 별이 얼마나 잡히나. 등급을 매기지 않고 센 수를 그대로 준다 —
+            # "절반만 보여요"의 경계는 근거가 없지만 "160개 중 46개"는 사실이다.
+            "stars_visible": c.visible_sky,
+            "stars_total": c.sky_stars,
         }
         for c in got if c.naked_eye
     ]
-    numbers: dict = {"constellations": rows}
+    numbers: dict = {
+        "constellations": rows,
+        # 맨눈 한계등급 — 이 하늘에서 몇 등급까지 보이나. 별자리 목록이 왜 이만큼인지의
+        # 근거이자, 달빛이 얼마나 깎았는지를 호출자가 직접 견줄 수 있는 값이다.
+        "limiting_magnitude": _constellation.nelm_of(bortle),
+        "limiting_magnitude_moonless": _constellation.nelm_of(bortle_dark),
+    }
     attribution = list(_constellation.SOURCES)
 
     # 판정이 '불가'인 밤이면 문장을 한 줄로 줄인다. 비 오는 밤에 "동쪽은 산에 가려요"

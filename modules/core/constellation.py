@@ -118,6 +118,11 @@ OVERHEAD_DEG: float = 90.0 - HIGH_ALT_DEG
 #: "1등성을 품은 별자리"는 왜 그것들인지 말할 수 있다.
 FIRST_MAGNITUDE: float = 1.5
 
+#: 별자리를 '알아본다'고 하려면 선 별이 몇 개는 보여야 하는가. 가장 밝은 별 하나만
+#: 걸리는 것은 별 하나가 보이는 것이지 별자리가 보이는 것이 아니다 — 선을 이으려면
+#: 둘이 필요하다. `naked_eye` 와 `lost` 가 같은 값을 봐야 경계가 어긋나지 않는다.
+_MIN_LINE_STARS: int = 2
+
 #: 한계등급을 모를 때(어둡기 격자 밖 등) 쓰는 값. Bortle 5(교외)는 제주 중산간의
 #: 흔한 하늘이라, 모른다고 다 보인다고 하지 않으면서 다 못 본다고도 하지 않는다.
 NELM_FALLBACK: float = NELM_BY_BORTLE[5]
@@ -183,6 +188,9 @@ def _prepare() -> list[dict]:
             "ra_hours": direction[0],
             "dec_deg": direction[1],
             "mags": mags,
+            # 경계 안 잔별의 등급(오름차순). 선 별과 **섞지 않는다** — 선 별은 모양과
+            # 방향을, 이쪽은 그 구역 하늘이 얼마나 촘촘한지를 담는다.
+            "sky_mags": c.get("sky_mags") or [],
         })
     return out
 
@@ -210,10 +218,17 @@ class Constellation:
     altitude_deg:  지평 위 고도(도). 음수면 떠 있지 않다.
     azimuth_deg:   방위각(도, 북=0 시계방향).
     bearing:       방위를 사람 말로(8방위).
-    visible_stars: 이 하늘에서 맨눈에 잡히는 별 수(한계등급보다 밝은 것).
-    total_stars:   별자리를 이루는 별 수(등급을 아는 것만).
+    visible_stars: 선 별 중 이 하늘에서 잡히는 수 — **알아보느냐**를 가른다.
+    total_stars:   별자리를 이루는 선 별 수(등급을 아는 것만).
     brightest:     가장 밝은 별의 등급. 없으면 None.
     horizon_deg:   그 방위의 지형 지평선(도). 안 받았으면 None.
+    sky_stars:     경계 안 성표 별 수(Vmag <= 6.5) — **얼마나 촘촘하냐**의 분모.
+    visible_sky:   그중 이 하늘에서 잡히는 수. 달이 밝으면 여기가 먼저 줄어든다.
+    visible_sky_dark: 달빛이 없었다면 잡혔을 수. 견줄 하늘을 안 받았으면 None.
+
+    두 쌍을 나눠 두는 이유 — 보름달에도 백조자리 십자는 보인다(선 별이 다 3등급보다
+    밝다). 사라지는 것은 그 사이의 잔별이다. 한 쌍으로 뭉치면 "백조자리가 안 보인다"는
+    틀린 말을 하게 되고, 잔별을 안 세면 "달이 떠도 똑같다"는 틀린 말을 하게 된다.
     """
 
     abbr: str
@@ -227,6 +242,33 @@ class Constellation:
     total_stars: int
     brightest: float | None
     horizon_deg: float | None = None
+    sky_stars: int = 0
+    visible_sky: int = 0
+    visible_sky_dark: int | None = None
+    visible_stars_dark: int | None = None
+
+    @property
+    def dimmed(self) -> bool:
+        """달빛에 잔별이 깎였는가 — 견줄 하늘을 받았을 때만 답한다."""
+        return (
+            self.visible_sky_dark is not None
+            and self.visible_sky < self.visible_sky_dark
+        )
+
+    @property
+    def lost(self) -> bool:
+        """달이 없었다면 알아봤을 텐데 오늘은 못 알아보는가.
+
+        선 별 기준이다(`naked_eye` 와 같은 잣대). 잔별이 줄어드는 것은 `dimmed` 이고,
+        이쪽은 **별자리 자체가 넘어가는** 경계다 — 둘은 다른 말이라 따로 센다.
+        """
+        return (
+            self.visible_stars_dark is not None
+            and self.up
+            and not self.blocked
+            and self.visible_stars_dark >= _MIN_LINE_STARS
+            and self.visible_stars < _MIN_LINE_STARS
+        )
 
     @property
     def blocked(self) -> bool:
@@ -258,7 +300,9 @@ class Constellation:
         가장 밝은 별 하나만 걸리는 것으로는 '별자리가 보인다'고 하지 않는다 —
         선을 이으려면 별이 둘 이상 필요하다. 지형에 가린 것도 빠진다.
         """
-        return self.up and not self.blocked and self.visible_stars >= 2
+        return (
+            self.up and not self.blocked and self.visible_stars >= _MIN_LINE_STARS
+        )
 
 
 # --- 보조 --------------------------------------------------------------------
@@ -283,6 +327,7 @@ def assess(
     when: datetime,
     bortle: int | None = None,
     horizon: dict[str, float] | None = None,
+    bortle_dark: int | None = None,
 ) -> list[Constellation]:
     """(lat, lon, when) 에서 본 별자리 전부. 고도 높은 순으로 돌려준다.
 
@@ -293,6 +338,10 @@ def assess(
                 값을 넘긴다 — 그러면 달이 뜬 시각에 보이는 별자리가 저절로 줄어든다.
         horizon: 방위별 지형 지평선(`horizon.profile`). 넘기면 그보다 낮은 별자리가
                 `blocked` 가 된다. 안 넘기면 지형을 모르는 것으로 둔다.
+        bortle_dark: **달빛을 뺀** 그 자리의 등급(`darkness.assess_site`). 넘기면
+                같은 별자리를 두 하늘에서 세어 `visible_sky_dark` 를 채운다 — 달이
+                무엇을 지웠는지 말하려면 지우기 전 값이 있어야 한다. 성표 조회는
+                한 번뿐이라(방향은 하늘밝기와 무관) 값이 두 배로 드는 일은 없다.
 
     Returns:
         88개(데이터가 있는 것) 전부. 지평 아래인 것도 담아 돌려준다 — 거르는 기준은
@@ -307,9 +356,11 @@ def assess(
     azs = az.degrees
 
     limit = nelm_of(bortle)
+    limit_dark = None if bortle_dark is None else nelm_of(bortle_dark)
     out: list[Constellation] = []
     for i, c in enumerate(_PREPARED):
         mags = c["mags"]
+        sky_mags = c["sky_mags"]
         bearing = bearing_ko(float(azs[i]))
         out.append(
             Constellation(
@@ -324,6 +375,16 @@ def assess(
                 total_stars=len(mags),
                 brightest=mags[0] if mags else None,
                 horizon_deg=None if horizon is None else horizon.get(bearing),
+                sky_stars=len(sky_mags),
+                visible_sky=sum(1 for m in sky_mags if m <= limit),
+                visible_sky_dark=(
+                    None if limit_dark is None
+                    else sum(1 for m in sky_mags if m <= limit_dark)
+                ),
+                visible_stars_dark=(
+                    None if limit_dark is None
+                    else sum(1 for m in mags if m <= limit_dark)
+                ),
             )
         )
     out.sort(key=lambda c: c.altitude_deg, reverse=True)
@@ -346,6 +407,44 @@ def highlights(got: list[Constellation]) -> list[Constellation]:
     ]
     picked.sort(key=lambda c: c.altitude_deg, reverse=True)
     return picked
+
+
+def _moonlight_lines(got: list[Constellation]) -> list[str]:
+    """달빛이 이 하늘에서 **무엇을 지웠는지**. 견줄 하늘을 안 받았으면 빈 목록.
+
+    두 가지를 따로 말한다 — 뭉치면 둘 다 틀린 말이 된다.
+
+        잔별이 묻힌다      별자리는 그대로 보이는데 사이가 비어 간다. 보름달 밤에
+                          실제로 일어나는 일이고, 은하수가 사라지는 것이 이것이다.
+        별자리가 넘어간다   선 별까지 묻혀 알아볼 수 없게 된다. 어두운 별로만 이뤄진
+                          별자리(현미경자리 같은)에서만 일어난다.
+
+    **비율을 등급으로 옮기지 않는다.** "절반만 보여요" 같은 말에는 근거가 되는 경계가
+    없다 — 센 수를 그대로 준다. 이 프로젝트가 운량을 "33%"로 주는 것과 같은 자리다.
+    """
+    up = [c for c in got if c.up and not c.blocked and c.visible_sky_dark is not None]
+    if not up:
+        return []
+
+    now = sum(c.visible_sky for c in up)
+    dark = sum(c.visible_sky_dark or 0 for c in up)
+    lines: list[str] = []
+
+    if now < dark:
+        lines.append(
+            f"달빛에 잔별이 묻혀요 — 달이 없는 밤이면 이 하늘에 별 {dark:,}개가 "
+            f"잡히는데 오늘은 {now:,}개예요. 은하수와 어두운 별부터 사라집니다"
+        )
+
+    lost = [c for c in got if c.lost]
+    if lost:
+        # 고도 높은 순으로 온다(assess 가 그렇게 정렬한다). 앞의 셋만 말한다 — 여덟
+        # 개를 읊으면 '무엇을 볼 수 있나'가 '무엇을 못 보나'에 묻힌다.
+        names = "·".join(c.korean for c in lost[:3])
+        more = f" 외 {len(lost) - 3}개" if len(lost) > 3 else ""
+        lines.append(f"오늘 하늘에선 알아보기 어려운 것도 있어요 — {names}{more}")
+
+    return lines
 
 
 def describe(
@@ -386,6 +485,7 @@ def describe(
         lines.append(f"거의 머리 위에 {_names(overhead)}가 떠 있어요")
     if middle:
         lines.append(f"조금 낮은 하늘에는 {_names(middle)}가 있어요")
+    lines.extend(_moonlight_lines(got))
 
     if low:
         # 낮게 뜬 것은 **팔 뻗은 손**으로 높이를 말한다 — 지평선 문구와 같은 단위라야

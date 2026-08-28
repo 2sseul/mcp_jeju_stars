@@ -18,8 +18,6 @@ from modules.clients import open_meteo
 from modules.core import astro
 from modules.core import constellation as _constellation
 from modules.core import darkness as _darkness
-from modules.core import elevation as _elevation
-from modules.core import horizon as _horizon
 from modules.core import judge as _judge
 from modules.core import lamps as _lamps
 from modules.core import moon as _moon
@@ -136,9 +134,10 @@ def constellation_node(state: EngineState) -> dict:
     한계등급은 **달빛까지 더한** 하늘밝기에서 낸다(`sky_sqm`). 그래서 보름달 밤에는
     잡히는 별이 저절로 줄어든다. 달빛을 못 구했으면 정적 광공해 등급으로 물러선다.
 
-    지형 지평선(`horizon.profile`)도 함께 넘긴다 — 그러면 하늘에 떠 있어도 오름·한라산에
-    가린 별자리가 목록에서 빠진다. 표고 격자가 없는 배포에서는 지평선이 None 이라
-    예전처럼 "가릴 수 있어요"까지만 말한다.
+    지형은 보지 않는다. 재려면 표고 격자가 있어야 하는데 배포 묶음에는 넣지 않고
+    (라이선스), 30m 격자로는 가까운 둔덕 하나가 수직오차 1.27m 때문에 20도 넘는
+    지평선으로 잡혀 값을 믿을 수 없었다. 낮게 뜬 별은 "가릴 수 있는 높이"라고만
+    말한다 — 확인 안 된 것을 확인된 것처럼 말하지 않는다.
     """
     if state.get("state_code") not in _WEATHER_STATES:
         return {}
@@ -150,10 +149,8 @@ def constellation_node(state: EngineState) -> dict:
     bortle_dark = nums.get("bortle")
     bortle = _darkness.bortle_of(sqm) if sqm is not None else bortle_dark
 
-    prof = _horizon.profile(state["lat"], state["lon"])
     got = _constellation.assess(
-        state["lat"], state["lon"], state["when"], bortle,
-        horizon=prof, bortle_dark=bortle_dark,
+        state["lat"], state["lon"], state["when"], bortle, bortle_dark=bortle_dark
     )
     # 알아볼 만한 것만 싣는다. 지평 아래·너무 흐린 것까지 실으면 88개가 그대로 나가
     # 호출자가 읽을 것이 아니라 걸러낼 것을 받게 된다.
@@ -189,15 +186,6 @@ def constellation_node(state: EngineState) -> dict:
     reasons = _constellation.describe(
         got, brief=brief, cloud_cover=state.get("cloud")
     )
-
-    if prof is not None:
-        numbers["horizon"] = prof
-        # '주먹'이 몇 도인지는 한 답에 한 번만 나온다 — 별자리 쪽이 이미 말했으면
-        # 지평선은 설명 없이 단위만 쓴다.
-        if not brief:
-            said_fist = any(c.low for c in _constellation.highlights(got))
-            reasons.extend(_horizon.describe(prof, explain_fist=not said_fist))
-        attribution.append(_elevation.SOURCE)
     return {
         "numbers": numbers,
         "reasons": reasons,

@@ -39,15 +39,9 @@ IAU 경계의 무게중심을 쓰지 않는다. 큰 별자리일수록 중심이
 `cloud.py` 가 관측 시야를 잡을 때 쓰는 것과 같다("그 아래는 지형/수목에 가려지는 경우가
 많아 제외"). 새 눈금을 만들지 않고 프로젝트 안에서 이미 근거를 밝힌 값을 재사용한다.
 
-**지형을 재면 '가릴 수 있다'가 '막혀 있다'가 된다.** `horizon.profile` 이 낸 방위별
-지평선을 넘겨받으면(`assess(..., horizon=...)`), 그 방위의 지평선보다 낮은 별자리는
-`blocked` 가 된다 — 영실입구 주차장은 북동쪽이 한라산에 18도까지 막혀 있어, 그쪽
-15도에 뜬 별자리는 하늘에 있어도 보이지 않는다.
-
-지평선을 안 받으면 예전처럼 *가릴 수 있다*고만 말한다(배포 컨테이너에는 표고 격자가
-없다). 받았더라도 격자는 **맨땅**이라 방풍림·건물은 안 잡히므로, 막히지 않았다고 나온
-방위도 현장은 더 막혀 있을 수 있다 — 확인 안 된 것을 확인된 것처럼 말하지 않는
-규율(`decisions.md` §2.31)이 여전히 적용된다.
+고도 30도 아래는 **낮다**고만 말한다. 오름·나무·건물에 가릴 수 있는 높이인데, 무엇이
+얼마나 가리는지는 이 축이 답할 수 있는 것이 아니다 — 서 있는 자리에서 몇 걸음만
+옮겨도 달라진다. 확인 안 된 것을 확인된 것처럼 말하지 않는다(`decisions.md` §2.31).
 """
 
 from __future__ import annotations
@@ -61,13 +55,14 @@ from skyfield.api import Star, wgs84
 
 from modules import path
 from modules.core.ephem import EPH, TS, require_aware
-from modules.core.horizon import FIST_NOTE_TAIL, hand_span
 from modules.core.judge import CLEAR_PCT, PHOTOMETRIC_PCT
 
 __all__ = [
     "FIRST_MAGNITUDE",
     "HIGH_ALT_DEG",
+    "FIST_DEG",
     "HORIZON_DEG",
+    "hand_span",
     "NELM_BY_BORTLE",
     "OVERHEAD_DEG",
     "SOURCES",
@@ -118,6 +113,20 @@ OVERHEAD_DEG: float = 90.0 - HIGH_ALT_DEG
 #: 목록을 자를 때 **개수로 자르지 않고 이 밝기로 자른다** — "상위 3개"는 근거가 없지만
 #: "1등성을 품은 별자리"는 왜 그것들인지 말할 수 있다.
 FIRST_MAGNITUDE: float = 1.5
+
+#: 팔 뻗은 주먹 하나의 각(도). 현장에서 팔을 뻗어 맞춰 볼 수 있는 말이라야 안내가 된다.
+FIST_DEG: float = 10.0
+
+#: 주먹보다 낮은 높이를 부르는 말. 경계는 손 모양이 바뀌는 자리다(약 1도 · 약 5도).
+_HAND: tuple[tuple[float, str], ...] = (
+    (2.0, "새끼손가락 하나"),
+    (7.0, "손가락 세 개"),
+)
+
+#: '주먹'이 몇 도인지 한 번만 알려 준다. 처음 가는 사람에게 "주먹 2개"는 그 자체로는
+#: 아무 높이도 아니다 — 그렇다고 나올 때마다 붙이면 문장이 설명으로 뒤덮인다. 문장
+#: **끝**에 단다. 앞에 끼우면 목록이 길 때 기준이 이름들에 묻힌다.
+_FIST_NOTE_TAIL: str = " · 팔 뻗은 주먹 하나가 약 10도예요"
 
 #: 별자리를 '알아본다'고 하려면 선 별이 몇 개는 보여야 하는가. 가장 밝은 별 하나만
 #: 걸리는 것은 별 하나가 보이는 것이지 별자리가 보이는 것이 아니다 — 선을 이으려면
@@ -222,7 +231,6 @@ class Constellation:
     visible_stars: 선 별 중 이 하늘에서 잡히는 수 — **알아보느냐**를 가른다.
     total_stars:   별자리를 이루는 선 별 수(등급을 아는 것만).
     brightest:     가장 밝은 별의 등급. 없으면 None.
-    horizon_deg:   그 방위의 지형 지평선(도). 안 받았으면 None.
     sky_stars:     경계 안 성표 별 수(Vmag <= 6.5) — **얼마나 촘촘하냐**의 분모.
     visible_sky:   그중 이 하늘에서 잡히는 수. 달이 밝으면 여기가 먼저 줄어든다.
     visible_sky_dark: 달빛이 없었다면 잡혔을 수. 견줄 하늘을 안 받았으면 None.
@@ -242,7 +250,6 @@ class Constellation:
     visible_stars: int
     total_stars: int
     brightest: float | None
-    horizon_deg: float | None = None
     sky_stars: int = 0
     visible_sky: int = 0
     visible_sky_dark: int | None = None
@@ -257,11 +264,6 @@ class Constellation:
         )
 
     @property
-    def hidden(self) -> bool:
-        """지형에 가려 못 보는가 — 그것만 아니면 알아봤을 것."""
-        return self.blocked and self.visible_stars >= _MIN_LINE_STARS
-
-    @property
     def lost(self) -> bool:
         """달이 없었다면 알아봤을 텐데 오늘은 못 알아보는가.
 
@@ -271,22 +273,8 @@ class Constellation:
         return (
             self.visible_stars_dark is not None
             and self.up
-            and not self.blocked
             and self.visible_stars_dark >= _MIN_LINE_STARS
             and self.visible_stars < _MIN_LINE_STARS
-        )
-
-    @property
-    def blocked(self) -> bool:
-        """지평 위에 있지만 **지형에 가려** 안 보이는가.
-
-        지평선을 안 받았으면 모르는 것이므로 False 다 — 모르는 것을 막혔다고
-        하면 볼 수 있는 별자리를 지워 버린다.
-        """
-        return (
-            self.horizon_deg is not None
-            and self.altitude_deg > HORIZON_DEG
-            and self.altitude_deg < self.horizon_deg
         )
 
     @property
@@ -304,14 +292,24 @@ class Constellation:
         """이 하늘에서 별자리라고 알아볼 만한가.
 
         가장 밝은 별 하나만 걸리는 것으로는 '별자리가 보인다'고 하지 않는다 —
-        선을 이으려면 별이 둘 이상 필요하다. 지형에 가린 것도 빠진다.
+        선을 이으려면 별이 둘 이상 필요하다.
         """
-        return (
-            self.up and not self.blocked and self.visible_stars >= _MIN_LINE_STARS
-        )
+        return self.up and self.visible_stars >= _MIN_LINE_STARS
 
 
 # --- 보조 --------------------------------------------------------------------
+
+def hand_span(deg: float) -> str:
+    """고도각(도)을 **팔 뻗은 손**의 단위로 옮긴다 — "주먹 2개".
+
+    주먹 하나가 10도이므로 낮게 뜬 별(대개 0~30도)은 주먹 한두 개로 떨어지고,
+    그보다 낮으면 손가락으로 센다.
+    """
+    for edge, label in _HAND:
+        if deg < edge:
+            return label
+    return f"주먹 {max(round(deg / FIST_DEG), 1):.0f}개"
+
 
 def bearing_ko(azimuth_deg: float) -> str:
     """방위각(도) → 8방위. 북이 0도이고 시계방향으로 잰다."""
@@ -332,7 +330,6 @@ def assess(
     lon: float,
     when: datetime,
     bortle: int | None = None,
-    horizon: dict[str, float] | None = None,
     bortle_dark: int | None = None,
 ) -> list[Constellation]:
     """(lat, lon, when) 에서 본 별자리 전부. 고도 높은 순으로 돌려준다.
@@ -342,8 +339,6 @@ def assess(
         when: 관측 시각(tz-aware).
         bortle: 그 하늘의 Bortle 등급. 달빛까지 반영하려면 `darkness.assess_sky` 의
                 값을 넘긴다 — 그러면 달이 뜬 시각에 보이는 별자리가 저절로 줄어든다.
-        horizon: 방위별 지형 지평선(`horizon.profile`). 넘기면 그보다 낮은 별자리가
-                `blocked` 가 된다. 안 넘기면 지형을 모르는 것으로 둔다.
         bortle_dark: **달빛을 뺀** 그 자리의 등급(`darkness.assess_site`). 넘기면
                 같은 별자리를 두 하늘에서 세어 `visible_sky_dark` 를 채운다 — 달이
                 무엇을 지웠는지 말하려면 지우기 전 값이 있어야 한다. 성표 조회는
@@ -380,7 +375,6 @@ def assess(
                 visible_stars=sum(1 for m in mags if m <= limit),
                 total_stars=len(mags),
                 brightest=mags[0] if mags else None,
-                horizon_deg=None if horizon is None else horizon.get(bearing),
                 sky_stars=len(sky_mags),
                 visible_sky=sum(1 for m in sky_mags if m <= limit),
                 visible_sky_dark=(
@@ -435,7 +429,6 @@ def describe(
     got: list[Constellation],
     *,
     brief: bool = False,
-    explain_fist: bool = True,
     cloud_cover: float | None = None,
 ) -> list[str]:
     """별자리를 **보이느냐 마느냐**로 끊어 말한다. 볼 것이 없으면 빈 목록.
@@ -446,8 +439,8 @@ def describe(
     한 줄이 한 가지 답을 한다.
 
         볼 수 있어요            고도 30도 위 — 서서 고개만 들면 된다
-        낮아서 놓치기 쉬워요     떠 있지만 낮다 — 그쪽이 트여야 보인다
-        안 보여요               달빛에 묻혔거나 지형에 가렸다(괄호에 이유)
+        낮아서 놓치기 쉬워요     떠 있지만 낮다 — 오름·나무에 가릴 수 있는 높이다
+        달빛에 묻혀 안 보여요    선 별까지 묻혀 알아볼 수 없다 — 날짜를 바꾸면 보인다
 
     센 수(`visible_sky` 등)는 문장에 넣지 않는다. "달이 없으면 2,443개인데 오늘은
     725개" 는 사실이지만, 갈지 말지를 정하는 사람이 읽을 말은 아니다 — 수치는
@@ -455,7 +448,6 @@ def describe(
 
     Args:
         brief: 판정이 '불가'인 밤이면 True. 한 줄만 낸다.
-        explain_fist: '주먹'이 몇 도인지 여기서 알려 줄지. 지평선 축과 나눠 쓴다.
         cloud_cover: 그 시각의 총운량(%). 받으면 "볼 수 있어요" 를 그만큼 물린다 —
                      이 축은 구름을 모르므로, 모르는 채로 단정하지 않기 위해서다.
     """
@@ -484,29 +476,21 @@ def describe(
 
     if low:
         # 낮게 뜬 것만 높이를 붙인다 — 여기서는 높이가 곧 '보이느냐'라서다.
+        # 높은 것부터 셋만. 지평 언저리까지 다 세면 새끼손가락 하나 높이(1~2도)에
+        # 걸친 것들이 붙는데, 그것들은 대기만으로도 흐려져 사실상 못 본다.
         names = "·".join(
-            f"{c.korean}({c.bearing}·{hand_span(c.altitude_deg)})" for c in low
+            f"{c.korean}({c.bearing}·{hand_span(c.altitude_deg)})" for c in low[:3]
         )
-        note = FIST_NOTE_TAIL if explain_fist else ""
-        lines.append(f"낮아서 놓치기 쉬워요 — {names}{note}")
+        more = f" 외 {len(low) - 3}개" if len(low) > 3 else ""
+        lines.append(f"낮아서 놓치기 쉬워요 — {names}{more}{_FIST_NOTE_TAIL}")
 
-    # 못 보는 것은 **이유를 괄호에** 단다. 달빛은 날짜를 바꾸면 되고 지형은 자리를
-    # 옮겨야 하니, 사용자가 할 수 있는 일이 다르다.
-    #
-    # 지형에 가린 것은 **원래 짚어 줬을 것**만 말한다. 지평선 언저리에는 늘 무언가
-    # 걸쳐 있어서 다 세면 조각가자리·망원경자리 같은 이름이 예닐곱 개씩 나오는데,
-    # 그것들은 지형이 없어도 안내에 안 나왔을 별자리다 — 없던 아쉬움을 만든다.
-    # 달빛에 묻힌 것은 밝기와 무관하게 다 말한다. 날짜를 바꾸면 볼 수 있어서다.
-    gone = [(c, "달빛") for c in got if c.lost]
-    gone += [
-        (c, "지형") for c in got
-        if c.hidden and c.brightest is not None and c.brightest <= FIRST_MAGNITUDE
-    ]
+    # 달빛에 묻힌 것은 밝기와 무관하게 다 말한다 — 날짜를 바꾸면 볼 수 있어서다.
+    gone = [c for c in got if c.lost]
     if gone:
         # 밝은 것부터 — 이름을 알아볼 만한 것이 앞에 와야 잘린 뒤가 아쉽지 않다.
-        gone.sort(key=lambda p: p[0].brightest if p[0].brightest is not None else 99)
-        shown = "·".join(f"{c.korean}({why})" for c, why in gone[:3])
+        gone.sort(key=lambda c: c.brightest if c.brightest is not None else 99)
+        shown = "·".join(c.korean for c in gone[:3])
         more = f" 외 {len(gone) - 3}개" if len(gone) > 3 else ""
-        lines.append(f"안 보여요 — {shown}{more}")
+        lines.append(f"달빛에 묻혀 안 보여요 — {shown}{more}")
 
     return lines

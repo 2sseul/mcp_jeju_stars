@@ -30,6 +30,7 @@ class EngineState(TypedDict, total=False):
     state_code: int | None  # 박명 구간 값(0=완전한 밤)
     cloud: float | None  # 총운량 %
     visibility: float | None  # 시정 m
+    weather: dict | None  # 판정에 안 쓰는 기상값(기온·체감·습도·바람·강수·기상코드)
     verdict: str | None  # 판정 등급(최적/양호/밝은 별 한정/불가)
     possible: bool | None  # 밝은 별이라도 볼 수 있는가
     darkness_cap: str | None  # 광공해가 정한 등급 상한(darkness → judge 로 전달)

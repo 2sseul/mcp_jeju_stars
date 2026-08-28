@@ -18,6 +18,12 @@ DEM_GRID   = DATA / "elevation" / "jeju_dem_grid.npz"
 DEM_RAW    = DATA / "elevation" / "N33E126_FABDEM_V1-2.tif"
 SPOTS      = DATA / "jeju_spots.json"
 
+# 별자리 — 구성(어떤 별들이 그 별자리를 이루나)과 그 별들의 좌표·등급을 합쳐 둔 것.
+# 표고 격자와 달리 **커밋한다**. 두 출처(Stellarium CC BY-SA 4.0 · Hipparcos)가
+# 재배포를 허용하고 크기도 작아서다. 귀속은 파일 안 `meta.sources` 에 함께 실린다.
+# `scripts/build_constellations.py` 가 만든다.
+CONSTELLATIONS = DATA / "constellations" / "constellations.json"
+
 # 마커에 얹는 그림. `icon/` 의 원본을 `scripts/build_icons.py` 가 마커 크기(56px)로
 # 줄여 둔 것이고, 파일 이름이 마커 갈래다(spot·parking·toilet). 지도 HTML 이 이것을
 # 통째로 품고 나가므로(base64) 원본을 그대로 쓸 수 없다 — 셋이 합쳐 3.4MB 다.
